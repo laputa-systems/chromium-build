@@ -1,0 +1,57 @@
+{
+  "schema": 1,
+  "chromium_version": "150.0.7871.114",
+  "layers": [
+    {
+      "project": "alpine",
+      "revision": "bc56128509194816d5cd3441d17c20ca2d71cc68",
+      "patches": [
+        {"name":"0001-hotfix-ignore-a-new-warning-in-rust-1.89.patch","state":"apply","replacement":null,"affected_paths":[]},
+        {"name":"compiler.patch","state":"apply","replacement":null,"affected_paths":[]},
+        {"name":"disable-dns_config_service.patch","state":"apply","replacement":null,"affected_paths":[]},
+        {"name":"disable-failing-tests.patch","state":"not-applicable","replacement":null,"affected_paths":["testing/","*_test.cc"]},
+        {"name":"fc-cache-version.patch","state":"apply","replacement":null,"affected_paths":[]},
+        {"name":"fix-ffmpeg-codec-list.patch","state":"apply","replacement":null,"affected_paths":[]},
+        {"name":"fstatat-32bit.patch","state":"not-applicable","replacement":null,"affected_paths":["base/files/file_util_posix.cc"]},
+        {"name":"gdbinit.patch","state":"not-applicable","replacement":null,"affected_paths":["tools/gdb/",".gdbinit"]},
+        {"name":"generic-sensor-include.patch","state":"apply","replacement":null,"affected_paths":[]},
+        {"name":"headless-shell-no-license.patch","state":"not-applicable","replacement":null,"affected_paths":["headless/","headless_shell"]},
+        {"name":"musl-sandbox.patch","state":"apply","replacement":null,"affected_paths":[]},
+        {"name":"musl-tid-caching.patch","state":"apply","replacement":null,"affected_paths":[]},
+        {"name":"net-test-no-vpython.patch","state":"not-applicable","replacement":null,"affected_paths":["net/","test/"]},
+        {"name":"net-test-pyws3-py3.12.patch","state":"not-applicable","replacement":null,"affected_paths":["net/","test/"]},
+        {"name":"no-execinfo.patch","state":"apply","replacement":null,"affected_paths":[]},
+        {"name":"no-mallinfo.patch","state":"apply","replacement":null,"affected_paths":[]},
+        {"name":"no-res-ninit-nclose.patch","state":"apply","replacement":null,"affected_paths":[]},
+        {"name":"no-sandbox-settls.patch","state":"apply","replacement":null,"affected_paths":[]},
+        {"name":"partalloc-no-tagging-arm64.patch","state":"apply","replacement":null,"affected_paths":[]},
+        {"name":"pvalloc.patch","state":"apply","replacement":null,"affected_paths":[]},
+        {"name":"temp-failure-retry.patch","state":"apply","replacement":null,"affected_paths":[]}
+      ]
+    },
+    {
+      "project": "copium",
+      "revision": "150.0",
+      "patches": [
+        {"name":"cr133-ffmpeg-no-noh264parse.patch","state":"apply","replacement":null,"affected_paths":[]},
+        {"name":"cr138-node-version-check.patch","state":"superseded","replacement":"portablelinux:node-version-check","affected_paths":["third_party/node/"]},
+        {"name":"cr140-musl-prctl.patch","state":"apply","replacement":null,"affected_paths":[]},
+        {"name":"cr143-libsync-__BEGIN_DECLS.patch","state":"apply","replacement":null,"affected_paths":[]},
+        {"name":"cr145-iwyu-dev_t.patch","state":"apply","replacement":null,"affected_paths":[]},
+        {"name":"cr145-musl-unfortify-SkDescriptor.patch","state":"apply","replacement":null,"affected_paths":[]},
+        {"name":"cr146-swiftshader-unfortify-memset-memcpy.patch","state":"not-applicable","replacement":null,"affected_paths":["gpu/command_buffer/service/swiftshader/","third_party/swiftshader/"]},
+        {"name":"cr146-unfortify-blink-display_item_list.patch","state":"apply","replacement":null,"affected_paths":[]},
+        {"name":"cr147-is-musl-libcxx.patch","state":"apply","replacement":null,"affected_paths":[]},
+        {"name":"cr147-simdutf-8.0-base-char.patch","state":"apply","replacement":null,"affected_paths":[]},
+        {"name":"cr148-rust-1.95-bytemuck.patch","state":"apply","replacement":null,"affected_paths":[]},
+        {"name":"cr148-v8-no-san-trap.patch","state":"apply","replacement":null,"affected_paths":[]},
+        {"name":"cr149-musl-alloc-shim-dispatch.patch","state":"apply","replacement":null,"affected_paths":[]},
+        {"name":"cr149-rust-toolchain-var.patch","state":"apply","replacement":null,"affected_paths":[]},
+        {"name":"cr149-unbundle-minizip-undo-unicode.patch","state":"apply","replacement":null,"affected_paths":[]},
+        {"name":"cr150-empty-ar.patch","state":"apply","replacement":null,"affected_paths":[]},
+        {"name":"cr150-ffmpeg-no-agtm.patch","state":"apply","replacement":null,"affected_paths":[]},
+        {"name":"cr150-no-sysroot-modules.patch","state":"apply","replacement":null,"affected_paths":[]}
+      ]
+    }
+  ]
+}

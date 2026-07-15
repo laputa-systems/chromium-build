@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "chromium": {
+    "version": "150.0.7871.114",
+    "devtools_revision": "ec97cf3bbeea2cb623fbf97c4e3f22f5acb4d568",
+    "archive_sha512": "c6ab88182810bbf9423f01c1c4d02abfb3dcec8c182095ddfae5a49bb3817aef21a43eb743dcc95a6418ffaa54f3a8a4686795fb2e7be67f4c3d0ab489f0ee66"
+  },
+  "source_identity": {
+    "schema": 1,
+    "chromium_version": "150.0.7871.114",
+    "devtools_revision": "ec97cf3bbeea2cb623fbf97c4e3f22f5acb4d568"
+  },
+  "base": {
+    "release": "3.24.1",
+    "digests": {
+      "arm64": "sha256:e7a1a92a5bfeee40966aea60f0796b0e7917cc35591542701834f03a68fa3d18",
+      "amd64": "sha256:79ff19e9084a00eece421b2523fb93e22d730e2c0e525905de047e848e56d95f"
+    }
+  },
+  "toolchain": {
+    "version": "22.1.8",
+    "root": "/opt/llvm-musl",
+    "clang_cfg_sha256": "a559cebb4529d700d0233e553c117990d4cd3e59936e15bbf21b9a49a65ea486",
+    "clangxx_cfg_sha256": "a760de264e4ee315f74cb79c1971d21e12e31d37fb45691a2efeb45d5a56a44a",
+    "architectures": {
+      "arm64": {
+        "linux_arch": "aarch64",
+        "chromium_cpu": "arm64",
+        "target_triple": "aarch64-unknown-linux-musl",
+        "archive_filename": "clang+llvm-22.1.8-aarch64-linux-musl.tar.xz",
+        "archive_size": 73611888,
+        "archive_url": "https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-22.1.8/clang+llvm-22.1.8-aarch64-linux-musl.tar.xz",
+        "archive_sha256": "675f9cf871313a5672a63882d4d30dd6dd55df0aa9caee70970542eb03a23da3"
+      },
+      "amd64": {
+        "linux_arch": "x86_64",
+        "chromium_cpu": "x64",
+        "target_triple": "x86_64-unknown-linux-musl",
+        "archive_filename": "clang+llvm-22.1.8-x86_64-linux-musl.tar.xz",
+        "archive_size": 78039176,
+        "archive_url": "https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-22.1.8/clang+llvm-22.1.8-x86_64-linux-musl.tar.xz",
+        "archive_sha256": "ac0bd443a1933bbd2c0efbedf6ebc97ff8ca2469e5ba65eadb966fb75f65dd1c"
+      }
+    }
+  },
+  "ccache": {
+    "path": "/usr/bin/ccache",
+    "package": "ccache=4.13.6-r0",
+    "license": "GPL-3.0-or-later",
+    "cache_root": "/ccache",
+    "temp_root": "/ccache/tmp",
+    "max_size": "10G",
+    "compiler_check": "content",
+    "compress": true,
+    "compress_level": 1,
+    "sloppiness": null,
+    "base_dir": null,
+    "namespace": "{architecture}-{toolchain_sha256}"
+  },
+  "system_library_policy": {
+    "schema": 1,
+    "ffmpeg_roots": ["libavcodec.so", "libavformat.so", "libavutil.so"],
+    "forbidden_sonames": ["libc.so.6", "libstdc++.so.6", "libgcc_s.so.1"],
+    "builder_only_sonames": ["libstdc++.so.6", "libgcc_s.so.1"],
+    "exception_descendants": ["libavcodec.so", "libavformat.so", "libavutil.so"]
+  }
+}

@@ -1,0 +1,11 @@
+.git
+out
+stage
+test-output
+*.tar
+*.tar.xz
+*.zst
+*.zip
+*.dmg
+__pycache__
+*.pyc

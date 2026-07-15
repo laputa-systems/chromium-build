@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "required": [
+    "environment_compatibility_id",
+    "package_lock_sha256",
+    "policy_sha256",
+    "unclassified_edges",
+    "glibc_entries",
+    "exception_leaks",
+    "ccache_runtime_classification"
+  ],
+  "proposed_roots": [
+    "libavcodec.so",
+    "libavformat.so",
+    "libavutil.so",
+    "libEGL.so",
+    "libGLESv2.so",
+    "libgbm.so",
+    "libdrm.so",
+    "libnss3.so"
+  ],
+  "ffmpeg_roots": [
+    "libavcodec.so",
+    "libavformat.so",
+    "libavutil.so"
+  ],
+  "exception_sonames": [
+    "libstdc++.so.6",
+    "libgcc_s.so.1",
+    "libX11.so.6",
+    "libXext.so.6",
+    "libxcb.so.1",
+    "libva.so.2",
+    "libvdpau.so.1",
+    "libssl.so.3",
+    "libcrypto.so.3"
+  ],
+  "zero_fields": ["unclassified_edges", "glibc_entries", "exception_leaks"],
+  "ccache_runtime_classification": "builder-only"
+}

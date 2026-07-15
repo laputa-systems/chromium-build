@@ -1,0 +1,56 @@
+{
+  "schema": 1,
+  "layers": [
+    {
+      "project": "alpine",
+      "revision": "bc56128509194816d5cd3441d17c20ca2d71cc68",
+      "patches": [
+        "0001-hotfix-ignore-a-new-warning-in-rust-1.89.patch",
+        "compiler.patch",
+        "disable-dns_config_service.patch",
+        "disable-failing-tests.patch",
+        "fc-cache-version.patch",
+        "fix-ffmpeg-codec-list.patch",
+        "fstatat-32bit.patch",
+        "gdbinit.patch",
+        "generic-sensor-include.patch",
+        "headless-shell-no-license.patch",
+        "musl-sandbox.patch",
+        "musl-tid-caching.patch",
+        "net-test-no-vpython.patch",
+        "net-test-pyws3-py3.12.patch",
+        "no-execinfo.patch",
+        "no-mallinfo.patch",
+        "no-res-ninit-nclose.patch",
+        "no-sandbox-settls.patch",
+        "partalloc-no-tagging-arm64.patch",
+        "pvalloc.patch",
+        "temp-failure-retry.patch"
+      ]
+    },
+    {
+      "project": "copium",
+      "revision": "150.0",
+      "patches": [
+        "cr133-ffmpeg-no-noh264parse.patch",
+        "cr138-node-version-check.patch",
+        "cr140-musl-prctl.patch",
+        "cr143-libsync-__BEGIN_DECLS.patch",
+        "cr145-iwyu-dev_t.patch",
+        "cr145-musl-unfortify-SkDescriptor.patch",
+        "cr146-swiftshader-unfortify-memset-memcpy.patch",
+        "cr146-unfortify-blink-display_item_list.patch",
+        "cr147-is-musl-libcxx.patch",
+        "cr147-simdutf-8.0-base-char.patch",
+        "cr148-rust-1.95-bytemuck.patch",
+        "cr148-v8-no-san-trap.patch",
+        "cr149-musl-alloc-shim-dispatch.patch",
+        "cr149-rust-toolchain-var.patch",
+        "cr149-unbundle-minizip-undo-unicode.patch",
+        "cr150-empty-ar.patch",
+        "cr150-ffmpeg-no-agtm.patch",
+        "cr150-no-sysroot-modules.patch"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+ARCH=arm64
+PROFILE=headless-debug
+IMAGE=${CHROMIUM_BUILDER_IMAGE:-}
+WORK_VOLUME=${CHROMIUM_WORK_VOLUME:-}
+CACHE_VOLUME=${CHROMIUM_CACHE_VOLUME:-}
+
+fail() {
+    echo "chromium-build: $*" >&2
+    exit 1
+}
+
+usage() {
+    printf '%s\n' \
+        'usage: chromium-build [--arch arm64|amd64] [--profile headless-debug] image|gate-a|gate-b|gate-c|poc' \
+        '       chromium-build image [--arch arm64|amd64]' \
+        '       chromium-build gate-a|gate-b|gate-c|poc [--arch arm64|amd64]'
+}
+
+command_name=
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --arch)
+            [ "$#" -ge 2 ] || fail '--arch needs a value'
+            ARCH=$2
+            shift 2
+            ;;
+        --profile)
+            [ "$#" -ge 2 ] || fail '--profile needs a value'
+            PROFILE=$2
+            shift 2
+            ;;
+        image|gate-a|gate-b|gate-c|poc)
+            [ -z "$command_name" ] || fail 'only one command may be selected'
+            command_name=$1
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            fail "unknown argument $1"
+            ;;
+    esac
+done
+[ -n "$command_name" ] || { usage >&2; exit 2; }
+case "$ARCH" in arm64|amd64) ;; *) fail "unsupported architecture $ARCH" ;; esac
+[ "$PROFILE" = headless-debug ] || fail "Gate A/B/C only support headless-debug"
+
+case "$ARCH" in
+    arm64)
+        platform=linux/arm64
+        base_image=alpine@sha256:e7a1a92a5bfeee40966aea60f0796b0e7917cc35591542701834f03a68fa3d18
+        llvm_url=https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-22.1.8/clang+llvm-22.1.8-aarch64-linux-musl.tar.xz
+        llvm_sha256=675f9cf871313a5672a63882d4d30dd6dd55df0aa9caee70970542eb03a23da3
+        llvm_size=73611888
+        ;;
+    amd64)
+        platform=linux/amd64
+        base_image=alpine@sha256:79ff19e9084a00eece421b2523fb93e22d730e2c0e525905de047e848e56d95f
+        llvm_url=https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-22.1.8/clang+llvm-22.1.8-x86_64-linux-musl.tar.xz
+        llvm_sha256=ac0bd443a1933bbd2c0efbedf6ebc97ff8ca2469e5ba65eadb966fb75f65dd1c
+        llvm_size=78039176
+        ;;
+esac
+
+IMAGE=${IMAGE:-ungoogled-chromium-builder:150.0.7871.114-$ARCH}
+WORK_VOLUME=${WORK_VOLUME:-ungoogled-chromium-work-$ARCH}
+CACHE_VOLUME=${CACHE_VOLUME:-ungoogled-chromium-ccache-$ARCH}
+
+native_arch=$(docker info --format '{{.Architecture}}' 2>/dev/null || true)
+case "$native_arch" in
+    aarch64|arm64) native_arch=arm64 ;;
+    x86_64|amd64) native_arch=amd64 ;;
+esac
+[ "$native_arch" = "$ARCH" ] || fail "requested $ARCH is not the native Docker architecture ($native_arch)"
+
+if [ "$command_name" = image ]; then
+    docker build --platform "$platform" \
+        --build-arg TARGET_ARCH="$ARCH" \
+        --build-arg BASE_IMAGE="$base_image" \
+        --build-arg LLVM_URL="$llvm_url" \
+        --build-arg LLVM_SHA256="$llvm_sha256" \
+        --build-arg LLVM_SIZE="$llvm_size" \
+        -t "$IMAGE" "$ROOT"
+    docker image inspect "$IMAGE" --format 'image={{.Id}}'
+    exit 0
+fi
+
+docker image inspect "$IMAGE" >/dev/null 2>&1 || fail "missing $IMAGE; run chromium-build image first"
+docker volume create "$WORK_VOLUME" >/dev/null
+docker volume create "$CACHE_VOLUME" >/dev/null
+image_digest=$(docker image inspect "$IMAGE" --format '{{.Id}}')
+
+run_gate() {
+    local gate=$1
+    docker run --rm --network=none \
+        -e CHROMIUM_ARCH="$ARCH" \
+        -e CHROMIUM_PROFILE="$PROFILE" \
+        -e BUILDER_IMAGE_DIGEST="$image_digest" \
+        -e CHROMIUM_METADATA_ROOT=/work/metadata \
+        -e APK_MANIFEST="/opt/chromium-build-metadata/packages.$ARCH.txt" \
+        -e ENVIRONMENT_METADATA="/opt/chromium-build-metadata/environment.json" \
+        -e SYSTEM_LIBRARY_PREFLIGHT="/opt/chromium-build-metadata/system-library-preflight.json" \
+        -e CCACHE_VOLUME="$CACHE_VOLUME" \
+        -v "$WORK_VOLUME:/work" \
+        -v "$CACHE_VOLUME:/ccache" \
+        "$IMAGE" "/opt/chromium-build/scripts/$gate"
+}
+
+case "$command_name" in
+    gate-a) run_gate verify-environment.sh ;;
+    gate-b) run_gate run-probes.sh ;;
+    gate-c) run_gate verify-source.sh ;;
+    poc)
+        run_gate verify-environment.sh
+        run_gate run-probes.sh
+        ;;
+esac
