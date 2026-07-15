@@ -1,7 +1,34 @@
 {
   "schema": 1,
   "chromium_version": "150.0.7871.114",
+  "patch_application": {"max_fuzz": 2},
   "layers": [
+    {
+      "project": "portablelinux",
+      "revision": "0033e274f91ec6aa57a36a486f41f46d801e381d",
+      "patches": [
+        {
+          "name": "drop-nodejs-version-check.patch",
+          "state": "not-applicable",
+          "replacement": null,
+          "affected_paths": ["third_party/node/node.gni", "third_party/protobuf/proto_library.gni"],
+          "reason": "The ungoogled source layer already contains this change."
+        },
+        {
+          "name": "fix-compiling-on-arm64.patch",
+          "state": "not-applicable",
+          "replacement": null,
+          "affected_paths": ["build/toolchain/linux/BUILD.gn", "tools/rust/"],
+          "reason": "The Laputa profile uses its external musl LLVM/Rust toolchain and does not invoke this Chromium host-Rust bootstrap path."
+        },
+        {
+          "name": "use-oauth2-client-switches-as-default.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": []
+        }
+      ]
+    },
     {
       "project": "alpine",
       "revision": "bc56128509194816d5cd3441d17c20ca2d71cc68",

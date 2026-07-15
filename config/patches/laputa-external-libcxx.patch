@@ -1,0 +1,51 @@
+diff --git a/build/config/BUILD.gn b/build/config/BUILD.gn
+--- a/build/config/BUILD.gn
++++ b/build/config/BUILD.gn
+@@ -287,1 +287,1 @@
+-  if (use_custom_libcxx) {
++  if (use_custom_libcxx && !use_laputa_libcxx) {
+diff --git a/build/config/c++/c++.gni b/build/config/c++/c++.gni
+--- a/build/config/c++/c++.gni
++++ b/build/config/c++/c++.gni
+@@ -28,1 +28,5 @@
+   use_custom_libcxx_for_host = true
++
++  # Use the validated static libc++ supplied by the Laputa toolchain.
++  use_laputa_libcxx = false
++
+@@ -141,1 +145,3 @@
+ libcxxabi_prefix = "//third_party/libc++abi/src"
++laputa_libcxx_include_dir = "/opt/llvm-musl/include/c++/v1"
++laputa_libcxx_library_dir = "/opt/llvm-musl/lib"
+diff --git a/build/config/c++/BUILD.gn b/build/config/c++/BUILD.gn
+--- a/build/config/c++/BUILD.gn
++++ b/build/config/c++/BUILD.gn
+@@ -36,1 +36,3 @@
+-  include_dirs += [ "//buildtools/third_party/libc++" ]
++  if (!use_laputa_libcxx) {
++    include_dirs += [ "//buildtools/third_party/libc++" ]
++  }
+@@ -84,5 +84,18 @@
+-    cflags_cc += [
+-      "-nostdinc++",
+-      "-isystem" + rebase_path("$libcxx_prefix/include", root_build_dir),
+-      "-isystem" + rebase_path("$libcxxabi_prefix/include", root_build_dir),
+-    ]
++    if (use_laputa_libcxx) {
++      cflags_cc += [
++        "-nostdinc++",
++        "-isystem" + laputa_libcxx_include_dir,
++      ]
++      ldflags += [
++        "-nostdlib++",
++        laputa_libcxx_library_dir + "/libc++.a",
++        laputa_libcxx_library_dir + "/libc++abi.a",
++        laputa_libcxx_library_dir + "/libunwind.a",
++      ]
++    } else {
++      cflags_cc += [
++        "-nostdinc++",
++        "-isystem" + rebase_path("$libcxx_prefix/include", root_build_dir),
++        "-isystem" + rebase_path("$libcxxabi_prefix/include", root_build_dir),
++      ]
++    }

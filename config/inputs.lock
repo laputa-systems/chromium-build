@@ -3,7 +3,40 @@
   "chromium": {
     "version": "150.0.7871.114",
     "devtools_revision": "ec97cf3bbeea2cb623fbf97c4e3f22f5acb4d568",
+    "archive_filename": "chromium-150.0.7871.114-linux.tar.xz",
+    "archive_url": "https://github.com/chromium-linux-tarballs/chromium-tarballs/releases/download/150.0.7871.114/chromium-150.0.7871.114-linux.tar.xz",
+    "archive_size": 1670274328,
     "archive_sha512": "c6ab88182810bbf9423f01c1c4d02abfb3dcec8c182095ddfae5a49bb3817aef21a43eb743dcc95a6418ffaa54f3a8a4686795fb2e7be67f4c3d0ab489f0ee66"
+  },
+  "source_inputs": {
+    "ungoogled": {
+      "revision": "2d89b04e1b68385c9086efab0df1e3679b35246e",
+      "filename": "ungoogled-2d89b04e1b68385c9086efab0df1e3679b35246e.tar.gz",
+      "url": "https://github.com/ungoogled-software/ungoogled-chromium/archive/2d89b04e1b68385c9086efab0df1e3679b35246e.tar.gz",
+      "size": 669641,
+      "sha512": "645d45ec4e48cb3052e89eed21ca4845d6d84e55be818c6e33d6ae3cbbe55a65501f34d0e02ba10b80022ef6801169c878ab28b8d35e600d4894bf8abf55ca49"
+    },
+    "portablelinux": {
+      "revision": "0033e274f91ec6aa57a36a486f41f46d801e381d",
+      "filename": "portablelinux-0033e274f91ec6aa57a36a486f41f46d801e381d.tar.gz",
+      "url": "https://github.com/ungoogled-software/ungoogled-chromium-portablelinux/archive/0033e274f91ec6aa57a36a486f41f46d801e381d.tar.gz",
+      "size": 13680,
+      "sha512": "76db5fc229b484ba6d04ccfa163a97051e3e71a8d166b1071123277743efd164390251003ef29bc82bd342926ef40e7befc258faa8cd5fd50054a63330b69d1e"
+    },
+    "alpine": {
+      "revision": "bc56128509194816d5cd3441d17c20ca2d71cc68",
+      "filename": "alpine-aports-bc56128509194816d5cd3441d17c20ca2d71cc68.tar.gz",
+      "url": "https://gitlab.alpinelinux.org/alpine/aports/-/archive/bc56128509194816d5cd3441d17c20ca2d71cc68/aports-bc56128509194816d5cd3441d17c20ca2d71cc68.tar.gz",
+      "size": 13982065,
+      "sha512": "aee791c8ea8d8a8083a8d0d99e85df1ac5bf0b532e9dccdfe0d48f4e53c05c2aa77a950b4d1c064d63edbe056e96efc8a46a6e2e4c2e3de84ff319c42b77cd4e"
+    },
+    "copium": {
+      "revision": "150.0",
+      "filename": "copium-150.0.tar.gz",
+      "url": "https://codeberg.org/selfisekai/copium/archive/150.0.tar.gz",
+      "size": 14203,
+      "sha512": "7b8316b95c103a1a992d48839ff4c460fde655707fc6e150cf0ec916d64df19ee002a3396d177134bba5fd6e3fefcd930a0f3d49bd23ad51bd459502ef1a5533"
+    }
   },
   "source_identity": {
     "schema": 1,

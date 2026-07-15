@@ -81,6 +81,9 @@ def patch_checks(args, lock):
     inventory = read_json(args.patch_inventory)
     disposition = read_json(args.patch_disposition)
     require(inventory.get("schema") == disposition.get("schema"), "patch manifests use different schemas")
+    patch_application = disposition.get("patch_application", {})
+    max_fuzz = patch_application.get("max_fuzz", 0)
+    require(isinstance(max_fuzz, int) and max_fuzz >= 0, "patch application has an invalid fuzz limit")
 
     expected_layers = [(layer["project"], layer["revision"], layer["patches"]) for layer in inventory["layers"]]
     actual_layers = []
@@ -113,6 +116,7 @@ def patch_checks(args, lock):
         require(isinstance(item.get("strip_level"), int) and item["strip_level"] >= 0, f"patch {name} has no strip level")
         require(isinstance(item.get("offset"), int) and isinstance(item.get("fuzz"), int), f"patch {name} has no offset/fuzz record")
         require(isinstance(item.get("deterministic_options"), dict), f"patch {name} has no deterministic options")
+        require(item["deterministic_options"].get("fuzz_limit") == max_fuzz, f"patch {name} used an unexpected fuzz limit")
         state = disposition_entry["state"]
         if state == "apply":
             require(item.get("result") == "applied", f"patch {name} was not applied")
@@ -164,6 +168,7 @@ def toolchain_checks(args):
     for key in ("compiler", "cxx", "linker", "ar", "rust_linker"):
         value = selection.get(key, "")
         require(value.startswith("/opt/llvm-musl/"), f"toolchain selection {key} is outside Laputa")
+    require(selection.get("rust_target_triple") in {"aarch64-alpine-linux-musl", "x86_64-alpine-linux-musl"}, "Rust target triple is not an approved Alpine musl target")
 
 
 def unbundle_checks(args):

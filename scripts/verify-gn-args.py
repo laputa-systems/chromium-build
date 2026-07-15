@@ -27,6 +27,17 @@ def parse_args(path):
     return values
 
 
+def parse_value(value):
+    if value == "true":
+        return True
+    if value == "false":
+        return False
+    try:
+        return ast.literal_eval(value)
+    except (SyntaxError, ValueError):
+        return value
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--args", type=Path, required=True)
@@ -46,6 +57,8 @@ def main():
         "is_clang": True,
         "is_musl": True,
         "use_sysroot": False,
+        "rust_sysroot_absolute": "/usr",
+        "rust_bindgen_root": "/usr",
         "use_lld": True,
         "clang_base_path": "/opt/llvm-musl",
         "clang_version": args.clang_major,
@@ -55,32 +68,30 @@ def main():
         "is_component_build": False,
         "is_debug": True,
         "is_official_build": False,
+        "safe_browsing_mode": 0,
         "symbol_level": 0,
         "blink_symbol_level": 0,
         "v8_symbol_level": 0,
         "chrome_pgo_phase": 0,
         "is_cfi": False,
         "use_thin_lto": False,
-        "use_jumbo_build": False,
         "use_custom_libcxx": True,
+        "use_laputa_libcxx": True,
         "use_safe_libstdcxx": False,
         "use_ozone": True,
         "ozone_platform": "headless",
         "ozone_platform_headless": True,
-        "use_x11": False,
+        "use_xkbcommon": False,
         "ozone_platform_wayland": False,
         "use_gtk": False,
         "use_qt6": False,
         "use_alsa": False,
         "use_pulseaudio": False,
-        "use_pipewire": False,
         "rtc_use_pipewire": False,
         "rtc_link_pipewire": False,
         "use_vaapi": False,
         "enable_vulkan": False,
         "enable_swiftshader": False,
-        "use_system_ffmpeg": True,
-        "is_component_ffmpeg": True,
         "ffmpeg_branding": "Chrome",
         "proprietary_codecs": True,
         "enable_widevine": False,
@@ -94,7 +105,7 @@ def main():
     canonical = args.canonical.read_text(encoding="utf-8")
     effective = json.loads(args.effective_json.read_text(encoding="utf-8"))
     effective_values = {
-        item["name"]: item["current"]["value"]
+        item["name"]: parse_value(item["current"]["value"])
         for item in effective
         if "name" in item and "current" in item
     }

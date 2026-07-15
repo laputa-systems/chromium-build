@@ -42,7 +42,7 @@ if ! "$GN" gen "$OUT" --root="$SOURCE_ROOT" --fail-on-unused-args --args="$args"
 fi
 
 canonical_tmp="$METADATA/.gn-args.canonical.txt.tmp-$$"
-if ! "$GN" args "$OUT" --list --short >"$canonical_tmp" 2>"$METADATA/gn-args.log"; then
+if ! "$GN" args "$OUT" --root="$SOURCE_ROOT" --list --short >"$canonical_tmp" 2>"$METADATA/gn-args.log"; then
     cat "$METADATA/gn-args.log" >&2
     rm -f "$canonical_tmp"
     fail "cannot read canonical GN args"
@@ -50,7 +50,7 @@ fi
 mv "$canonical_tmp" "$METADATA/gn-args.canonical.txt"
 
 json_tmp="$METADATA/.gn-args.effective.json.tmp-$$"
-if ! "$GN" args "$OUT" --list --json >"$json_tmp" 2>>"$METADATA/gn-args.log"; then
+if ! "$GN" args "$OUT" --root="$SOURCE_ROOT" --list --json >"$json_tmp" 2>>"$METADATA/gn-args.log"; then
     rm -f "$json_tmp"
     fail "cannot read effective GN args JSON"
 fi

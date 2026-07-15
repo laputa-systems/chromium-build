@@ -2,6 +2,15 @@
   "schema": 1,
   "layers": [
     {
+      "project": "portablelinux",
+      "revision": "0033e274f91ec6aa57a36a486f41f46d801e381d",
+      "patches": [
+        "drop-nodejs-version-check.patch",
+        "fix-compiling-on-arm64.patch",
+        "use-oauth2-client-switches-as-default.patch"
+      ]
+    },
+    {
       "project": "alpine",
       "revision": "bc56128509194816d5cd3441d17c20ca2d71cc68",
       "patches": [

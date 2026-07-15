@@ -15,9 +15,9 @@ fail() {
 
 usage() {
     printf '%s\n' \
-        'usage: chromium-build [--arch arm64|amd64] [--profile headless-debug] image|gate-a|gate-b|gate-c|gate-d|poc' \
+        'usage: chromium-build [--arch arm64|amd64] [--profile headless-debug] image|fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-f|poc' \
         '       chromium-build image [--arch arm64|amd64]' \
-        '       chromium-build gate-a|gate-b|gate-c|gate-d|poc [--arch arm64|amd64]'
+        '       chromium-build fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-f|poc [--arch arm64|amd64]'
 }
 
 command_name=
@@ -33,7 +33,7 @@ while [ "$#" -gt 0 ]; do
             PROFILE=$2
             shift 2
             ;;
-        image|gate-a|gate-b|gate-c|gate-d|poc)
+        image|fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-f|poc)
             [ -z "$command_name" ] || fail 'only one command may be selected'
             command_name=$1
             shift
@@ -49,7 +49,7 @@ while [ "$#" -gt 0 ]; do
 done
 [ -n "$command_name" ] || { usage >&2; exit 2; }
 case "$ARCH" in arm64|amd64) ;; *) fail "unsupported architecture $ARCH" ;; esac
-[ "$PROFILE" = headless-debug ] || fail "Gate A/B/C/D only support headless-debug"
+[ "$PROFILE" = headless-debug ] || fail "Gate A/B/C/D/F only support headless-debug"
 
 case "$ARCH" in
     arm64)
@@ -96,6 +96,16 @@ docker volume create "$WORK_VOLUME" >/dev/null
 docker volume create "$CACHE_VOLUME" >/dev/null
 image_digest=$(docker image inspect "$IMAGE" --format '{{.Id}}')
 
+run_fetch() {
+    docker run --rm --network=bridge \
+        -e NETWORK_MODE=fetch \
+        -e CHROMIUM_ARCH="$ARCH" \
+        -e CHROMIUM_PROFILE="$PROFILE" \
+        -e CHROMIUM_METADATA_ROOT=/work/metadata \
+        -v "$WORK_VOLUME:/work" \
+        "$IMAGE" /opt/chromium-build/scripts/fetch-inputs.sh
+}
+
 run_gate() {
     local gate=$1
     docker run --rm --network=none \
@@ -113,14 +123,18 @@ run_gate() {
 }
 
 case "$command_name" in
+    fetch) run_fetch ;;
+    prepare) run_gate prepare-source.sh ;;
     gate-a) run_gate verify-environment.sh ;;
     gate-b) run_gate run-probes.sh ;;
     gate-c) run_gate verify-source.sh ;;
     gate-d) run_gate generate-gn.sh ;;
+    gate-f) run_gate audit-chrome-graph.sh ;;
     poc)
         run_gate verify-environment.sh
         run_gate run-probes.sh
         run_gate verify-source.sh
         run_gate generate-gn.sh
+        run_gate audit-chrome-graph.sh
         ;;
 esac

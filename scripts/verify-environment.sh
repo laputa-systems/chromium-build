@@ -59,7 +59,11 @@ source_stamp=${SOURCE_STAMP:-$WORK/metadata/source-complete.stamp}
 fetch_stamp=${FETCH_STAMP:-$WORK/metadata/fetch-complete.stamp}
 need_file "$source_stamp"
 need_file "$fetch_stamp"
-$PYTHON - "$LOCK" "$source_stamp" "$fetch_stamp" <<'PY'
+source_report=${SOURCE_INPUTS_REPORT:-$METADATA/source-inputs.json}
+fetch_report=${FETCH_INPUTS_REPORT:-$METADATA/fetch-inputs.json}
+need_file "$source_report"
+need_file "$fetch_report"
+$PYTHON - "$LOCK" "$source_report" "$fetch_report" <<'PY'
 import json
 import sys
 
@@ -77,7 +81,10 @@ with open(sys.argv[3], encoding="utf-8") as stream:
     fetch = json.load(stream)
 if fetch.get("status") != "complete":
     raise SystemExit(f"{sys.argv[3]}: status is not complete")
-if fetch.get("sha512") != lock["chromium"]["archive_sha512"]:
+if fetch.get("chromium_version") != lock["chromium"]["version"]:
+    raise SystemExit(f"{sys.argv[3]}: Chromium version does not match the input lock")
+chromium_entry = next((item for item in fetch.get("entries", []) if item.get("name") == "chromium"), None)
+if chromium_entry is None or chromium_entry.get("sha512") != lock["chromium"]["archive_sha512"]:
     raise SystemExit(f"{sys.argv[3]}: source archive digest does not match input lock")
 PY
 
