@@ -130,14 +130,14 @@ The trimmed Chromium archive is preferred because it omits multi-gigabyte materi
 - Commit the resulting installed-package manifest and compare it during image validation.
 - Use only Alpine 3.24 repositories. Do not mix edge packages into the environment.
 
-Alpine 3.24 provides the matching Chromium 150 generation of GN, Rust, samurai, ccache, FFmpeg, and related libraries. The current lock resolves Rust `1.96.0-r0` and ccache `4.13.6-r0`; the exact architecture-specific resolved locks remain authoritative if metadata changes. The Rust compiler package itself depends on Alpine GCC, libstdc++, and libgcc in the builder, which is the explicitly approved Rust-toolchain exception described above. Stock ccache independently uses the approved builder-only GNU/GPL exception. The custom C/C++ compiler remains LLVM 22.1.8 even if Alpine packages compiler-adjacent libraries built with another LLVM 22 patch release.
+Alpine 3.24 provides the matching Chromium 150 generation of GN, Rust, ccache, FFmpeg, and related libraries. Ninja 1.12.1 is built from its locked upstream source with the external musl toolchain. The current lock resolves Rust `1.96.0-r0` and ccache `4.13.6-r0`; the exact architecture-specific resolved locks remain authoritative if metadata changes. The Rust compiler package itself depends on Alpine GCC, libstdc++, and libgcc in the builder, which is the explicitly approved Rust-toolchain exception described above. Stock ccache independently uses the approved builder-only GNU/GPL exception. The custom C/C++ compiler remains LLVM 22.1.8 even if Alpine packages compiler-adjacent libraries built with another LLVM 22 patch release.
 
 Do not request Alpine `build-base`, GCC, G++, binutils, Clang, or LLD as generic build dependencies. Install individual development packages. The approved Alpine Rust package currently pulls GCC/libstdc++/libgcc transitively into the builder; retain them only because APK dependency resolution requires them. Do not add their directories ahead of `/opt/llvm-musl` in `PATH`, do not set any compiler variable to them, and fail if a Chromium compile/link command uses them. A transitive builder runtime may enter the shipped bundle only through the exact FFmpeg-exception closure.
 
 Builder tools include only what the source graph needs, grouped approximately as:
 
 - source and scripting: Bash, ca-certificates, curl, patch, Python, Perl, tar, xz, zstd;
-- generators and cache: Bison, Flex, gperf, Go, Node, GN, samurai, and the exact locked Alpine ccache package;
+- generators and cache: Bison, Flex, gperf, Go, Node, GN, Ninja, and the exact locked Alpine ccache package;
 - Rust: Alpine Rust, Cargo components required by Chromium, rust-bindgen, and rustfmt if the source graph requires it;
 - native platform headers: musl-dev, Linux headers, pkgconf, NSS/NSPR, GLib/DBus where structurally required;
 - selected system libraries and their `-dev` packages;
@@ -824,8 +824,10 @@ Add a repository-owned target under a clearly named source overlay such as `//to
 
 ### Gate F: Chrome graph dry-run and audit
 
-- Run a full Ninja dry-run of `chrome`.
-- Generate/inspect commands for the graph.
+The reproducible graph-oracle procedure, generated artifacts, regeneration commands, and verification checklist are documented in [ORACLE.md](ORACLE.md).
+
+- Run `ninja -n chrome` and record whether it reports regeneration, pending work, or no work.
+- Generate and inspect the complete target-scoped command list with `ninja -t commands chrome`; use the procedure in [ORACLE.md](ORACLE.md) to cross-check its counts.
 - Prove all C/C++ commands use the approved ccache wrapper over absolute custom LLVM compiler paths, while archive/link-only tools use custom LLVM directly.
 - Prove Chromium's in-tree libc++ targets are not scheduled.
 - Prove the generated graph uses the system-FFmpeg shims and does not schedule Chromium's bundled FFmpeg sources.
@@ -837,7 +839,7 @@ Passing the PoC must never automatically launch the full build.
 
 ## 14. Full build behavior
 
-The `build` command invokes samurai/Ninja for `chrome` only. It runs offline and uses the persistent profile output directory.
+The `build` command invokes Ninja for `chrome` only. It runs offline and uses the persistent profile output directory.
 
 The intended development loop is:
 

@@ -186,8 +186,12 @@ def main():
     counts = audit_commands(command_text, failures)
     if not command_text.strip():
         failures.append("command list is empty")
+    if args.dry_run_mode not in {"passed", "no-work"}:
+        failures.append(f"unknown Ninja dry-run mode: {args.dry_run_mode}")
     if not dry_run_text.strip():
         failures.append("Ninja dry-run output is empty")
+    if args.dry_run_mode == "no-work" and "ninja: no work to do" not in dry_run_text:
+        failures.append("Ninja dry-run was marked no-work without Ninja's no-work result")
     if counts["compile_commands"] == 0:
         failures.append("no C/C++ compile commands found")
     if counts["link_commands"] == 0:

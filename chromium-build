@@ -86,6 +86,9 @@ if [ "$command_name" = image ]; then
         --build-arg LLVM_URL="$llvm_url" \
         --build-arg LLVM_SHA256="$llvm_sha256" \
         --build-arg LLVM_SIZE="$llvm_size" \
+        --build-arg NINJA_SOURCE_URL=https://github.com/ninja-build/ninja/archive/refs/tags/v1.12.1.tar.gz \
+        --build-arg NINJA_SOURCE_SHA256=821bdff48a3f683bc4bb3b6f0b5fe7b2d647cf65d52aeb63328c91a6c6df285a \
+        --build-arg NINJA_SOURCE_SIZE=240483 \
         -t "$IMAGE" "$ROOT"
     docker image inspect "$IMAGE" --format 'image={{.Id}}'
     exit 0

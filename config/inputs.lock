@@ -43,6 +43,14 @@
     "chromium_version": "150.0.7871.114",
     "devtools_revision": "ec97cf3bbeea2cb623fbf97c4e3f22f5acb4d568"
   },
+  "build_tools": {
+    "ninja": {
+      "version": "1.12.1",
+      "source_url": "https://github.com/ninja-build/ninja/archive/refs/tags/v1.12.1.tar.gz",
+      "source_size": 240483,
+      "source_sha256": "821bdff48a3f683bc4bb3b6f0b5fe7b2d647cf65d52aeb63328c91a6c6df285a"
+    }
+  },
   "base": {
     "release": "3.24.1",
     "digests": {

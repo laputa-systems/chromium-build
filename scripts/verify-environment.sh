@@ -132,6 +132,9 @@ dumpmachine=$($CC -dumpmachine 2>/dev/null) || fail "cannot query compiler targe
 for tool in clang clang++ ld.lld llvm-ar llvm-ranlib llvm-nm llvm-strip llvm-objcopy; do
     need_file "$LLVM_ROOT/bin/$tool"
 done
+need_file /usr/local/bin/ninja
+[ "$(/usr/local/bin/ninja --version)" = 1.12.1 ] || fail "Ninja is not version 1.12.1"
+file /usr/local/bin/ninja | grep -Fq 'statically linked' || fail "Ninja is not statically linked"
 ld_version=$($LLVM_ROOT/bin/ld.lld --version 2>&1) || fail "cannot execute LLD"
 printf '%s\n' "$ld_version" | grep -Fq "$LLVM_VERSION" || fail "LLD version is not $LLVM_VERSION"
 : > "$METADATA/toolchain-config-sha256"

@@ -7,6 +7,9 @@ ARG TARGET_ARCH=arm64
 ARG LLVM_URL=https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-22.1.8/clang+llvm-22.1.8-aarch64-linux-musl.tar.xz
 ARG LLVM_SHA256=675f9cf871313a5672a63882d4d30dd6dd55df0aa9caee70970542eb03a23da3
 ARG LLVM_SIZE=73611888
+ARG NINJA_SOURCE_URL=https://github.com/ninja-build/ninja/archive/refs/tags/v1.12.1.tar.gz
+ARG NINJA_SOURCE_SHA256=821bdff48a3f683bc4bb3b6f0b5fe7b2d647cf65d52aeb63328c91a6c6df285a
+ARG NINJA_SOURCE_SIZE=240483
 
 RUN apk add --no-cache \
     bash=5.3.9-r1 \
@@ -36,7 +39,6 @@ RUN apk add --no-cache \
     rust=1.96.0-r0 \
     rust-bindgen=0.72.1-r1 \
     rustfmt=1.96.0-r0 \
-    samurai=1.2-r8 \
     tar=1.35-r5 \
     xz=5.8.3-r0 \
     zstd=1.5.7-r2
@@ -54,6 +56,23 @@ RUN set -eux; \
     test -f /opt/llvm-musl/lib/libc++.a; \
     test -f /opt/llvm-musl/lib/libc++abi.a; \
     test -f /opt/llvm-musl/lib/libunwind.a
+
+RUN set -eux; \
+    mkdir -p /tmp/ninja-source /usr/local/bin; \
+    curl -fsSL "$NINJA_SOURCE_URL" -o /tmp/ninja.tar.gz; \
+    test "$(stat -c %s /tmp/ninja.tar.gz)" = "$NINJA_SOURCE_SIZE"; \
+    echo "$NINJA_SOURCE_SHA256  /tmp/ninja.tar.gz" | sha256sum -c -; \
+    tar -xzf /tmp/ninja.tar.gz -C /tmp/ninja-source --strip-components=1; \
+    cd /tmp/ninja-source; \
+    target_triple=$([ "$TARGET_ARCH" = arm64 ] && echo aarch64-unknown-linux-musl || echo x86_64-unknown-linux-musl); \
+    CXX=/opt/llvm-musl/bin/clang++ \
+    CXXFLAGS="--target=$target_triple -nostdinc++ -isystem/opt/llvm-musl/include/c++/v1 -O2" \
+    LDFLAGS="--target=$target_triple -fuse-ld=lld -static -L/opt/llvm-musl/lib -nostdlib++ /opt/llvm-musl/lib/libc++.a /opt/llvm-musl/lib/libc++abi.a /opt/llvm-musl/lib/libunwind.a" \
+    python3 configure.py --bootstrap; \
+    install -m 0755 ninja /usr/local/bin/ninja; \
+    /usr/local/bin/ninja --version | grep -Fx 1.12.1; \
+    file /usr/local/bin/ninja | grep -F 'statically linked'; \
+    rm -rf /tmp/ninja.tar.gz /tmp/ninja-source
 
 COPY config /opt/chromium-build/config
 COPY scripts /opt/chromium-build/scripts
