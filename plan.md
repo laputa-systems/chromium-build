@@ -6,7 +6,7 @@ Build a repeatable, Docker/OrbStack-contained ungoogled-chromium environment tha
 
 - builds natively for Linux musl;
 - uses the Laputa LLVM 22.1.8 musl toolchain for every C and C++ compilation, archive operation, and link;
-- produces ELF artifacts with no glibc, libstdc++, libgcc, or other GNU runtime dependency;
+- produces Chromium-owned ELF artifacts with no glibc, libstdc++, libgcc, or other GNU runtime dependency, with one narrowly audited exception for the copied stock-Alpine FFmpeg dependency closure;
 - uses direct, checksummed source archives rather than Git clones or Chromium `depot_tools` checkouts;
 - persists the prepared source tree and Ninja output in Docker named volumes, never performance-sensitive host bind mounts;
 - minimizes source, output, environment, and runtime-bundle disk usage where doing so does not make the build substantially more fragile;
@@ -37,11 +37,11 @@ A fully cached builder image plus a stamped prepared-source volume is the practi
 
 ### 2.2 Meaning of no GNU
 
-The no-GNU requirement applies as follows:
+The no-GNU requirement remains strict for the compiler path and Chromium-owned output:
 
 - No GCC or G++ driver may compile or link Chromium code.
 - No GNU `ar`, `ranlib`, `nm`, `strip`, `objcopy`, or linker may process Chromium outputs.
-- No shipped ELF may dynamically depend on glibc, libstdc++, libgcc, or another GNU runtime.
+- Chrome, Chromium-built helper executables, and Chromium-built shared libraries may not directly depend on glibc, libstdc++, libgcc, or another GNU runtime.
 - Link command logs must prove that no static libstdc++ or libgcc archive was embedded either.
 - The custom LLVM toolchain must itself retain its existing musl-only dynamic dependency property.
 
@@ -49,16 +49,33 @@ Incidental builder utilities such as Bash, Bison, gperf, tar, or findutils are a
 
 Rust is an explicit, separately approved compiler path. Chromium's Rust crates use the pinned Alpine Rust toolchain selected below. Any crate build script that invokes a C/C++ compiler must inherit the Laputa `CC`, `CXX`, and LLVM-binutils environment. Rust compiler provenance is recorded, and Rust-linked final artifacts are subject to the same ELF/runtime audit as C++ output.
 
-The shipped-artifact boundary does not claim that every host-owned library loaded at runtime is free of GNU runtime dependencies. This distinction is material: Alpine's Mesa and Rust packages currently use GNU runtime libraries internally. The browser bundle must not contain those runtimes, but a stricter future requirement that the complete browser process closure load no GNU code would require custom LLVM-built Mesa, Rust, and other host packages and is outside v1.
+The shipped-artifact boundary does not claim that every host-owned library loaded at runtime is free of GNU runtime dependencies. This distinction is material: Alpine's Mesa and Rust packages currently use GNU runtime libraries internally. A stricter future requirement that the complete browser process closure load no GNU code would require custom LLVM-built Mesa, Rust, and other host packages and is outside v1.
 
-There is one unresolved hard interaction inside the shipped-artifact boundary: Alpine 3.24's stock FFmpeg closure is not eligible to be copied wholesale into a no-GNU bundle. Current aarch64 package metadata shows:
+Stock Alpine FFmpeg is the sole shipped-runtime exception. The package lock currently resolves FFmpeg `8.1.2-r0`; relevant Alpine 3.24 aarch64 package metadata shows:
 
-- `ffmpeg-libavcodec` depends on x265 and libjxl, which depend on `libstdc++.so.6`;
-- `ffmpeg-libavcodec` depends on rav1e, which depends on `libgcc_s.so.1`;
+- `ffmpeg-libavcodec` depends on x265 `4.1-r0` and libjxl `0.11.2-r1`, which depend on `libstdc++.so.6`;
+- `ffmpeg-libavcodec` depends on rav1e `0.8.1-r0`, which depends on `libgcc_s.so.1`;
 - `ffmpeg-libavutil` depends on X11, VA-API, VDPAU, and DRM libraries;
 - `ffmpeg-libavformat` brings a broad TLS/network/media dependency closure.
 
-Therefore “stock Alpine FFmpeg,” “copy its complete closure into the artifact,” and “ship no GNU runtime” cannot all be true simultaneously. The implementation must expose this in the system-library preflight before downloading Chromium. It must not disguise the conflict by omitting required `DT_NEEDED` libraries or copying GNU runtimes. The allowed resolution must be selected explicitly before packaging: make the complete FFmpeg stack host-owned for the Alpine-specific artifact, supply a separately built LLVM/musl minimal FFmpeg artifact, permit Chromium's minimal bundled FFmpeg build, or relax the no-GNU shipped-closure rule. The current plan does not silently choose among those policy changes.
+The selected practical resolution is to copy the complete, exact stock-Alpine FFmpeg closure, including `libstdc++.so.6`, `libgcc_s.so.1`, and otherwise-disabled X11/VA-API/VDPAU dependencies when the package graph requires them. This exception is acceptable only because Chromium consumes FFmpeg through its C shim/API and Alpine already proves the combination of Chromium's custom libc++ with its system FFmpeg package.
+
+Here “complete closure” means every recursively resolved ELF `DT_NEEDED` dependency plus a reviewed set of modules/data that FFmpeg actually loads in the tested Chromium path. It does not mean copying optional Mesa/VA-API drivers, command-line FFmpeg tools, documentation, or every package-level recommendation merely because Alpine groups them with FFmpeg.
+
+The closure also includes OpenSSL through Alpine `libavformat`. Chromium itself continues using bundled BoringSSL. Loading both implementations is allowed only inside this FFmpeg exception and requires dynamic-symbol/interposition checks plus an HTTPS regression test; it is not permission to replace BoringSSL or link Chrome directly to OpenSSL.
+
+Containment rules are mandatory:
+
+- glibc remains forbidden everywhere; the exception does not permit `libc.so.6`;
+- GCC/G++, GNU binutils, libstdc++, and libgcc remain forbidden in every Chromium compile/link command;
+- Chrome or another Chromium-owned ELF may directly need `libavcodec`, `libavformat`, or `libavutil`, but may not directly need `libstdc++` or `libgcc_s`;
+- every allowed path to `libstdc++`, `libgcc_s`, X11, VA-API, VDPAU, OpenSSL, or another exception library must pass through a pinned `libav*` root in the FFmpeg closure;
+- a non-FFmpeg private library that independently needs an exception soname is a failure, even if the same file is already present for FFmpeg;
+- exception libraries are copied unmodified from exact locked APKs; never delete `DT_NEEDED` entries, patch out unresolved symbols, or pretend a partial closure is valid;
+- the dependency report preserves every exception path and labels the package/version/license that introduced it;
+- expanding the exception to another subsystem requires a plan change, not an allowlist-only edit.
+
+This deliberately trades runtime-bundle size and purity for iteration speed. A future minimal LLVM-built FFmpeg stack can remove the exception after the browser works, but it is not v1 work.
 
 ### 2.3 Source-control and mount boundary
 
@@ -110,9 +127,9 @@ The trimmed Chromium archive is preferred because it omits multi-gigabyte materi
 - Commit the resulting installed-package manifest and compare it during image validation.
 - Use only Alpine 3.24 repositories. Do not mix edge packages into the environment.
 
-Alpine 3.24 provides the matching Chromium 150 generation of GN, Rust, samurai, FFmpeg, and related libraries. The custom compiler remains LLVM 22.1.8 even if Alpine packages compiler-adjacent libraries built with another LLVM 22 patch release.
+Alpine 3.24 provides the matching Chromium 150 generation of GN, Rust, samurai, FFmpeg, and related libraries. The current lock resolves Rust `1.96.0-r0`; that compiler package itself depends on Alpine GCC, libstdc++, and libgcc in the builder, which is the explicitly approved Rust-toolchain exception described above. The custom C/C++ compiler remains LLVM 22.1.8 even if Alpine packages compiler-adjacent libraries built with another LLVM 22 patch release.
 
-Do not install Alpine `build-base`, GCC, G++, binutils, Clang, or LLD as generic shortcuts. Install individual development packages. A transitive runtime package required by Rust or a system library is tolerable in the builder, but it may never enter Chromium's compile/link commands or the shipped runtime closure.
+Do not request Alpine `build-base`, GCC, G++, binutils, Clang, or LLD as generic build dependencies. Install individual development packages. The approved Alpine Rust package currently pulls GCC/libstdc++/libgcc transitively into the builder; retain them only because APK dependency resolution requires them. Do not add their directories ahead of `/opt/llvm-musl` in `PATH`, do not set any compiler variable to them, and fail if a Chromium compile/link command uses them. A transitive builder runtime may enter the shipped bundle only through the exact FFmpeg-exception closure.
 
 Builder tools include only what the source graph needs, grouped approximately as:
 
@@ -274,11 +291,12 @@ The host CLI defaults to `--arch arm64` and `--profile headless-debug`. Every co
 
 - Runs after `image` and before `prepare`; it does not require Chromium source.
 - Audits the complete `DT_NEEDED` closure of every proposed system library using the installed Alpine packages.
-- Classifies every soname as private, host-owned, or forbidden using the same policy later used by packaging.
-- Prints dependency paths to forbidden GNU, X11, audio, VA-API, or other excluded libraries.
+- Classifies every soname as private, host-owned, FFmpeg-exception, or forbidden using the same policy later used by packaging.
+- Prints every path to GNU, X11, audio, VA-API, VDPAU, TLS, and other normally excluded libraries, marking each as a valid FFmpeg exception or a failure.
 - Records a content-addressed completion report under the environment identity.
 - Is a hard prerequisite for `prepare` and `poc`.
-- Stops with the known stock-FFmpeg conflict until its packaging/runtime policy is explicitly resolved; it never changes the policy automatically.
+- Accepts GNU/X11/VA-API/VDPAU exception paths only when they are descendants of the exact locked stock-Alpine `libav*` roots.
+- Fails if the exception leaks into a different candidate library, if any closure entry is unclassified, or if glibc appears anywhere.
 
 ### `prepare`
 
@@ -351,7 +369,62 @@ Preparation is deterministic and uses this exact conceptual order:
 12. Remove source files for libraries selected for system unbundling only after GN replacement files have been installed and validated.
 13. Write patch provenance, tree identity, and the atomic completion stamp.
 
-The Alpine patch import includes its current musl, arm64, compiler, FFmpeg, Rust, and libc compatibility fixes. Test-only or packaging-only patches may remain if harmless, but the plan must not rely on building Alpine's APK target. Copium patches are applied from the pinned `150.0` archive, not fetched individually from a moving branch.
+The pinned Alpine base patch inventory is:
+
+```text
+0001-hotfix-ignore-a-new-warning-in-rust-1.89.patch
+compiler.patch
+disable-dns_config_service.patch
+disable-failing-tests.patch
+fc-cache-version.patch
+fix-ffmpeg-codec-list.patch
+fstatat-32bit.patch
+gdbinit.patch
+generic-sensor-include.patch
+headless-shell-no-license.patch
+musl-sandbox.patch
+musl-tid-caching.patch
+net-test-no-vpython.patch
+net-test-pyws3-py3.12.patch
+no-execinfo.patch
+no-mallinfo.patch
+no-res-ninit-nclose.patch
+no-sandbox-settls.patch
+partalloc-no-tagging-arm64.patch
+pvalloc.patch
+temp-failure-retry.patch
+```
+
+The pinned copium `150.0` inventory is:
+
+```text
+cr133-ffmpeg-no-noh264parse.patch
+cr138-node-version-check.patch
+cr140-musl-prctl.patch
+cr143-libsync-__BEGIN_DECLS.patch
+cr145-iwyu-dev_t.patch
+cr145-musl-unfortify-SkDescriptor.patch
+cr146-swiftshader-unfortify-memset-memcpy.patch
+cr146-unfortify-blink-display_item_list.patch
+cr147-is-musl-libcxx.patch
+cr147-simdutf-8.0-base-char.patch
+cr148-rust-1.95-bytemuck.patch
+cr148-v8-no-san-trap.patch
+cr149-musl-alloc-shim-dispatch.patch
+cr149-rust-toolchain-var.patch
+cr149-unbundle-minizip-undo-unicode.patch
+cr150-empty-ar.patch
+cr150-ffmpeg-no-agtm.patch
+cr150-no-sysroot-modules.patch
+```
+
+Do not blindly apply the entire inventory. Create a committed disposition manifest with exactly one state per patch:
+
+- `apply`: required by the selected Chrome graph or runtime;
+- `superseded`: behavior is provided by another pinned patch, with the replacement named;
+- `not-applicable`: affects only an excluded target such as upstream tests, GDB helpers, or legacy `headless_shell`, with affected paths recorded.
+
+Preparation applies only `apply` entries, in original APKBUILD order. Every inventory entry must appear in the disposition manifest; an unknown new patch or missing old patch is fatal. This keeps test/headless-shell packaging changes out of the source tree without silently discarding musl build knowledge. The implementation never invokes Alpine's APK build/package functions. Copium patches come from the pinned archive, not a moving branch.
 
 Every patch application logs its source project, upstream path, upstream commit/tag, checksum, strip level, and result. Local conflict patches must state which two upstream patch sets conflicted and why the chosen resolution preserves both intents. Do not silently edit upstream patch files during preparation.
 
@@ -441,7 +514,7 @@ This list is a candidate set, not a blanket approval. `preflight` computes each 
 - If a nonessential candidate reaches a forbidden runtime, do not unbundle it; leave Chromium's bundled copy to be compiled by the Laputa toolchain.
 - If a candidate reaches only explicitly host-owned libraries, its GN/pkg-config integration may remain while packaging records the host requirement.
 - If a required candidate reaches a forbidden runtime, stop at preflight and require a policy/input change.
-- FFmpeg is a required candidate under the current product intent, so the known stock-package conflict is a stop condition rather than an automatic fallback.
+- FFmpeg is the single exception: paths rooted at the locked Alpine `libav*` packages may reach the committed FFmpeg-exception closure.
 
 Use Chromium's `build/linux/unbundle/replace_gn_files.py` and the pinned Alpine preparation logic rather than inventing new pkg-config shims where upstream ones exist.
 
@@ -456,9 +529,11 @@ Do not initially unbundle tightly coupled or high-risk libraries such as:
 
 Chromium uses BoringSSL rather than OpenSSL. There is no plan to compile or substitute OpenSSL. BoringSSL stays bundled because it is tightly coupled to Chromium.
 
-The intended fast path is Alpine FFmpeg, and Chromium's bundled FFmpeg source should not be compiled. That intent is conditional on resolving the no-GNU packaging conflict documented above. Use common-codec behavior from the selected FFmpeg input; Widevine remains disabled. OpenH264 and WebRTC-specific media dependencies are unnecessary while WebRTC is disabled.
+Use stock Alpine FFmpeg. Chromium's bundled FFmpeg source must not be compiled. Use common-codec behavior from the locked Alpine FFmpeg packages; Widevine remains disabled. OpenH264 and WebRTC-specific Chromium features remain disabled even if similarly named libraries happen to exist inside FFmpeg's package closure.
 
 “Common codecs” means the system-FFmpeg integration is configured to expose the normal H.264/AAC-capable browser codec set where the Alpine FFmpeg build supplies it, while still omitting Widevine/DRM. Record the resolved `ffmpeg_branding` and `proprietary_codecs` GN values in the profile audit. This is a technical capability decision, not a claim about distribution licensing in every jurisdiction.
+
+Do not attempt to slim stock FFmpeg by deleting codec libraries from its closure. Shared Alpine `libavcodec`/`libavformat` packages encode their enabled features in `DT_NEEDED`; even codecs unused by the browser remain load dependencies. Any future reduction requires a separately configured FFmpeg build and a new locked artifact.
 
 Mesa is different from ordinary unbundled libraries because its loader and DRI driver must remain version-compatible. Treat the entire driver-facing Mesa stack as host-owned for the portable artifact: Mesa EGL/GLES/GBM/GL loader libraries, DRI drivers, and their LLVM closure come from the target Alpine host. They are installed in the builder/test image for compilation and testing but excluded from the private bundle closure. `libdrm` may also remain host-owned to keep the graphics stack coherent.
 
@@ -514,7 +589,7 @@ The profile source file contains only arguments verified to exist in Chromium 15
 | Ozone/UI | headless enabled; Wayland, X11, GTK, and Qt disabled |
 | Audio/capture | ALSA, PulseAudio, PipeWire, and WebRTC capture disabled |
 | Graphics | host Mesa/llvmpipe path; VA-API, Vulkan, and SwiftShader disabled |
-| Media | the preflight-selected FFmpeg input with common codecs; Widevine disabled |
+| Media | locked stock-Alpine system FFmpeg with common codecs; Widevine disabled |
 | Product | ungoogled defaults, local extensions and DevTools retained, en-US only |
 
 For each row, the PoC stores both the controlling GN values and evidence from the generated target graph. A runtime-only command-line flag is not accepted as proof that an unwanted backend was excluded from compilation.
@@ -548,7 +623,7 @@ The PoC is intentionally much cheaper than building Chrome. It must catch toolch
 - Network is absent for all PoC subprocesses.
 - All expected source stamps match.
 - `which` and resolved symlinks for compiler/binutils variables point under `/opt/llvm-musl`.
-- System-library preflight exists for the exact environment/package policy and has no unresolved required-library decision.
+- System-library preflight exists for the exact environment/package policy, matches the committed FFmpeg-exception rules, and contains no unclassified required-library edge.
 
 ### Gate B: direct compiler/runtime probes
 
@@ -565,7 +640,7 @@ Compile and run small native probes covering:
 - creation of a shared object and executable with LLD;
 - musl interpreter and allowed `DT_NEEDED` entries.
 
-Compile/link separate pkg-config probes for the headless profile's Mesa EGL/GLES/GBM, libdrm, NSS where required, and the selected FFmpeg input. A Chromium-bundled FFmpeg resolution uses a small GN target instead of a pkg-config probe.
+Compile/link separate pkg-config probes for the headless profile's Mesa EGL/GLES/GBM, libdrm, NSS where required, and stock Alpine FFmpeg. The FFmpeg probe exercises the exact headers and `libavcodec`/`libavformat`/`libavutil` linkage Chromium's system shim will use.
 
 Add a renderer probe that creates a minimal surfaceless/headless EGL context using the same host Mesa packages intended for Chrome tests. This distinguishes “headers and libraries link” from “llvmpipe can actually initialize in the container.”
 
@@ -582,7 +657,7 @@ Add a renderer probe that creates a minimal surfaceless/headless EGL context usi
 
 - Generate `out/headless-debug` with `--fail-on-unused-args`.
 - Save the final canonical args listing.
-- Assert target CPU, musl, no sysroot, custom host/default toolchains, LLD, monolithic debug, symbol levels, headless Ozone, no X11/Wayland/GTK/audio, the recorded FFmpeg resolution, and disabled optimization features.
+- Assert target CPU, musl, no sysroot, custom host/default toolchains, LLD, monolithic debug, symbol levels, headless Ozone, no X11/Wayland/GTK/audio, stock system FFmpeg, and disabled optimization features.
 - Run `gn check` only where it is useful and bounded; do not let a full unrelated upstream check become the PoC.
 
 ### Gate E: small GN build
@@ -592,7 +667,7 @@ Add a repository-owned target under a clearly named source overlay such as `//to
 - is built by Chromium's generated Ninja graph;
 - uses generated Chromium build configuration headers;
 - exercises C++ standard library, exceptions, TLS, and threads;
-- links the profile's Mesa dependencies and exercises the selected FFmpeg path where it can remain small;
+- links the profile's Mesa dependencies and system-FFmpeg shim where it can remain small;
 - runs successfully inside the container;
 - remains tiny and does not depend on `//base`, `//content`, or another large Chromium library merely for symbolism.
 
@@ -602,14 +677,12 @@ Add a repository-owned target under a clearly named source overlay such as `//to
 - Generate/inspect commands for the graph.
 - Prove all C/C++ commands use the custom LLVM tools.
 - Prove Chromium's in-tree libc++ targets are not scheduled.
-- Prove the generated FFmpeg graph matches the recorded preflight resolution.
+- Prove the generated graph uses the system-FFmpeg shims and does not schedule Chromium's bundled FFmpeg sources.
 - Prove no forbidden compiler/runtime flags or archive paths appear.
 
 Because a Ninja dry-run does not necessarily expand every response file until its generating edge has run, audit both `ninja -t commands chrome` and the response files/command descriptions that exist after the small GN build. Repeat the complete command/response-file audit after the actual Chrome build before declaring the compiler boundary proven.
 
 Passing the PoC must never automatically launch the full build.
-
-The FFmpeg graph assertion follows the resolution selected at preflight. If the explicit resolution permits Chromium's minimal bundled FFmpeg, invert this assertion and instead prove those sources use the Laputa compiler. Do not leave the audit text inconsistent with the recorded policy.
 
 ## 14. Full build behavior
 
@@ -678,7 +751,27 @@ Ship a tiny Manifest V3 unpacked extension fixture containing no external resour
 - Confirm its primary HTML/JavaScript resources load without an external network request.
 - Interactive human use is not automated beyond resource loading and protocol attachment.
 
-### 15.6 Rendering and sandbox tests
+### 15.6 System-FFmpeg containment and media tests
+
+Use tiny, checksummed, locally served media fixtures with documented provenance. Include at least one H.264-in-MP4 video and one AAC-bearing fixture so the “common codecs” decision is tested rather than inferred from GN arguments.
+
+Validate:
+
+- an HTML media element reaches usable metadata and decoded-frame states;
+- a decoded video frame can be drawn to canvas and produces non-empty pixels;
+- repeated create/play/seek/destroy cycles do not crash the browser, GPU process, or media process;
+- codec success/failure events and console output are captured through CDP;
+- Chromium reports the expected codec support through `canPlayType`/MediaCapabilities where available;
+- `/proc/<pid>/maps` and the dependency audit show the locked Alpine `libav*` libraries and expected exception libraries, not Chromium's bundled FFmpeg output or an untracked host copy;
+- no C++ object, exception, allocator, or ownership crosses a newly invented C++ shim boundary; Chromium continues to use its existing system-FFmpeg C interface;
+- the presence of libstdc++/libgcc for FFmpeg does not change the custom-libc++ identity checks for Chrome;
+- the presence of OpenSSL for `libavformat` does not replace/interpose Chromium's BoringSSL network path; a local HTTPS navigation succeeds before and after media decoding using a pinned test certificate/SPKI allowance.
+
+Generate a dynamic-symbol intersection report between Chrome and every FFmpeg-exception DSO. Highlight allocator operators, `__cxa_*`, `_Unwind_*`, OpenSSL/BoringSSL-like symbols, and any default-visible duplicate. Do not assume every duplicate is fatal—Chromium intentionally exports allocator symbols for loaded libraries—but require the initial baseline to be reviewed, stored, and unchanged on rebuild. A new high-risk collision after a package/version change invalidates preflight.
+
+Do not require physical audio output in `headless-debug`; ALSA is intentionally disabled. Codec parsing/decoding is the acceptance target. Actual ALSA output is tested only in `wayland-debug`.
+
+### 15.7 Rendering and sandbox tests
 
 - Use Mesa llvmpipe installed in the builder/test image.
 - Verify Chrome reports a usable software GL renderer rather than SwiftShader.
@@ -694,11 +787,13 @@ Use LLVM readelf/readobj/nm/strings for final audits. Resolve every executable a
 Hard failures include:
 
 - glibc interpreter or `libc.so.6`;
-- `libstdc++.so.6`, `libgcc_s.so.1`, static libstdc++/libgcc inputs in recorded link commands, or `GLIBCXX_*` requirements;
+- `libstdc++.so.6`, `libgcc_s.so.1`, or `GLIBCXX_*` requirements in a Chromium-owned ELF;
+- static libstdc++/libgcc inputs in any recorded Chromium link command;
+- a path to `libstdc++`, `libgcc_s`, X11, VA-API, VDPAU, or another exception soname that does not descend from a locked FFmpeg `libav*` root;
 - a compiler/linker path outside `/opt/llvm-musl` in the recorded Chrome graph;
 - an RPATH/RUNPATH pointing into `/work`, `/opt/llvm-musl`, or another builder-only directory;
 - PulseAudio, PipeWire, GTK, or direct X11 dependencies in `headless-debug`;
-- an FFmpeg object/library/runtime path inconsistent with the recorded preflight resolution;
+- Chromium bundled-FFmpeg objects or a stock-FFmpeg library/runtime path inconsistent with the locked APK/preflight closure;
 - an unexpected dynamically linked libc++/libc++abi/libunwind;
 - an architecture or musl-loader mismatch.
 
@@ -707,9 +802,10 @@ The audit report also records without initially failing:
 - transitive X11/XCB sonames introduced by a host/system Mesa package;
 - all dlopen-style runtime modules that cannot be discovered solely through `DT_NEEDED`;
 - the complete system-library provenance and versions;
-- binary sizes and stripped/unstripped state.
+- binary sizes and stripped/unstripped state;
+- every FFmpeg-exception edge, its root-to-leaf dependency path, APK owner/version, soname, file digest, and license metadata.
 
-“Direct X11 dependency” means a `DT_NEEDED` edge from Chrome or a Chromium-owned staged library to an X11/XCB soname. An X11/XCB edge reachable only through a host-owned Mesa package is reported as transitive during v1. The dependency report must preserve the path that introduced each soname so the distinction is reviewable.
+“Direct X11 dependency” means a `DT_NEEDED` edge from Chrome or a Chromium-owned staged library to an X11/XCB soname. An X11/XCB edge reachable only through a host-owned Mesa package is reported as transitive during v1. An X11/XCB edge inside the copied stock-FFmpeg closure is an FFmpeg exception and must be reported as such. The dependency report preserves the complete path that introduced each soname so these cases remain reviewable.
 
 The final link command and response file must be preserved in metadata so the absence of static GNU runtime archives is independently reviewable.
 
@@ -727,7 +823,7 @@ Stage only what the automation browser needs:
 - en-US locale resources;
 - DevTools frontend resources;
 - required local component/shared libraries that remain in the monolithic profile;
-- the recursively resolved private Alpine shared-library closure, excluding the host-owned graphics stack;
+- the recursively resolved private Alpine shared-library closure, including the complete FFmpeg-exception closure and excluding the host-owned graphics stack except where an exact library is independently required by FFmpeg;
 - launcher script;
 - build, dependency, license, checksum, and audit metadata.
 
@@ -750,20 +846,26 @@ Do not package:
 
 Build the closure by parsing `DT_NEEDED` entries with LLVM tools and resolving sonames against known Alpine library directories. Include an explicit reviewed list for libraries Chromium loads dynamically and therefore do not appear in `DT_NEEDED`, particularly NSS/trust-store modules if required.
 
-The resolver classifies every dependency as `private`, `host`, or `forbidden`:
+The resolver classifies every dependency edge as `private`, `host`, `ffmpeg-exception`, or `forbidden`:
 
 - `private`: copied into the bundle and recursively resolved;
 - `host`: intentionally omitted and listed in the required-host manifest, including the graphics stack, musl, fonts, and trust data;
-- `forbidden`: causes packaging to fail, including GNU runtimes and disabled backend libraries.
+- `ffmpeg-exception`: copied into the bundle, but permitted to violate the ordinary GNU/X11/VA-API/VDPAU policy only on a dependency path rooted at the locked stock-Alpine FFmpeg libraries;
+- `forbidden`: causes packaging to fail, including GNU runtimes and disabled backend libraries outside a valid FFmpeg-exception path.
 
-Classification is by exact soname/pattern in a committed policy file, not by ad hoc copying during packaging. After staging, rerun the resolver against the staged tree plus declared host set and fail on an unclassified dependency.
+Classification is by exact soname, APK owner/version, and dependency ancestry in a committed policy file, not by ad hoc copying during packaging. A soname is not globally exempt merely because FFmpeg also uses it. After staging, rerun the resolver against the staged tree plus declared host set and fail on an unclassified dependency or an exception library reachable from an unauthorized root.
 
-The selected FFmpeg resolution is represented in this same policy:
+The stock-FFmpeg closure is snapshotted during preflight as an exact directed graph. Packaging must reproduce that graph from the locked installed files. Any added/removed edge, package-owner change, or digest change invalidates preflight and requires package-lock review.
 
-- host-owned FFmpeg means none of its libraries are copied and exact Alpine runtime packages are required;
-- external minimal FFmpeg means its artifact digest and closure are locked like the LLVM toolchain;
-- Chromium-bundled FFmpeg means its objects and resulting library are audited as build outputs;
-- relaxing the no-GNU rule requires an explicit plan revision and cannot be expressed as a packaging allowlist tweak.
+Dependency graphs and exception manifests are architecture-specific. The aarch64 evidence in this document must not be copied forward as amd64 truth; native amd64 preflight recomputes and reviews its closure from `packages.amd64.lock` before any amd64 artifact is eligible for packaging.
+
+When the same soname is used both by FFmpeg and by a host-owned stack, packaging follows these rules:
+
+- copy it if FFmpeg has a real `DT_NEEDED` path to it;
+- record that the private copy will take precedence through `LD_LIBRARY_PATH`;
+- run both FFmpeg media tests and Mesa renderer tests against the staged bundle to catch loader/version conflicts;
+- fail if the private copy makes the host-owned Mesa path load a mismatched library or changes the validated renderer;
+- never maintain two files with the same soname in different private directories and rely on search-order accidents.
 
 Never copy a library merely because it exists in the builder. Every staged library must be justified by the dependency graph, a known dlopen path, or a test requirement.
 
@@ -800,6 +902,20 @@ Produce:
 - required-host-package and kernel-capability documentation.
 
 Create the archive inside the named volume. Use `docker cp` to export it; do not use a host output bind mount.
+
+### 17.5 FFmpeg licensing/provenance gate
+
+Stock Alpine FFmpeg's broad codec closure can include LGPL, GPL, and separately licensed codec libraries. Packaging must not imply that a binary manifest alone satisfies redistribution obligations.
+
+Always generate:
+
+- exact APK package names, versions, file digests, declared licenses, project/source URLs, and Alpine source-package references for the complete FFmpeg-exception closure;
+- copies of license/notice files installed by those packages where available;
+- Chromium/system-FFmpeg configuration metadata, including codec branding flags;
+- a machine-readable mapping from every staged exception file to its APK/source package;
+- a warning in the artifact metadata that redistribution requires an independent license-compliance review and may require corresponding source/build material.
+
+Local development export may proceed with this provenance bundle. Publishing or distributing the archive is a separate release gate and is not declared compliant by the build scripts.
 
 ## 18. Runtime host contract
 
@@ -867,7 +983,11 @@ Risk: Chromium pins Rust behavior and vendored crates while Alpine provides its 
 
 ### System FFmpeg API compatibility
 
-Risk: Chromium's unbundle shim supports a constrained API while Alpine FFmpeg evolves, and Alpine's full FFmpeg closure currently reaches forbidden GNU runtimes plus disabled X11/VA-API libraries. Mitigation: run closure preflight before source download, use exact package/patch versions, compile the FFmpeg probe, and require an explicit packaging/input resolution. Never discover this only during final packaging.
+Risk: Chromium's unbundle shim supports a constrained API while Alpine FFmpeg evolves, and Alpine's full FFmpeg closure reaches the exceptional GNU runtimes plus X11/VA-API/VDPAU libraries. Loading libstdc++ beside Chrome's static libc++ creates potential symbol-interposition/allocator/exception hazards even though the boundary is C. Loading OpenSSL through `libavformat` beside Chromium's BoringSSL creates a second interposition risk. Mitigation: exact package/patch versions, graph containment preflight, dynamic-symbol intersection baselines, compile/link probes, repeated runtime media tests, local HTTPS regression, process-map capture, and preservation of Chromium's existing C shim. Any direct Chromium dependency on the exception runtimes or evidence of an unsafe ABI/crypto boundary is a hard failure.
+
+### FFmpeg exception growth and licensing
+
+Risk: Alpine may enable another codec or dependency in a package revision, expanding disk size, licenses, or exception reach without a Chromium change. Mitigation: pin the full resolved APK set, snapshot the exact closure graph and file digests, fail on drift, report size deltas, and keep publishing behind a separate license/provenance release gate.
 
 ### Trimmed source versus ungoogled pruning
 
@@ -897,9 +1017,8 @@ Risk: feature-reduction flags change across Chromium versions. Mitigation: pin C
 - ARM64 image builds natively under OrbStack.
 - Package and LLVM locks match the installed environment.
 - No generic compiler/binutils path can accidentally override `/opt/llvm-musl`.
-- Candidate system-library closures have been audited and their private/host/forbidden classifications are recorded.
-
-An unresolved required-library policy such as the stock-FFmpeg/no-GNU conflict prevents moving to source preparation even if the image itself validates.
+- Candidate system-library closures have been audited and their private/host/FFmpeg-exception/forbidden classifications are recorded.
+- The exact stock-FFmpeg exception graph is accepted only within its committed roots and contains no glibc.
 
 ### Source preparation complete
 
@@ -914,13 +1033,14 @@ An unresolved required-library policy such as the stock-FFmpeg/no-GNU conflict p
 - GN generation passes with no unused args.
 - Small GN smoke executable builds/runs.
 - Chrome dry-run and command audit pass.
-- No in-tree libc++, GCC, libstdc++, or libgcc path is scheduled, and the FFmpeg graph matches its recorded resolution.
+- No in-tree libc++, GCC, libstdc++, or libgcc compiler/link input is scheduled for Chromium-owned targets, and the system-FFmpeg graph matches the locked exception policy.
 
 ### Functional browser complete
 
 - Monolithic Chrome builds from the persistent volume.
 - Modern headless mode runs with sandboxing and host llvmpipe.
 - Raw CDP pipe/TCP, DevTools resources, downloads, screenshots, storage/network events, and local extension tests pass offline.
+- System-FFmpeg H.264/AAC decode/containment tests pass without disturbing Chrome's static-libc++ identity or Mesa llvmpipe rendering.
 - ELF/link audits pass.
 
 This is the first full-build success milestone. Packaging is not required to call the browser functional.
@@ -930,6 +1050,7 @@ This is the first full-build success milestone. Packaging is not required to cal
 - Minimal runtime closure is staged and tested.
 - Tar.zst and all manifests/audits/checksums are exported without a bind mount.
 - A clean Alpine 3.24-compatible host can run the bundle using documented host dependencies.
+- The copied FFmpeg exception closure exactly matches preflight, and its package/license/source provenance accompanies the artifact.
 
 ### Wayland follow-up complete
 
@@ -950,6 +1071,7 @@ This is the first full-build success milestone. Packaging is not required to cal
 - Wider locale support.
 - GTK or another native desktop toolkit.
 - Bundled Mesa/llvmpipe runtime.
+- Replacing the stock-Alpine FFmpeg exception with a minimal LLVM/musl-built FFmpeg and codec closure.
 - Zero transitive X/XCB libraries.
 - Generic-musl or glibc-host portability.
 - Bit-for-bit reproducible output.
