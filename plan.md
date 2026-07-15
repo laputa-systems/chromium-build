@@ -24,7 +24,7 @@ The first functional milestone deliberately excludes interactive Wayland and ALS
 Hermeticity has two boundaries:
 
 1. The builder image is assembled from a base image digest, exact package versions, checksummed configuration archives, and a checksummed LLVM artifact. Once built, its image digest is immutable provenance. Cache reuse is controlled by the narrower environment compatibility identity defined in section 7, so harmless changes to tests or wrappers do not invalidate compiled output.
-2. The prepared source tree is assembled from checksummed source/configuration inputs and a committed patch set. Once prepared, all configuration, compilation, testing, auditing, and packaging commands run with container networking disabled.
+2. A networked `fetch` phase downloads immutable inputs into a content-addressed inbox and verifies them before they become eligible inputs. The separate `prepare` phase assembles source from that inbox plus image-resident configuration and patches with container networking disabled. All later configuration, compilation, testing, auditing, and packaging commands also run with networking disabled.
 
 The initial project does not promise:
 
@@ -112,6 +112,7 @@ All values below live in one committed machine-readable lock file. The lock also
 
 - Chromium version: `150.0.7871.114`.
 - Ungoogled release: `150.0.7871.114-1`.
+- DevTools frontend revision pinned by Chromium 150 `DEPS`: `ec97cf3bbeea2cb623fbf97c4e3f22f5acb4d568`.
 - Chromium source archive: Alpine's trimmed `chromium-150.0.7871.114-linux.tar.xz` from `chromium-linux-tarballs`.
 - Chromium archive SHA-512: `c6ab88182810bbf9423f01c1c4d02abfb3dcec8c182095ddfae5a49bb3817aef21a43eb743dcc95a6418ffaa54f3a8a4686795fb2e7be67f4c3d0ab489f0ee66`.
 - Ungoogled common commit: `2d89b04e1b68385c9086efab0df1e3679b35246e`.
@@ -158,6 +159,12 @@ Use the release artifacts from `laputa-systems/llvm-prebuilt-musl`:
 | `arm64` | `aarch64` | `arm64` | `675f9cf871313a5672a63882d4d30dd6dd55df0aa9caee70970542eb03a23da3` |
 | `amd64` | `x86_64` | `x64` | `ac0bd443a1933bbd2c0efbedf6ebc97ff8ca2469e5ba65eadb966fb75f65dd1c` |
 
+The canonical hermetic input is the published release archive plus its committed URL, filename, size, and SHA-256. This matches the release-artifact pattern demonstrated by `~/d/laputa-systems/mirror/Dockerfile`. The neighboring `~/d/laputa-systems/llvm-prebuilt-musl` checkout is provenance and a development reference only; an ordinary image build must not read mutable files from that checkout or require it as an implicit Docker build context.
+
+An unreleased local prebuilt archive may be used only through an explicit image-build override. The override accepts one archive file, computes and prints its digest, requires a matching temporary lock entry, copies only that archive into the build context or a named BuildKit context, and records the non-release provenance in the image metadata. It must never compile LLVM from the neighboring source checkout as part of the Chromium image build.
+
+For remote HTTP(S) archive ingestion, prefer Dockerfile `ADD --checksum=sha256:<digest>` when the selected Dockerfile frontend supports it, then retain the existing post-download size/hash and toolchain-content validation. Otherwise download and verify in one image layer so an unverified archive never survives into a later layer. BuildKit cache state is an acceleration only and is not trusted as verification.
+
 Extract to `/opt/llvm-musl`. The environment sets absolute paths for:
 
 - `CC=/opt/llvm-musl/bin/clang`
@@ -184,14 +191,18 @@ config/
   inputs.lock
   packages.arm64.lock
   packages.amd64.lock
+  disk-budget.arm64.json
+  disk-budget.amd64.json
   profiles/
     headless-debug.gn
     wayland-debug.gn
 patches/
   chromium-runtime/
   conflicts/
+  development/
 scripts/
   container-entrypoint.sh
+  fetch-inputs.sh
   prepare-source.sh
   generate-args.sh
   verify-environment.sh
@@ -260,10 +271,13 @@ Suggested internal layout:
 ```text
 /work/
   metadata/
+    fetch-inputs.json
+    fetch-complete.stamp
     source-inputs.json
     source-complete.stamp
     patches.json
     phases/
+  inputs/
   src/
   out/
     headless-debug/
@@ -276,18 +290,25 @@ Suggested internal layout:
 
 Stamps are written atomically only after a phase succeeds. A partially downloaded archive, partially extracted source directory, or partially applied patch set never receives a completion stamp.
 
+`fetch` downloads to a temporary file, verifies expected size and digest, and atomically renames it to a content-addressed filename only after verification. Without the optional download volume, that inbox is `/work/inputs`; with it, the download volume is mounted at `/downloads` and holds the canonical verified archive while `/work/metadata/fetch-inputs.json` records its exact digest/path. `prepare` mounts the selected inbox read-only wherever the container runtime permits and independently re-verifies the archive before extraction. A fetch stamp proves only byte acquisition and verification, never source preparation.
+
 Preparation uses sibling temporary paths such as `src.prepare.<pid>` and atomically renames the completed tree to `src`. If an unstamped final `src` exists, `prepare` refuses and reports it instead of guessing whether it is reusable. Test and package staging use the same pattern: build into a temporary directory, validate it, then replace the profile's completed directory. Ninja's `out/` is the exception; it is intentionally resumable in place and is never transactionally replaced.
 
 Separate provenance identity from cache compatibility:
 
-- Source identity includes Chromium, ungoogled, portable, Alpine/copium, local patches, architecture-sensitive source transformations, and an explicit preparation-compatibility schema version. It does not hash the preparation script wholesale, so a comment or logging-only edit does not invalidate source.
+- Source identity includes Chromium, ungoogled, portable, Alpine/copium, committed clean preparation patches under `patches/chromium-runtime` and `patches/conflicts`, architecture-sensitive source transformations, and an explicit preparation-compatibility schema version. It does not hash the preparation script wholesale, so a comment or logging-only edit does not invalidate source.
 - Environment compatibility identity includes the architecture, pinned Alpine base and resolved package lock, LLVM artifact digest, sysroot/header/runtime contents, compiler-affecting environment, and an explicit build-driver compatibility schema version.
 - Profile identity includes exact GN arguments and profile-owned source overlay files.
+- Development-dirty identity is the clean source identity plus the ordered SHA-256 hashes, strip levels, and deterministic application options of every development patch applied after preparation. Wall-clock timestamps are provenance only and never change cache identity.
 - Provenance includes the complete builder image digest, repository revision or dirty-state description, and all script/test/package metadata even when those values do not affect compatibility.
 
 The complete image digest is recorded but must not by itself invalidate `src/` or `out/`. Editing a smoke test, packaging script, log message, comment, or host wrapper must leave compatible source and Ninja output reusable. A change that can affect prepared source or compiler output must deliberately bump the corresponding source, environment, or profile compatibility input. Do not approximate this with a hash of every file copied into the image.
 
 A profile change creates a new `out/<profile>` without duplicating `src`. An environment or source mismatch causes an immediate refusal with a field-by-field difference. It must not delete or mutate the volume automatically. The user may select another volume name or explicitly run `reset --yes`.
+
+A clean source initially has no development-dirty identity. `dev-apply-patch` may transition only from a matching clean base or an existing dirty state whose recorded clean base still matches. It appends the new patch digest to the ordered dirty identity. `poc`, `build-target`, `build`, `test-fast`, and `test` accept that dirty identity and key their phase results to it; `audit`, `package`, and publishable `export` reject it. A source-affecting image/input change invalidates the dirty chain rather than attempting to replay it implicitly. Only a clean reset/prepare removes dirty state for acceptance purposes.
+
+Files under `patches/development/` are copied into the thin orchestration image layer but are never applied by clean `prepare` and are excluded from clean source compatibility identity until selected by `dev-apply-patch`. Editing one changes image provenance without invalidating the matching clean base, allowing rapid rebuild-and-apply experiments. Promoting a successful experiment means moving/reworking it into the clean patch series, updating patch disposition/provenance and source compatibility identity, then proving it through a fresh clean preparation; the dirty chain itself is never promoted as acceptance evidence.
 
 The persistent `out/` directory is the primary incremental cache and handles normal edit/rebuild cycles without duplicating objects. Stock Alpine ccache is the approved secondary recovery/reuse cache for volume resets, clean source preparation, reverted edits, compatible output-directory changes, and unchanged translation units across nearby source versions. Its correctness is never part of artifact identity, and disabling or deleting it must not change the build result.
 
@@ -300,7 +321,6 @@ The initial effective configuration is equivalent to:
 ```text
 CCACHE_DIR=/ccache
 CCACHE_TEMPDIR=/ccache/tmp
-CCACHE_BASEDIR=/work
 CCACHE_COMPILERCHECK=content
 CCACHE_COMPRESS=true
 CCACHE_COMPRESSLEVEL=1
@@ -309,7 +329,9 @@ CCACHE_NAMESPACE=<architecture>-<laputa-toolchain-digest>
 CCACHE_SLOPPINESS=<unset>
 ```
 
-Mount the selected compiler-cache named volume at `/ccache` and keep source/output at fixed `/work/src` and `/work/out/...` paths in every container. Verify the exact environment-variable names against the locked ccache version and store `ccache --show-config` output; the semantic requirements above prevail if the package changes spelling. Set GN `cc_wrapper` to the verified absolute Alpine ccache executable, expected to be `/usr/bin/ccache`, while the GN compiler itself remains an absolute `/opt/llvm-musl/bin/clang` or `clang++` path. Do not enable hard-link mode, compiler masquerade directories, time-based sloppiness, or `compiler_check=none`.
+Mount the selected compiler-cache named volume at `/ccache` and keep source/output at fixed `/work/src` and `/work/out/...` paths in every container. Leave `CCACHE_BASEDIR`/`base_dir` unset initially: stable container paths make rewriting unnecessary, and rewriting can alter `__FILE__` and debug-path behavior. Measure misses before considering it. Any later enablement requires an A/B cache-hit report plus compile/runtime comparison and becomes a profile/environment compatibility input.
+
+Verify the exact environment-variable names against the locked ccache version and store `ccache --show-config` output; the semantic requirements above prevail if the package changes spelling. Set GN `cc_wrapper` to the verified absolute Alpine ccache executable, expected to be `/usr/bin/ccache`, while the GN compiler itself remains an absolute `/opt/llvm-musl/bin/clang` or `clang++` path. Do not enable hard-link mode, compiler masquerade directories, time-based sloppiness, `compiler_check=none`, or path rewriting by default.
 
 Use ccache only for Chromium C/C++ compiler invocations. Rust and other language actions rely on their normal persistent Ninja outputs; do not add sccache merely to cache them. A cold cache can make a clean build slightly slower and consumes storage in addition to `out/`, which is why the size and statistics remain visible and bounded.
 
@@ -317,7 +339,7 @@ Never recursively `chown` or `chmod` `/work` at container startup. Initialize ow
 
 ## 8. Host command contract
 
-The host CLI defaults to `--arch arm64` and `--profile headless-debug`. Every command prints the selected image, volume, architecture, profile, source identity, and networking mode before starting.
+The host CLI defaults to `--arch arm64` and `--profile headless-debug`. Every command prints the selected image, work/cache/download volumes, architecture, profile, fetch state, clean/development-dirty/untracked-dirty source state, effective identity, ccache enabled/disabled state, and networking mode before starting. Dirty state is never hidden in verbose-only output.
 
 ### `image`
 
@@ -330,32 +352,56 @@ The host CLI defaults to `--arch arm64` and `--profile headless-debug`. Every co
 ### `preflight`
 
 - Runs after `image` and before `prepare`; it does not require Chromium source.
+- Runs with `--network=none`; it audits only the immutable installed image and committed policies.
 - Audits the complete `DT_NEEDED` closure of every proposed system library using the installed Alpine packages.
 - Classifies every soname as private, host-owned, FFmpeg-exception, or forbidden using the same policy later used by packaging.
 - Prints every path to GNU, X11, audio, VA-API, VDPAU, TLS, and other normally excluded libraries, marking each as a valid FFmpeg exception or a failure.
-- Records a content-addressed completion report under the environment identity.
+- Records a content-addressed completion report under the environment compatibility identity and records the full image digest separately as provenance.
 - Is a hard prerequisite for `prepare` and `poc`.
 - Accepts GNU/X11/VA-API/VDPAU exception paths only when they are descendants of the exact locked stock-Alpine `libav*` roots.
 - Fails if the exception leaks into a different candidate library, if any closure entry is unclassified, or if glibc appears anywhere.
 
+### `fetch`
+
+- Runs after `image` with network access and before `prepare`.
+- Downloads only the exact locked Chromium archive and any other input explicitly classified as a fetch-phase input; small ungoogled/portable/Alpine/copium archives and repository patches normally remain image-resident.
+- Uses temporary filenames, expected-size checks, and the locked digest, then atomically publishes verified bytes to `/work/inputs` or the optional `/downloads` volume.
+- Writes `fetch-inputs.json` and the atomic fetch-complete stamp only after every requested byte is verified.
+- Is idempotent for a matching content-addressed archive and re-verifies cached content before reporting success.
+- Does not extract, patch, generate source metadata, invoke upstream hooks, or execute any downloaded program.
+- Refuses redirects to an unapproved scheme and records the final resolved URL for provenance; correctness is determined by the digest, not the server response metadata.
+
 ### `prepare`
 
 - Creates/initializes the named volume if needed.
-- Runs with network access.
-- Downloads only the Chromium source archive; small patch/configuration inputs should already be in the image.
-- Verifies the source archive before extraction.
+- Requires a matching successful `fetch` and runs with `--network=none` for the entire container lifetime.
+- Reads only the verified Chromium archive from the selected inbox; small patch/configuration inputs are already in the image.
+- Re-verifies the source archive before extraction.
 - Prepares the tree transactionally.
-- Deletes the compressed archive after successful extraction in the disk-minimal mode.
-- With the explicit download-cache option, moves or reuses the verified compressed archive in the download volume instead; cached bytes are verified again before every extraction.
+- Deletes the compressed archive only after successful complete preparation in the disk-minimal mode.
+- With the explicit download-cache option, preserves the verified compressed archive in the download volume; cached bytes are verified again before every extraction.
 - Is idempotent when stamps match.
 
 ### `dev-apply-patch`
 
 - Is an explicitly non-hermetic patch-development escape hatch, disabled unless requested by name.
-- Applies one selected repository patch to the existing prepared source without rebuilding the tree and records the patch, prior source identity, timestamp, and resulting development-dirty state.
-- Never claims a new clean source stamp and makes `audit`, `package`, and publish/export completion unavailable.
+- Runs with `--network=none`.
+- Applies one selected repository patch to the existing prepared source without rebuilding the tree and records the patch, prior source identity, deterministic application options, provenance timestamp, and resulting development-dirty state.
+- Computes a new development-dirty identity from the clean base plus the ordered development-patch hash chain; it never overwrites the clean source identity or claims a clean source stamp.
+- Allows `poc`, `build-target`, `build`, `test-fast`, and `test` to operate under the exact dirty identity while making `audit`, `package`, and publishable `export` unavailable.
 - Allows Ninja to rebuild only files affected by a patch experiment.
+- Refuses if the recorded clean base no longer matches, a prior dirty transition is incomplete, the patch was already applied at another chain position, or patch fuzz/offset exceeds the explicit development allowance.
 - Requires `reset --yes`, clean `prepare`, and all normal gates before any artifact can be accepted.
+
+Arbitrary manual source edits are not assigned a reproducible development-dirty identity. Any diagnostic shell capable of modifying `/work/src` must first mark the volume `untracked-dirty`; builds/tests may continue for diagnosis, but all identity-bearing phase reuse, audit, package, and publishable export are blocked until reset/prepare. The supported fast iteration path is to edit a repository file under `patches/development/`, rebuild the thin image layer, and invoke `dev-apply-patch`.
+
+### `shell`
+
+- Defaults to mounting the work volume read-only for inspection.
+- Always runs with `--network=none`; use dedicated `fetch` for any permitted download.
+- Requires `--write-source --yes` to mount it read-write, writes the atomic `untracked-dirty` marker before starting the shell, and prints that the session cannot produce acceptance evidence.
+- Never clears or synthesizes clean/development identities after a writable session.
+- Permits explicitly diagnostic `build-target`, `build`, `test-fast`, or `test` invocations afterward, but their outputs remain untrusted/untracked and no reusable completion stamp is written.
 
 ### `poc`
 
@@ -395,10 +441,12 @@ The host CLI defaults to `--arch arm64` and `--profile headless-debug`. Every co
 
 - Runs post-build compile-command, response-file, ELF, runtime-closure, GNU-boundary, and provenance audits without packaging.
 - Is explicit and is never an automatic consequence of an ordinary `build` or `test-fast` iteration.
+- Refuses development-dirty source; focused compile-command inspection during dirty development belongs to `poc`/`build`, not an acceptance audit stamp.
 
 ### `package`
 
 - Is unavailable until the functional browser and ELF audits pass.
+- Refuses development-dirty source and every phase stamp derived from a dirty identity.
 - Builds a staging directory inside the volume.
 - Never copies Mesa drivers, fonts, or a host musl loader into the bundle.
 
@@ -407,10 +455,21 @@ The host CLI defaults to `--arch arm64` and `--profile headless-debug`. Every co
 - Produces the final `tar.zst`, checksums, and adjacent metadata.
 - Creates a temporary container with the named volume mounted, keeps it running while the mount is active, uses `docker cp` to copy a completed export directory to the host, and removes the temporary container afterward.
 - Does not bind-mount an output directory.
+- Refuses publishable artifact export from development-dirty source; diagnostic logs may still be copied explicitly but are labeled dirty and are not packaged as a browser artifact.
+
+### `verify-cold`
+
+- Is the expensive clean-room acceptance command, not part of the normal edit loop.
+- Creates uniquely named temporary work and compiler-cache volumes and refuses to reuse an existing `src/`, `out/`, stage, or ccache entry.
+- Runs `fetch` into the fresh work metadata, optionally satisfying it from the independently re-verified compressed download-cache archive; networking is permitted only for this fetch step and is unnecessary on a cache hit.
+- Executes clean offline `prepare`, `poc`, full `build` with `CCACHE_DISABLE=1`, complete `test`, `audit`, `package`, staged-runtime retest, and `export`.
+- Records that the build started from empty source/output/cache state, along with volume identifiers and before/after sizes.
+- Deletes temporary volumes only with an explicit cleanup option after reports/artifacts have been exported; failure preserves them for diagnosis.
+- Is required once for each materially changed environment/toolchain/source/profile compatibility tuple before that tuple is considered release-eligible. Ordinary patch iteration and the first warm browser milestone do not wait for it.
 
 ### `status`, `clean`, and `reset`
 
-- `status` reports phase stamps, compatibility and provenance identities, tool versions, source/output/stage/cache sizes, compiler-cache statistics, dirty-source state, and incomplete phases.
+- `status` reports phase stamps, compatibility and provenance identities, tool versions, source/input/output/stage/cache sizes, compiler-cache statistics, dirty-source state, measured disk budget/peak projection, and incomplete phases.
 - `clean --profile <name>` removes only that profile's `out`, stage, and test output.
 - `clean --all-profiles` preserves prepared source.
 - `reset` refuses without `--yes`, then removes the complete architecture volume.
@@ -422,10 +481,10 @@ The host CLI defaults to `--arch arm64` and `--profile headless-debug`. Every co
 
 Preparation is deterministic and uses this exact conceptual order:
 
-1. Download the trimmed Chromium archive to a temporary path in the volume, or copy it from the optional download cache after re-verifying its identity.
-2. Verify size and SHA-512 before extraction.
+1. With networking disabled, open the content-addressed Chromium archive produced by `fetch` from `/work/inputs` or the optional download volume.
+2. Re-verify size and SHA-512 immediately before extraction.
 3. Extract into a temporary source directory and validate expected Chromium version files and top-level layout.
-4. Remove the archive after successful extraction in disk-minimal mode, or retain only the verified compressed archive in the optional download cache.
+4. Validate every source-control-free revision/version input required by Chromium generators, including applicable `LASTCHANGE`, `LASTCHANGE.committime`, version, revision, and generated metadata files. Prove the selected GN/Ninja graph does not require a Git checkout.
 5. Run ungoogled binary pruning from the pinned common configuration.
 6. Apply ungoogled common patches in their declared order.
 7. Apply the matching portablelinux source patches in their declared order:
@@ -438,8 +497,11 @@ Preparation is deterministic and uses this exact conceptual order:
 11. Install the repository-owned GN smoke target/fixture overlay.
 12. Remove source files for libraries selected for system unbundling only after GN replacement files have been installed and validated.
 13. Write patch provenance, tree identity, and the atomic completion stamp.
+14. In disk-minimal mode, remove the `/work/inputs` archive only after the completed source stamp is durable and mark the fetch record `consumed`; retain it only in the optional download cache otherwise.
 
 Preparation must preserve timestamps and avoid rewriting unchanged files wherever the upstream tools permit it. Generated profile files are written through compare-and-replace so identical content retains its previous timestamp. A script/test-only image rebuild must not cause preparation to touch the source tree.
+
+Do not install Git merely to satisfy version-generation scripts. The trimmed archive must contain or deterministically generate the required revision metadata from locked values. Run preparation and the representative generators under `--network=none`; any attempt to consult Git, depot_tools, a remote revision service, or an undeclared host path is a source-preparation failure. If a small repository-owned metadata overlay is required, its exact contents and Chromium-version derivation belong to source identity and patch provenance.
 
 The pinned Alpine base patch inventory is:
 
@@ -670,7 +732,9 @@ The profile source file contains only arguments verified to exist in Chromium 15
 
 For each row, the PoC stores both the controlling GN values and evidence from the generated target graph. A runtime-only command-line flag is not accepted as proof that an unwanted backend was excluded from compilation.
 
-The fast profile must explicitly verify `optimize_webui=false`, which avoids WebUI minification/bundling work and is normally implied by `is_debug=true`. Probe Chromium 150 for `devtools_skip_typecheck` and `devtools_bundle` before placing them in the profile. When present, set both as shown above: DevTools remains built and packaged, but TypeScript checking and frontend bundling are skipped for the development browser. The CDP and DevTools-resource tests must prove that this unbundled frontend remains functional in the integrated Chrome build. If either argument is absent or the frontend fails, remove only that verified-incompatible argument rather than disabling DevTools.
+Chromium tag `150.0.7871.114` is already known to define `cc_wrapper` and to define `optimize_webui = !is_debug`; the profile still records their effective generated values rather than trusting documentation. The fast profile explicitly sets and verifies `optimize_webui=false`, which avoids WebUI minification/bundling work and makes WebUI code-cache generation effectively false for this graph.
+
+The exact rolled DevTools frontend revision is `ec97cf3bbeea2cb623fbf97c4e3f22f5acb4d568`. Probe the extracted source from that revision for `devtools_skip_typecheck` and `devtools_bundle` before placing either argument in the profile. Record the defining file/line and effective GN value in PoC metadata. When present, set both as shown above: DevTools remains built and packaged, but TypeScript checking and frontend bundling are skipped for the development browser. The CDP and DevTools-resource tests must prove that this unbundled frontend remains functional in the integrated Chrome build. If either argument is absent, has been renamed, is unused, or breaks the frontend, omit only that verified-incompatible argument rather than patching it back in or disabling DevTools.
 
 Run DevTools TypeScript checking as a separate explicit validation target or command at milestone boundaries if Chromium exposes one. Do not create another full C++ output directory merely to typecheck the frontend unless the generated graph makes that unavoidable. The ordinary C++ edit loop never performs frontend typechecking implicitly.
 
@@ -733,6 +797,7 @@ Add a renderer probe that creates a minimal surfaceless/headless EGL context usi
 ### Gate C: source and patch validation
 
 - Expected Chromium version files match `150.0.7871.114`.
+- Required source-control-free revision metadata exists and matches the locked Chromium/DevTools revisions; representative version generators run without Git or network access.
 - Binary pruning completes.
 - Every common, portable, Alpine/copium, and local patch is accounted for.
 - Domain substitution completes without unprocessed entries.
@@ -743,7 +808,7 @@ Add a renderer probe that creates a minimal surfaceless/headless EGL context usi
 
 - Generate `out/headless-debug` with `--fail-on-unused-args`.
 - Save the final canonical args listing.
-- Assert target CPU, musl, no sysroot, custom host/default toolchains, LLD, monolithic debug, symbol levels, headless Ozone, no X11/Wayland/GTK/audio, stock system FFmpeg, ccache wrapper, `optimize_webui=false`, supported DevTools fast-build arguments, and disabled optimization features.
+- Assert target CPU, musl, no sysroot, custom host/default toolchains, LLD, monolithic debug, symbol levels, headless Ozone, no X11/Wayland/GTK/audio, stock system FFmpeg, ccache wrapper, `optimize_webui=false`, only those DevTools fast-build arguments proven to exist at the locked revision, and disabled optimization features.
 - Run `gn check` only where it is useful and bounded; do not let a full unrelated upstream check become the PoC.
 
 ### Gate E: small GN build
@@ -776,18 +841,34 @@ The `build` command invokes samurai/Ninja for `chrome` only. It runs offline and
 
 The intended development loop is:
 
-1. edit repository patches/configuration or prepared development source;
+1. edit repository configuration or a patch under `patches/development/`, rebuild only the thin orchestration image layer, and apply it through `dev-apply-patch` when source changes are required;
 2. run `build-target` for the failing or directly affected object/generated target where practical;
 3. run `build` only when a complete `chrome` executable or relink is required;
 4. run `test-fast`;
-5. run the complete `test` and `audit` commands only at milestones;
-6. run `package` only for an accepted candidate.
+5. run the complete `test` at dirty or clean milestones;
+6. after promoting changes and performing clean preparation, run `audit` only at clean acceptance milestones;
+7. run `package` only for an accepted clean candidate.
 
 Use `gn desc`, `ninja -t query`, `ninja -t commands`, and generated compilation data to identify the narrowest useful target. Do not repeatedly run GN generation when neither GN inputs nor build files changed; allow Ninja's dependency graph to request regeneration when required. Never clean as a speculative remedy for an ordinary compile or link failure.
 
 Expose Ninja job count and load limit independently. Begin with a conservative host-derived default, then benchmark nearby values rather than assuming maximum visible CPUs is optimal. On the current 10-core/32-GiB development machine, start with `-j8` and compare `-j10` using the same build state. Do not oversubscribe memory merely to keep every CPU busy. Mount only disposable `/tmp` and `/dev/shm` as tmpfs where useful; never put persistent `src/`, `out/`, or the compiler cache on tmpfs.
 
 Every meaningful clean and incremental timing run records wall time, CPU count, job/load settings, peak memory when observable, free/used volume space, Ninja statistics/critical-path information, final-link duration, and ccache hits, misses, evictions, cacheable/non-cacheable calls, and size. Keep a small benchmark log keyed by source/environment/profile compatibility identities. Optimization decisions must be based on these measurements, not cache folklore.
+
+After the first successful native arm64 build, write `config/disk-budget.arm64.json` from observed high-water measurements rather than estimates. Record, separately:
+
+- verified compressed input bytes;
+- extracted/prepared source bytes and inode count;
+- profile `out/` bytes before and after the final link;
+- maximum temporary bytes observed during the final link;
+- ccache bytes, configured maximum, and effective compression ratio;
+- test-output bytes;
+- staged runtime bytes;
+- uncompressed and compressed export bytes;
+- peak aggregate bytes and a documented safety margin;
+- the source/environment/profile identities and measurement command that produced the numbers.
+
+Generate the amd64 budget only from a native amd64 measurement; never copy arm64 values. `status` compares current free space and phase sizes with the applicable measured high-water projection and emits an early warning before a multi-hour build. Initially this is advisory because the first measurement does not yet exist and filesystem behavior varies. Promote it to a hard low-water gate only after repeated measurements establish a conservative bound, always leaving an explicit override for diagnosis. Report which optional data—download archive, old profiles, test output, stage, or ccache entries—can be pruned and the bytes each action would recover; never prune automatically.
 
 Behavior on failure:
 
@@ -816,6 +897,8 @@ Tests are tiered by iteration cost:
 - Run Chrome as the non-root build/test user.
 - Do not pass `--no-sandbox`.
 - Set only required deterministic flags such as headless mode, user-data-dir, no-first-run, and remote-debugging transport.
+- Mount an explicit `/dev/shm` tmpfs for every browser-test container, initially `rw,nosuid,nodev,noexec,size=1g`, and record its configured size. Do not rely on Docker's small default shared-memory allocation or work around exhaustion with `--disable-dev-shm-usage`.
+- Give `/tmp` a separate bounded disposable tmpfs where useful; browser profiles, downloads, screenshots, and diagnostics remain in the named work volume so failures survive container exit.
 
 ### 15.2 CDP pipe test
 
@@ -1041,6 +1124,8 @@ The first artifact supports Alpine 3.24-compatible hosts of the matching archite
 
 The artifact does not support running as root with sandbox disabled. Container deployments must arrange a non-root user and permit Chromium's normal sandbox primitives.
 
+Container deployments must also provide adequate `/dev/shm`; the tested baseline is a 1 GiB tmpfs with `rw,nosuid,nodev,noexec`. The required-host documentation explains how to size it from workload concurrency and treats shared-memory exhaustion as an environment failure, not a reason to disable Chromium features or redirect shared memory silently.
+
 ## 19. Wayland/ALSA follow-up acceptance
 
 After headless packaging works, add `wayland-debug` without changing the prepared source identity unless new patches are required.
@@ -1067,9 +1152,10 @@ A Chromium update is a controlled change, not an automatic build option:
 4. Review patch-series changes and system-unbundle compatibility.
 5. Review Chromium's expected Clang and Rust versions against the custom LLVM and Alpine Rust packages.
 6. Rebuild the immutable environment image if any package/tool input changes.
-7. Use a new named volume or explicitly reset the old one; never patch a stamped old source tree in place.
-8. Re-run every PoC gate before starting Chrome.
-9. Re-run functional, ELF, and packaging tests before publishing an artifact.
+7. Use a new named work volume or explicitly reset the old one; never patch a stamped old source tree in place.
+8. Run `fetch`, then offline `prepare`, and re-run every PoC gate before starting Chrome.
+9. Re-run functional, ELF, and packaging tests.
+10. Complete `verify-cold` for the new compatibility tuple before publishing an artifact.
 
 amd64 follows the identical process using its own image digest, APK lock, LLVM archive, named volume, and output artifact. The scripts must be architecture-neutral even though only arm64 execution is required initially.
 
@@ -1127,6 +1213,22 @@ Risk: ccache duplicates object storage, cache misses add overhead, unsafe sloppi
 
 Risk: hashing the whole image discards valuable output after harmless wrapper/test changes, while omitting a true compiler-affecting input can incorrectly reuse Ninja or ccache results. Mitigation: record the complete image digest for provenance, define compatibility fields explicitly, version the build-driver compatibility schema deliberately, compare field-by-field, and test representative harmless and material changes. When uncertain, bump the narrow relevant compatibility field; never delete a volume automatically.
 
+### Network leakage during source preparation
+
+Risk: if preparation shared a network-capable phase, a source helper, version generator, or upstream hook could silently download an undeclared input. Mitigation: confine networking to `fetch`, which only downloads and verifies inert locked files; run the entire preparation container with `--network=none`; do not execute downloaded programs; and re-verify the content-addressed archive immediately before extraction. Any new network requirement must become an explicit locked fetch input and cannot be hidden inside a patching hook.
+
+### Development-dirty state confusion
+
+Risk: an in-place patch experiment is mistaken for the clean stamped source, a PoC result is reused across a different dirty chain, or an experimental binary reaches packaging. Mitigation: preserve the immutable clean base identity, derive an ordered dirty identity from every patch digest, key allowed phase stamps to that identity, print `DEVELOPMENT-DIRTY` prominently on every command, and hard-block audit/package/publishable export. A clean acceptance run always begins from reset/prepare rather than attempting to reverse patches heuristically.
+
+### Cold-build proof hidden by caches
+
+Risk: persistent Ninja or ccache outputs conceal a missing input, a broken generator, or a compiler-wrapper error. Mitigation: require `verify-cold` once per release-eligible compatibility tuple using fresh volumes, empty output, ccache disabled, and no network from preparation onward. Preserve failed cold volumes for diagnosis and record their identities; cache-assisted iterative success alone is not hermetic acceptance evidence.
+
+### Disk-budget drift
+
+Risk: source, object, link-temporary, ccache, or packaging growth causes a late ENOSPC failure after hours of compilation. Mitigation: commit architecture-specific measured high-water budgets, compare them in `status`, retain a safety margin, report reclaimable optional data, and update budgets on material version/profile changes. Do not turn first-run guesses into an inflexible hard gate.
+
 ## 22. Completion criteria by phase
 
 ### Environment complete
@@ -1140,12 +1242,20 @@ Risk: hashing the whole image discards valuable output after harmless wrapper/te
 - Candidate system-library closures have been audited and their private/host/FFmpeg-exception/forbidden classifications are recorded.
 - The exact stock-FFmpeg exception graph is accepted only within its committed roots and contains no glibc.
 
+### Fetch complete
+
+- At fetch completion, the exact locked Chromium archive exists under its content-addressed name in `/work/inputs` or the optional download volume; disk-minimal preparation may subsequently consume the `/work/inputs` copy only after stamping source complete.
+- Expected size and SHA-512 have been verified, the final resolved URL is recorded, and no downloaded program was executed.
+- The atomic fetch stamp distinguishes an available archive from a disk-minimal archive already consumed by successful preparation.
+- No extraction, patching, or source generation occurred in the networked phase.
+
 ### Source preparation complete
 
 - No Git clone exists.
 - Trimmed source is verified and extracted; its archive is removed in disk-minimal mode or retained only as a verified compressed download-cache entry in iteration mode.
 - All patch layers and domain substitution succeed.
 - Source identity/provenance is complete and repeatable.
+- Preparation and representative version generators ran with networking disabled and did not require Git; locked revision/version metadata is complete.
 - Any `dev-apply-patch` use leaves an unmistakable development-dirty state that blocks audit and packaging until a clean reset/prepare.
 
 ### PoC complete
@@ -1175,6 +1285,16 @@ This is the first full-build success milestone. Packaging is not required to cal
 - Tar.zst and all manifests/audits/checksums are exported without a bind mount.
 - A clean Alpine 3.24-compatible host can run the bundle using documented host dependencies.
 - The copied FFmpeg exception closure exactly matches preflight, and its package/license/source provenance accompanies the artifact.
+
+Packaging success from an ordinary cache-assisted build produces a candidate artifact. It is not release-eligible until the cold acceptance criterion below passes for the same compatibility tuple.
+
+### Cold acceptance complete
+
+- `verify-cold` used fresh work and cache volumes, empty source/output/stage state, and `CCACHE_DISABLE=1`.
+- Any reused bytes were limited to the independently re-verified compressed fetch archive; a cache miss may download it normally during the isolated fetch phase. `prepare` and every later phase ran with networking disabled.
+- PoC, full Chrome build, complete focused tests, audits, package creation, staged-runtime retest, and export all passed.
+- Cold-build timing, peak disk/memory, Ninja/link statistics, the empty ccache directory before/after proof, and the effective `CCACHE_DISABLE=1` environment are stored as zero-cache-use evidence with the artifact metadata.
+- The cold result matches the same environment/source/profile compatibility tuple as the candidate intended for release.
 
 ### Wayland follow-up complete
 
