@@ -23,7 +23,7 @@ The first functional milestone deliberately excludes interactive Wayland and ALS
 
 Hermeticity has two boundaries:
 
-1. The builder image is assembled from a base image digest, exact package versions, checksummed configuration archives, and a checksummed LLVM artifact. Once built, its image digest is the immutable environment identity.
+1. The builder image is assembled from a base image digest, exact package versions, checksummed configuration archives, and a checksummed LLVM artifact. Once built, its image digest is immutable provenance. Cache reuse is controlled by the narrower environment compatibility identity defined in section 7, so harmless changes to tests or wrappers do not invalidate compiled output.
 2. The prepared source tree is assembled from checksummed source/configuration inputs and a committed patch set. Once prepared, all configuration, compilation, testing, auditing, and packaging commands run with container networking disabled.
 
 The initial project does not promise:
@@ -47,11 +47,13 @@ The no-GNU requirement remains strict for the compiler path and Chromium-owned o
 
 Incidental builder utilities such as Bash, Bison, gperf, tar, or findutils are allowed when Chromium's build scripts need them. Alpine system libraries are selected by compatibility and runtime linkage rather than by auditing the authorship of every source file in those libraries. The prohibition is specifically against the GNU compiler/binutils/runtime path, not against every utility ever published by a GNU project.
 
+Stock Alpine ccache is an explicit build-only GNU/GPL exception. Its GPL-3.0 license and dynamic dependencies on `libstdc++.so.6` and `libgcc_s.so.1` are knowingly accepted because its compiler-output reuse is valuable for local iteration. It may execute only as a compiler wrapper, may never replace the Laputa compiler driver or LLVM binutils, and is excluded from every staged browser artifact. This permission does not allow GCC/G++, GNU binutils, libstdc++, or libgcc into a Chromium compile/link command or Chromium-owned ELF. Record ccache's exact APK version, dependency closure, configuration, and license in builder provenance.
+
 Rust is an explicit, separately approved compiler path. Chromium's Rust crates use the pinned Alpine Rust toolchain selected below. Any crate build script that invokes a C/C++ compiler must inherit the Laputa `CC`, `CXX`, and LLVM-binutils environment. Rust compiler provenance is recorded, and Rust-linked final artifacts are subject to the same ELF/runtime audit as C++ output.
 
 The shipped-artifact boundary does not claim that every host-owned library loaded at runtime is free of GNU runtime dependencies. This distinction is material: Alpine's Mesa and Rust packages currently use GNU runtime libraries internally. A stricter future requirement that the complete browser process closure load no GNU code would require custom LLVM-built Mesa, Rust, and other host packages and is outside v1.
 
-Stock Alpine FFmpeg is the sole shipped-runtime exception. The package lock currently resolves FFmpeg `8.1.2-r0`; relevant Alpine 3.24 aarch64 package metadata shows:
+Stock Alpine FFmpeg is the sole shipped-runtime exception; ccache is builder-only and therefore does not change this statement. The package lock currently resolves FFmpeg `8.1.2-r0`; relevant Alpine 3.24 aarch64 package metadata shows:
 
 - `ffmpeg-libavcodec` depends on x265 `4.1-r0` and libjxl `0.11.2-r1`, which depend on `libstdc++.so.6`;
 - `ffmpeg-libavcodec` depends on rav1e `0.8.1-r0`, which depends on `libgcc_s.so.1`;
@@ -127,14 +129,14 @@ The trimmed Chromium archive is preferred because it omits multi-gigabyte materi
 - Commit the resulting installed-package manifest and compare it during image validation.
 - Use only Alpine 3.24 repositories. Do not mix edge packages into the environment.
 
-Alpine 3.24 provides the matching Chromium 150 generation of GN, Rust, samurai, FFmpeg, and related libraries. The current lock resolves Rust `1.96.0-r0`; that compiler package itself depends on Alpine GCC, libstdc++, and libgcc in the builder, which is the explicitly approved Rust-toolchain exception described above. The custom C/C++ compiler remains LLVM 22.1.8 even if Alpine packages compiler-adjacent libraries built with another LLVM 22 patch release.
+Alpine 3.24 provides the matching Chromium 150 generation of GN, Rust, samurai, ccache, FFmpeg, and related libraries. The current lock resolves Rust `1.96.0-r0` and ccache `4.13.6-r0`; the exact architecture-specific resolved locks remain authoritative if metadata changes. The Rust compiler package itself depends on Alpine GCC, libstdc++, and libgcc in the builder, which is the explicitly approved Rust-toolchain exception described above. Stock ccache independently uses the approved builder-only GNU/GPL exception. The custom C/C++ compiler remains LLVM 22.1.8 even if Alpine packages compiler-adjacent libraries built with another LLVM 22 patch release.
 
 Do not request Alpine `build-base`, GCC, G++, binutils, Clang, or LLD as generic build dependencies. Install individual development packages. The approved Alpine Rust package currently pulls GCC/libstdc++/libgcc transitively into the builder; retain them only because APK dependency resolution requires them. Do not add their directories ahead of `/opt/llvm-musl` in `PATH`, do not set any compiler variable to them, and fail if a Chromium compile/link command uses them. A transitive builder runtime may enter the shipped bundle only through the exact FFmpeg-exception closure.
 
 Builder tools include only what the source graph needs, grouped approximately as:
 
 - source and scripting: Bash, ca-certificates, curl, patch, Python, Perl, tar, xz, zstd;
-- generators: Bison, Flex, gperf, Go, Node, GN, samurai;
+- generators and cache: Bison, Flex, gperf, Go, Node, GN, samurai, and the exact locked Alpine ccache package;
 - Rust: Alpine Rust, Cargo components required by Chromium, rust-bindgen, and rustfmt if the source graph requires it;
 - native platform headers: musl-dev, Linux headers, pkgconf, NSS/NSPR, GLib/DBus where structurally required;
 - selected system libraries and their `-dev` packages;
@@ -224,10 +226,14 @@ Image construction performs these operations:
 4. Download and verify the matching LLVM archive.
 5. Extract LLVM to `/opt/llvm-musl` and remove its archive in the same image layer.
 6. Download/verify or copy the small ungoogled, portable, Alpine patch, and copium configuration inputs into `/opt/chromium-inputs`.
-7. Copy repository scripts, local patches, smoke tests, and fixtures into `/opt/chromium-build`.
-8. Create a fixed non-root build user and an entrypoint that can initialize named-volume ownership without changing host files.
-9. Run environment/toolchain validation during the image build.
-10. Record the image input hash and package manifest under `/opt/chromium-build-metadata`.
+7. Create a fixed non-root build user and an entrypoint that initializes new named-volume ownership without changing host files.
+8. Run environment/toolchain validation during the stable image stage.
+9. Record the image input hash and package manifest under `/opt/chromium-build-metadata`.
+10. In a final thin layer, copy repository scripts, local patches, smoke tests, and fixtures into `/opt/chromium-build`.
+
+Order Dockerfile layers from least to most frequently changed: pinned Alpine base and packages, custom LLVM, immutable upstream inputs, user/environment setup, and repository-owned orchestration last. A change to a test or shell wrapper should rebuild only the final thin layer. Keep the Docker build context minimal with a strict `.dockerignore`; never send source archives, named-volume exports, local build output, or unrelated parent-directory contents to the daemon.
+
+Use BuildKit's normal layer cache, and where useful its cache mounts, only to accelerate image construction downloads. Every downloaded input is still content-verified and the completed image must be correct with an empty cache. Cache contents are neither an input lock nor evidence of hermeticity.
 
 Do not place Chromium source in an image layer. It belongs in the named volume so source preparation, patch iteration, and Ninja output do not duplicate enormous Docker layers.
 
@@ -235,12 +241,19 @@ Do not place Chromium source in an image layer. It belongs in the named volume s
 
 ## 7. Named-volume model and state machine
 
-Use one volume per architecture:
+Use one primary work volume per architecture:
 
 - `ungoogled-chromium-work-arm64`
 - `ungoogled-chromium-work-amd64`
 
 Allow an explicit environment override for experiments, but never derive a volume from the current directory or mount a host path.
+
+Reserve separate compiler-cache volumes so resetting source/output does not destroy cached compilation results:
+
+- `ungoogled-chromium-ccache-arm64`
+- `ungoogled-chromium-ccache-amd64`
+
+An optional architecture-independent `ungoogled-chromium-downloads` volume may retain only verified compressed source/input archives during active patch development. It is a speed-for-disk feature, is never required for correctness, and has an explicit prune command. It must not contain an extracted source tree or build output.
 
 Suggested internal layout:
 
@@ -265,15 +278,42 @@ Stamps are written atomically only after a phase succeeds. A partially downloade
 
 Preparation uses sibling temporary paths such as `src.prepare.<pid>` and atomically renames the completed tree to `src`. If an unstamped final `src` exists, `prepare` refuses and reports it instead of guessing whether it is reusable. Test and package staging use the same pattern: build into a temporary directory, validate it, then replace the profile's completed directory. Ninja's `out/` is the exception; it is intentionally resumable in place and is never transactionally replaced.
 
-Separate source identity from profile identity:
+Separate provenance identity from cache compatibility:
 
-- Source identity includes Chromium, ungoogled, portable, Alpine/copium, local patches, architecture-sensitive source transformations, and preparation script version.
-- Environment identity includes the builder image digest, package lock, LLVM artifact, and architecture.
+- Source identity includes Chromium, ungoogled, portable, Alpine/copium, local patches, architecture-sensitive source transformations, and an explicit preparation-compatibility schema version. It does not hash the preparation script wholesale, so a comment or logging-only edit does not invalidate source.
+- Environment compatibility identity includes the architecture, pinned Alpine base and resolved package lock, LLVM artifact digest, sysroot/header/runtime contents, compiler-affecting environment, and an explicit build-driver compatibility schema version.
 - Profile identity includes exact GN arguments and profile-owned source overlay files.
+- Provenance includes the complete builder image digest, repository revision or dirty-state description, and all script/test/package metadata even when those values do not affect compatibility.
+
+The complete image digest is recorded but must not by itself invalidate `src/` or `out/`. Editing a smoke test, packaging script, log message, comment, or host wrapper must leave compatible source and Ninja output reusable. A change that can affect prepared source or compiler output must deliberately bump the corresponding source, environment, or profile compatibility input. Do not approximate this with a hash of every file copied into the image.
 
 A profile change creates a new `out/<profile>` without duplicating `src`. An environment or source mismatch causes an immediate refusal with a field-by-field difference. It must not delete or mutate the volume automatically. The user may select another volume name or explicitly run `reset --yes`.
 
-Do not add ccache or sccache initially. The persistent `out/` directory is the primary incremental cache. Compiler caching can be reconsidered only after measuring rebuild patterns and accounting for duplicated object storage.
+The persistent `out/` directory is the primary incremental cache and handles normal edit/rebuild cycles without duplicating objects. Stock Alpine ccache is the approved secondary recovery/reuse cache for volume resets, clean source preparation, reverted edits, compatible output-directory changes, and unchanged translation units across nearby source versions. Its correctness is never part of artifact identity, and disabling or deleting it must not change the build result.
+
+Install the exact locked Alpine ccache package as the explicit build-only GNU/GPL exception defined in section 2.2. Audit its builder dependency closure and keep it outside every runtime stage and export. Configure Chromium through its supported `cc_wrapper` GN argument using the absolute ccache executable path; do not use compiler-name masquerade directories or allow ccache to select a different compiler implicitly.
+
+Use a separate cache per architecture, stable `/work` paths, content-based compiler checking, compression at a low level, no unsafe sloppiness settings, and an initial 10 GiB limit. Put ccache temporary data on the cache volume, print `ccache --show-config` and before/after statistics, and expose explicit cache status/prune/disable controls. Namespace or invalidate entries when architecture or Laputa toolchain content changes even though ccache also hashes the compiler. Measure hit rate, eviction rate, miss overhead, and duplicated disk before increasing the bound. Do not add sccache, remote cache storage, or distributed compilation in v1.
+
+The initial effective configuration is equivalent to:
+
+```text
+CCACHE_DIR=/ccache
+CCACHE_TEMPDIR=/ccache/tmp
+CCACHE_BASEDIR=/work
+CCACHE_COMPILERCHECK=content
+CCACHE_COMPRESS=true
+CCACHE_COMPRESSLEVEL=1
+CCACHE_MAXSIZE=10G
+CCACHE_NAMESPACE=<architecture>-<laputa-toolchain-digest>
+CCACHE_SLOPPINESS=<unset>
+```
+
+Mount the selected compiler-cache named volume at `/ccache` and keep source/output at fixed `/work/src` and `/work/out/...` paths in every container. Verify the exact environment-variable names against the locked ccache version and store `ccache --show-config` output; the semantic requirements above prevail if the package changes spelling. Set GN `cc_wrapper` to the verified absolute Alpine ccache executable, expected to be `/usr/bin/ccache`, while the GN compiler itself remains an absolute `/opt/llvm-musl/bin/clang` or `clang++` path. Do not enable hard-link mode, compiler masquerade directories, time-based sloppiness, or `compiler_check=none`.
+
+Use ccache only for Chromium C/C++ compiler invocations. Rust and other language actions rely on their normal persistent Ninja outputs; do not add sccache merely to cache them. A cold cache can make a clean build slightly slower and consumes storage in addition to `out/`, which is why the size and statistics remain visible and bounded.
+
+Never recursively `chown` or `chmod` `/work` at container startup. Initialize ownership once when a volume is empty, then inspect only the volume root and expected top-level paths. Avoid any startup or stamp check that walks the complete Chromium tree.
 
 ## 8. Host command contract
 
@@ -305,8 +345,17 @@ The host CLI defaults to `--arch arm64` and `--profile headless-debug`. Every co
 - Downloads only the Chromium source archive; small patch/configuration inputs should already be in the image.
 - Verifies the source archive before extraction.
 - Prepares the tree transactionally.
-- Deletes the compressed archive after successful extraction to minimize disk use.
+- Deletes the compressed archive after successful extraction in the disk-minimal mode.
+- With the explicit download-cache option, moves or reuses the verified compressed archive in the download volume instead; cached bytes are verified again before every extraction.
 - Is idempotent when stamps match.
+
+### `dev-apply-patch`
+
+- Is an explicitly non-hermetic patch-development escape hatch, disabled unless requested by name.
+- Applies one selected repository patch to the existing prepared source without rebuilding the tree and records the patch, prior source identity, timestamp, and resulting development-dirty state.
+- Never claims a new clean source stamp and makes `audit`, `package`, and publish/export completion unavailable.
+- Allows Ninja to rebuild only files affected by a patch experiment.
+- Requires `reset --yes`, clean `prepare`, and all normal gates before any artifact can be accepted.
 
 ### `poc`
 
@@ -323,11 +372,29 @@ The host CLI defaults to `--arch arm64` and `--profile headless-debug`. Every co
 - Accepts `JOBS` and an optional Ninja load-limit override. Default jobs may follow the CPU count visible inside the container. Do not enforce guessed memory/disk thresholds; print available volume space for observability and preserve normal OOM/ENOSPC failures for diagnosis.
 - Leaves partial Ninja output intact after failure so rerunning resumes normally.
 
+### `build-target`
+
+- Accepts one explicit Ninja output or a GN label resolved to its outputs.
+- Runs offline against the existing profile output and never broadens the request to `all`.
+- Exists for rebuilding the failing object, generated-resource target, archive, or other narrow dependency before paying for a `chrome` relink.
+- Prints `gn desc`/`ninja -t query` guidance when a supplied label has several outputs or is not directly buildable.
+
+### `test-fast`
+
+- Runs the shortest deterministic browser loop: launch sandboxed modern headless Chrome, complete a raw CDP handshake, navigate to one loopback fixture, evaluate JavaScript, capture and validate a screenshot, and shut down cleanly.
+- Uses a fresh small user-data directory and writes concise failure logs.
+- Must remain independent of extension, media, complete DevTools-resource, dependency-audit, and packaging checks so its expected runtime is seconds rather than minutes.
+
 ### `test`
 
-- Runs repository-owned smoke/CDP/extension tests offline.
+- Runs the complete repository-owned smoke/CDP/DevTools/extension/media/rendering tests offline.
 - Runs Chrome as a non-root user and never adds `--no-sandbox`.
 - Writes logs, screenshots, and downloads under `test-output/<profile>`.
+
+### `audit`
+
+- Runs post-build compile-command, response-file, ELF, runtime-closure, GNU-boundary, and provenance audits without packaging.
+- Is explicit and is never an automatic consequence of an ordinary `build` or `test-fast` iteration.
 
 ### `package`
 
@@ -343,19 +410,22 @@ The host CLI defaults to `--arch arm64` and `--profile headless-debug`. Every co
 
 ### `status`, `clean`, and `reset`
 
-- `status` reports phase stamps, identities, tool versions, source/output/stage sizes, and incomplete phases.
+- `status` reports phase stamps, compatibility and provenance identities, tool versions, source/output/stage/cache sizes, compiler-cache statistics, dirty-source state, and incomplete phases.
 - `clean --profile <name>` removes only that profile's `out`, stage, and test output.
 - `clean --all-profiles` preserves prepared source.
 - `reset` refuses without `--yes`, then removes the complete architecture volume.
+- `cache-status` reports cache configuration, hits/misses, evictions, compression, and disk use without changing it.
+- `cache-prune` independently bounds or removes the compiler/download cache and never touches the work volume.
+- `build --no-compiler-cache` sets ccache's supported disable control for a diagnostic build without changing GN arguments or deleting entries; use it to reproduce suspected cache faults.
 
 ## 9. Source preparation pipeline
 
 Preparation is deterministic and uses this exact conceptual order:
 
-1. Download the trimmed Chromium archive to a temporary path in the volume.
+1. Download the trimmed Chromium archive to a temporary path in the volume, or copy it from the optional download cache after re-verifying its identity.
 2. Verify size and SHA-512 before extraction.
 3. Extract into a temporary source directory and validate expected Chromium version files and top-level layout.
-4. Remove the archive after successful extraction.
+4. Remove the archive after successful extraction in disk-minimal mode, or retain only the verified compressed archive in the optional download cache.
 5. Run ungoogled binary pruning from the pinned common configuration.
 6. Apply ungoogled common patches in their declared order.
 7. Apply the matching portablelinux source patches in their declared order:
@@ -368,6 +438,8 @@ Preparation is deterministic and uses this exact conceptual order:
 11. Install the repository-owned GN smoke target/fixture overlay.
 12. Remove source files for libraries selected for system unbundling only after GN replacement files have been installed and validated.
 13. Write patch provenance, tree identity, and the atomic completion stamp.
+
+Preparation must preserve timestamps and avoid rewriting unchanged files wherever the upstream tools permit it. Generated profile files are written through compare-and-replace so identical content retains its previous timestamp. A script/test-only image rebuild must not cause preparation to touch the source tree.
 
 The pinned Alpine base patch inventory is:
 
@@ -578,6 +650,8 @@ Explicit exclusions:
 
 When an exclusion lacks a supported GN flag, prefer omitting the related build/package target and runtime resource. Do not maintain a large invasive patch merely to prove the dead code is physically absent unless it materially removes a dependency. `gn gen --fail-on-unused-args` is mandatory; never keep aspirational or obsolete arguments in the profile.
 
+Request only the `chrome` target and its implicit dependencies. Do not request `all`, documentation groups, test suites, benchmarks, examples, chromedriver, headless shell, or packaging groups. There is no separate global “disable docs/tests” switch required: those products are excluded by target selection. Generated protocol descriptions, GRIT data, DevTools resources, and other apparent documentation/resource steps that are dependencies of `chrome` are runtime inputs and must not be suppressed indiscriminately.
+
 PDF is not an acceptance capability. Do not test `Page.printToPDF`, package the PDF viewer, or install CUPS. If a small amount of PDF implementation remains structurally required by the full Chrome graph, removing it is not allowed to block the first browser.
 
 The profile source file contains only arguments verified to exist in Chromium 150. At minimum, verify the effective values corresponding to this behavior matrix rather than assuming every desired capability has a same-named GN argument:
@@ -586,13 +660,19 @@ The profile source file contains only arguments verified to exist in Chromium 15
 | --- | --- |
 | Toolchain | Clang/LLD, native musl, no sysroot, Laputa external libc++, compiler-rt |
 | Build shape | debug, monolithic, zero symbol levels, no PGO/LTO/CFI/Chrome plugins |
+| Compiler cache | absolute Alpine ccache wrapper, bounded per-architecture named volume, Laputa compiler remains the wrapped executable |
 | Ozone/UI | headless enabled; Wayland, X11, GTK, and Qt disabled |
 | Audio/capture | ALSA, PulseAudio, PipeWire, and WebRTC capture disabled |
 | Graphics | host Mesa/llvmpipe path; VA-API, Vulkan, and SwiftShader disabled |
 | Media | locked stock-Alpine system FFmpeg with common codecs; Widevine disabled |
 | Product | ungoogled defaults, local extensions and DevTools retained, en-US only |
+| Web frontend iteration | `optimize_webui=false`; verify and use `devtools_skip_typecheck=true` and `devtools_bundle=false` when supported by Chromium 150 |
 
 For each row, the PoC stores both the controlling GN values and evidence from the generated target graph. A runtime-only command-line flag is not accepted as proof that an unwanted backend was excluded from compilation.
+
+The fast profile must explicitly verify `optimize_webui=false`, which avoids WebUI minification/bundling work and is normally implied by `is_debug=true`. Probe Chromium 150 for `devtools_skip_typecheck` and `devtools_bundle` before placing them in the profile. When present, set both as shown above: DevTools remains built and packaged, but TypeScript checking and frontend bundling are skipped for the development browser. The CDP and DevTools-resource tests must prove that this unbundled frontend remains functional in the integrated Chrome build. If either argument is absent or the frontend fails, remove only that verified-incompatible argument rather than disabling DevTools.
+
+Run DevTools TypeScript checking as a separate explicit validation target or command at milestone boundaries if Chromium exposes one. Do not create another full C++ output directory merely to typecheck the frontend unless the generated graph makes that unavoidable. The ordinary C++ edit loop never performs frontend typechecking implicitly.
 
 ### 12.2 `wayland-debug`: follow-up profile
 
@@ -612,6 +692,10 @@ Continue to disable X11, GTK, Qt, PulseAudio, PipeWire, VA-API, Vulkan, and Swif
 
 VA-API is a separate later profile because it adds libva, driver discovery, render-node access, sandbox interaction, and hardware-specific testing. Do not mix it into the initial Wayland work.
 
+After the monolithic browser works, publish a new pinned Laputa toolchain artifact containing validated shared musl builds of libc++, libc++abi, and the selected unwind runtime. Only then add a `headless-component-debug` iteration profile with `is_component_build=true`. It must use those intentional toolchain release artifacts, not an ad hoc shared library synthesized inside this project, and must pass the same compiler/runtime/ELF checks. Component mode is development-only and may have behavior differences; monolithic `headless-debug` remains the artifact-producing validation profile. This is the largest planned improvement to repeated C++ relink time because ccache does not cache links.
+
+Do not enable stale jumbo/unity-build switches, Clang modules, remote execution, distcc, Icecc, or another cache service merely because older Chromium guidance mentions them. Each adds correctness or dependency risk and must be reconsidered only from Chromium 150's actual supported graph and measured local bottlenecks.
+
 ## 13. Proof-of-concept gates
 
 The PoC is intentionally much cheaper than building Chrome. It must catch toolchain, runtime, patch, GN, and dependency failures early.
@@ -619,10 +703,12 @@ The PoC is intentionally much cheaper than building Chrome. It must catch toolch
 ### Gate A: environment identity
 
 - Architecture inside the container matches the selected native architecture.
-- Builder image digest and package manifest match the locks.
+- Builder image digest is recorded as provenance; the environment compatibility fields and package manifest match their locks.
 - Network is absent for all PoC subprocesses.
 - All expected source stamps match.
 - `which` and resolved symlinks for compiler/binutils variables point under `/opt/llvm-musl`.
+- ccache configuration names the absolute Laputa compiler wrapper path, the selected per-architecture cache volume, content-based compiler checking, the committed size bound, and no unsafe sloppiness settings.
+- ccache's installed GNU runtime dependencies are classified builder-only and no cache executable/library is eligible for staging.
 - System-library preflight exists for the exact environment/package policy, matches the committed FFmpeg-exception rules, and contains no unclassified required-library edge.
 
 ### Gate B: direct compiler/runtime probes
@@ -657,7 +743,7 @@ Add a renderer probe that creates a minimal surfaceless/headless EGL context usi
 
 - Generate `out/headless-debug` with `--fail-on-unused-args`.
 - Save the final canonical args listing.
-- Assert target CPU, musl, no sysroot, custom host/default toolchains, LLD, monolithic debug, symbol levels, headless Ozone, no X11/Wayland/GTK/audio, stock system FFmpeg, and disabled optimization features.
+- Assert target CPU, musl, no sysroot, custom host/default toolchains, LLD, monolithic debug, symbol levels, headless Ozone, no X11/Wayland/GTK/audio, stock system FFmpeg, ccache wrapper, `optimize_webui=false`, supported DevTools fast-build arguments, and disabled optimization features.
 - Run `gn check` only where it is useful and bounded; do not let a full unrelated upstream check become the PoC.
 
 ### Gate E: small GN build
@@ -675,7 +761,7 @@ Add a repository-owned target under a clearly named source overlay such as `//to
 
 - Run a full Ninja dry-run of `chrome`.
 - Generate/inspect commands for the graph.
-- Prove all C/C++ commands use the custom LLVM tools.
+- Prove all C/C++ commands use the approved ccache wrapper over absolute custom LLVM compiler paths, while archive/link-only tools use custom LLVM directly.
 - Prove Chromium's in-tree libc++ targets are not scheduled.
 - Prove the generated graph uses the system-FFmpeg shims and does not schedule Chromium's bundled FFmpeg sources.
 - Prove no forbidden compiler/runtime flags or archive paths appear.
@@ -687,6 +773,21 @@ Passing the PoC must never automatically launch the full build.
 ## 14. Full build behavior
 
 The `build` command invokes samurai/Ninja for `chrome` only. It runs offline and uses the persistent profile output directory.
+
+The intended development loop is:
+
+1. edit repository patches/configuration or prepared development source;
+2. run `build-target` for the failing or directly affected object/generated target where practical;
+3. run `build` only when a complete `chrome` executable or relink is required;
+4. run `test-fast`;
+5. run the complete `test` and `audit` commands only at milestones;
+6. run `package` only for an accepted candidate.
+
+Use `gn desc`, `ninja -t query`, `ninja -t commands`, and generated compilation data to identify the narrowest useful target. Do not repeatedly run GN generation when neither GN inputs nor build files changed; allow Ninja's dependency graph to request regeneration when required. Never clean as a speculative remedy for an ordinary compile or link failure.
+
+Expose Ninja job count and load limit independently. Begin with a conservative host-derived default, then benchmark nearby values rather than assuming maximum visible CPUs is optimal. On the current 10-core/32-GiB development machine, start with `-j8` and compare `-j10` using the same build state. Do not oversubscribe memory merely to keep every CPU busy. Mount only disposable `/tmp` and `/dev/shm` as tmpfs where useful; never put persistent `src/`, `out/`, or the compiler cache on tmpfs.
+
+Every meaningful clean and incremental timing run records wall time, CPU count, job/load settings, peak memory when observable, free/used volume space, Ninja statistics/critical-path information, final-link duration, and ccache hits, misses, evictions, cacheable/non-cacheable calls, and size. Keep a small benchmark log keyed by source/environment/profile compatibility identities. Optimization decisions must be based on these measurements, not cache folklore.
 
 Behavior on failure:
 
@@ -701,6 +802,12 @@ The final monolithic link is expected to be the slowest incremental operation. T
 ## 15. Functional headless tests
 
 Tests use only repository-owned fixtures and local loopback services. No test requires Internet access, Google services, Puppeteer, Playwright, Selenium, or chromedriver.
+
+Tests are tiered by iteration cost:
+
+- `test-fast` performs only launch, raw CDP handshake, one local navigation, JavaScript evaluation, screenshot validation, and clean shutdown. It is the default post-link loop and must not invoke extension, media, complete DevTools, ELF, provenance, or package checks.
+- `test` performs all functional subsections below and is required at milestones and before `audit`/`package`.
+- Upstream Chromium unit, browser, Web, layout, performance, and end-to-end suites are not built or run in v1. Repository-owned focused tests provide acceptance evidence for this deliberately narrow product.
 
 ### 15.1 Test server and profile isolation
 
@@ -790,7 +897,7 @@ Hard failures include:
 - `libstdc++.so.6`, `libgcc_s.so.1`, or `GLIBCXX_*` requirements in a Chromium-owned ELF;
 - static libstdc++/libgcc inputs in any recorded Chromium link command;
 - a path to `libstdc++`, `libgcc_s`, X11, VA-API, VDPAU, or another exception soname that does not descend from a locked FFmpeg `libav*` root;
-- a compiler/linker path outside `/opt/llvm-musl` in the recorded Chrome graph;
+- a resolved compiler/linker path outside `/opt/llvm-musl` in the recorded Chrome graph, except for the single approved absolute ccache wrapper executable in compile commands;
 - an RPATH/RUNPATH pointing into `/work`, `/opt/llvm-musl`, or another builder-only directory;
 - PulseAudio, PipeWire, GTK, or direct X11 dependencies in `headless-debug`;
 - Chromium bundled-FFmpeg objects or a stock-FFmpeg library/runtime path inconsistent with the locked APK/preflight closure;
@@ -831,6 +938,7 @@ Stage into a fresh directory and strip only the staged copies with `/opt/llvm-mu
 
 Do not package:
 
+- ccache, its cache contents, or any library present only for the builder-side ccache exception;
 - chromedriver;
 - legacy headless shell;
 - setuid `chrome-sandbox` fallback;
@@ -896,6 +1004,8 @@ Produce:
 - input and package locks;
 - canonical GN arguments;
 - builder image digest;
+- environment compatibility identity and build-driver schema version;
+- ccache APK/dependency/license provenance, effective configuration, and final statistics, while excluding cached object contents;
 - patch provenance;
 - library/license manifest;
 - ELF/link audit report;
@@ -1009,6 +1119,14 @@ Risk: full Chrome may retain ANGLE even though SwiftShader/Vulkan are disabled, 
 
 Risk: feature-reduction flags change across Chromium versions. Mitigation: pin Chromium, keep profile files version-specific, use `--fail-on-unused-args`, and distinguish dependency-removing requirements from optional dead-code pruning.
 
+### Compiler-cache correctness, disk growth, and GNU containment
+
+Risk: ccache duplicates object storage, cache misses add overhead, unsafe sloppiness can return stale output, and Alpine's ccache executable brings the deliberately approved builder-side `libstdc++`/`libgcc_s` exception. Mitigation: bound each architecture cache initially to 10 GiB, use content-based compiler checks and stable paths, prohibit sloppiness initially, collect hit/miss/eviction and disk statistics, and make cache deletion/disable harmless to correctness. Audit the wrapper's resolved compiler on every PoC, reject GCC/G++ or GNU binutils in generated commands, and prohibit ccache plus its runtime closure from staging. A suspected false hit requires disabling/clearing the cache and reproducing from normal Ninja inputs before diagnosing Chromium.
+
+### Compatibility-key under- or over-invalidation
+
+Risk: hashing the whole image discards valuable output after harmless wrapper/test changes, while omitting a true compiler-affecting input can incorrectly reuse Ninja or ccache results. Mitigation: record the complete image digest for provenance, define compatibility fields explicitly, version the build-driver compatibility schema deliberately, compare field-by-field, and test representative harmless and material changes. When uncertain, bump the narrow relevant compatibility field; never delete a volume automatically.
+
 ## 22. Completion criteria by phase
 
 ### Environment complete
@@ -1016,6 +1134,8 @@ Risk: feature-reduction flags change across Chromium versions. Mitigation: pin C
 - Both architecture mappings, input locks, and image definitions pass static validation.
 - ARM64 image builds natively under OrbStack.
 - Package and LLVM locks match the installed environment.
+- The image digest is recorded separately from the environment compatibility identity; a test/wrapper-only image change has been proven not to invalidate compatible `src/` or `out/`.
+- Exact Alpine ccache provenance and dependency closure are locked, its per-architecture named volume is bounded/configured, and its resolved wrapped compiler is under `/opt/llvm-musl`.
 - No generic compiler/binutils path can accidentally override `/opt/llvm-musl`.
 - Candidate system-library closures have been audited and their private/host/FFmpeg-exception/forbidden classifications are recorded.
 - The exact stock-FFmpeg exception graph is accepted only within its committed roots and contains no glibc.
@@ -1023,14 +1143,17 @@ Risk: feature-reduction flags change across Chromium versions. Mitigation: pin C
 ### Source preparation complete
 
 - No Git clone exists.
-- Trimmed source is verified, extracted, and its archive removed.
+- Trimmed source is verified and extracted; its archive is removed in disk-minimal mode or retained only as a verified compressed download-cache entry in iteration mode.
 - All patch layers and domain substitution succeed.
 - Source identity/provenance is complete and repeatable.
+- Any `dev-apply-patch` use leaves an unmistakable development-dirty state that blocks audit and packaging until a clean reset/prepare.
 
 ### PoC complete
 
 - Direct compiler/runtime/system-library probes pass.
 - GN generation passes with no unused args.
+- ccache is the configured compiler wrapper, reports the intended Laputa compiler, and remains a builder-only exception.
+- `optimize_webui=false` and every supported DevTools fast-build argument have their effective values recorded.
 - Small GN smoke executable builds/runs.
 - Chrome dry-run and command audit pass.
 - No in-tree libc++, GCC, libstdc++, or libgcc compiler/link input is scheduled for Chromium-owned targets, and the system-FFmpeg graph matches the locked exception policy.
@@ -1040,6 +1163,7 @@ Risk: feature-reduction flags change across Chromium versions. Mitigation: pin C
 - Monolithic Chrome builds from the persistent volume.
 - Modern headless mode runs with sandboxing and host llvmpipe.
 - Raw CDP pipe/TCP, DevTools resources, downloads, screenshots, storage/network events, and local extension tests pass offline.
+- `test-fast` supplies the short post-link acceptance loop; the complete focused `test` suite passes at the milestone without building upstream test suites.
 - System-FFmpeg H.264/AAC decode/containment tests pass without disturbing Chrome's static-libc++ identity or Mesa llvmpipe rendering.
 - ELF/link audits pass.
 
@@ -1076,4 +1200,5 @@ This is the first full-build success milestone. Packaging is not required to cal
 - Generic-musl or glibc-host portability.
 - Bit-for-bit reproducible output.
 - Prebuilt APK archival or a private Alpine snapshot repository.
-- ccache/sccache until measured evidence justifies the duplicate disk usage.
+- Remote compiler caches, sccache, distributed compilation, and remote execution; the approved v1 cache is local stock Alpine ccache only.
+- Component builds until a pinned Laputa toolchain release provides validated shared musl libc++/libc++abi/unwind artifacts.
