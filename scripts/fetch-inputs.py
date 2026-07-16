@@ -2,6 +2,7 @@
 """Fetch and verify the locked source inputs."""
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
 import os
@@ -52,6 +53,42 @@ def write_atomic(path, text):
     temporary.replace(path)
 
 
+def fetch_one(item, inputs_root):
+    destination = inputs_root / item["filename"]
+    if destination.is_file():
+        verify(destination, item)
+        final_url = item["url"]
+        action = "reused"
+    else:
+        with tempfile.NamedTemporaryFile(
+            dir=inputs_root, prefix=f".{item['name']}.", delete=False
+        ) as temporary:
+            temporary_path = Path(temporary.name)
+        try:
+            opener = urllib.request.build_opener(HTTPSRedirectHandler())
+            with opener.open(item["url"]) as response, temporary_path.open("wb") as output:
+                final_url = response.geturl()
+                if urllib.parse.urlparse(final_url).scheme != "https":
+                    raise RuntimeError(f'{item["name"]}: final URL is not HTTPS')
+                while chunk := response.read(1024 * 1024):
+                    output.write(chunk)
+            verify(temporary_path, item)
+            temporary_path.replace(destination)
+            action = "downloaded"
+        finally:
+            temporary_path.unlink(missing_ok=True)
+    return {
+        "name": item["name"],
+        "filename": item["filename"],
+        "path": str(destination),
+        "url": item["url"],
+        "final_url": final_url,
+        "size": item["size"],
+        "sha512": item["sha512"],
+        "action": action,
+    }
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--lock", type=Path, required=True)
@@ -61,41 +98,9 @@ def main():
 
     lock = json.loads(args.lock.read_text(encoding="utf-8"))
     args.inputs_root.mkdir(parents=True, exist_ok=True)
-    entries = []
-    opener = urllib.request.build_opener(HTTPSRedirectHandler())
-    for item in locked_inputs(lock):
-        destination = args.inputs_root / item["filename"]
-        if destination.is_file():
-            verify(destination, item)
-            final_url = item["url"]
-            action = "reused"
-        else:
-            with tempfile.NamedTemporaryFile(
-                dir=args.inputs_root, prefix=f".{item['name']}.", delete=False
-            ) as temporary:
-                temporary_path = Path(temporary.name)
-            try:
-                with opener.open(item["url"]) as response, temporary_path.open("wb") as output:
-                    final_url = response.geturl()
-                    if urllib.parse.urlparse(final_url).scheme != "https":
-                        raise RuntimeError(f'{item["name"]}: final URL is not HTTPS')
-                    while chunk := response.read(1024 * 1024):
-                        output.write(chunk)
-                verify(temporary_path, item)
-                temporary_path.replace(destination)
-                action = "downloaded"
-            finally:
-                temporary_path.unlink(missing_ok=True)
-        entries.append({
-            "name": item["name"],
-            "filename": item["filename"],
-            "path": str(destination),
-            "url": item["url"],
-            "final_url": final_url,
-            "size": item["size"],
-            "sha512": item["sha512"],
-            "action": action,
-        })
+    items = locked_inputs(lock)
+    with ThreadPoolExecutor(max_workers=min(4, len(items))) as executor:
+        entries = list(executor.map(fetch_one, items, [args.inputs_root] * len(items)))
 
     report = {
         "schema": 1,

@@ -3,6 +3,8 @@
 
 import argparse
 import json
+import multiprocessing
+import os
 import shlex
 import sys
 from pathlib import Path
@@ -76,7 +78,7 @@ def scan_text(text, label, failures):
             failures.append(f"{label}: {description}: {needle}")
 
 
-def audit_commands(commands, failures):
+def audit_command_lines(lines):
     counts = {
         "compile_commands": 0,
         "link_commands": 0,
@@ -88,8 +90,9 @@ def audit_commands(commands, failures):
     compiler_failures = []
     linker_failures = []
     archive_failures = []
+    direct_failures = []
 
-    for number, line in enumerate(commands.splitlines(), 1):
+    for number, line in lines:
         if not line.strip():
             continue
         tokens = tokenize(line)
@@ -142,8 +145,80 @@ def audit_commands(commands, failures):
             ):
                 linker_failures.append(f"line {number}: link command does not select LLD")
         if "third_party/ffmpeg" in line:
-            failures.append(f"line {number}: bundled FFmpeg path in a compiler/link command")
+            direct_failures.append(f"line {number}: bundled FFmpeg path in a compiler/link command")
 
+    return counts, direct_failures, ccache_failures, compiler_failures, linker_failures, archive_failures
+
+
+_COMMAND_LINES = []
+
+
+def configured_jobs(line_count):
+    default_jobs = min(8, os.cpu_count() or 1)
+    try:
+        requested_jobs = int(os.environ.get("GATE_F_JOBS", default_jobs))
+    except ValueError:
+        requested_jobs = default_jobs
+    return max(1, min(requested_jobs, line_count or 1))
+
+
+def parallel_line_results(lines, direct_worker, range_worker):
+    jobs = configured_jobs(len(lines))
+    if jobs == 1 or len(lines) < 2 or "fork" not in multiprocessing.get_all_start_methods():
+        return [direct_worker(lines)]
+
+    global _COMMAND_LINES
+    _COMMAND_LINES = lines
+    ranges = []
+    for index in range(jobs):
+        start = len(lines) * index // jobs
+        end = len(lines) * (index + 1) // jobs
+        if start < end:
+            ranges.append((start, end))
+    context = multiprocessing.get_context("fork")
+    try:
+        with context.Pool(processes=len(ranges)) as pool:
+            return pool.map(range_worker, ranges)
+    finally:
+        _COMMAND_LINES = []
+
+
+def audit_command_range(bounds):
+    start, end = bounds
+    return audit_command_lines(_COMMAND_LINES[start:end])
+
+
+def audit_commands(commands, failures):
+    lines = list(enumerate(commands.splitlines(), 1))
+    results = parallel_line_results(lines, audit_command_lines, audit_command_range)
+
+    counts = {
+        name: 0
+        for name in (
+            "compile_commands",
+            "link_commands",
+            "archive_commands",
+            "ranlib_commands",
+            "assembly_commands",
+        )
+    }
+    direct_failures = []
+    ccache_failures = []
+    compiler_failures = []
+    linker_failures = []
+    archive_failures = []
+    for result in results:
+        result_counts, *result_failures = result
+        for name, value in result_counts.items():
+            counts[name] += value
+        direct, ccache, compiler, linker, archive = result_failures
+        direct_failures.extend(direct)
+        ccache_failures.extend(ccache)
+        compiler_failures.extend(compiler)
+        linker_failures.extend(linker)
+        archive_failures.extend(archive)
+
+    failures.extend(direct_failures)
     failures.extend(ccache_failures)
     failures.extend(compiler_failures)
     failures.extend(linker_failures)
@@ -151,14 +226,30 @@ def audit_commands(commands, failures):
     return counts
 
 
+def response_file_candidates(lines):
+    candidates = set()
+    for _, line in lines:
+        for token in tokenize(line):
+            if not token.startswith("@") or token == "@":
+                continue
+            candidate = token[1:]
+            if not candidate.startswith("-"):
+                candidates.add(candidate)
+    return candidates
+
+
+def response_file_range(bounds):
+    start, end = bounds
+    return response_file_candidates(_COMMAND_LINES[start:end])
+
+
 def response_files(out, command_text):
+    lines = list(enumerate(command_text.splitlines(), 1))
+    candidates = set()
+    for result in parallel_line_results(lines, response_file_candidates, response_file_range):
+        candidates.update(result)
     paths = set()
-    for token in tokenize(command_text):
-        if not token.startswith("@") or token == "@":
-            continue
-        candidate = token[1:]
-        if candidate.startswith("-"):
-            continue
+    for candidate in candidates:
         path = Path(candidate)
         if not path.is_absolute():
             path = out / path
