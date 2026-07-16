@@ -1,0 +1,11 @@
+diff --git a/third_party/node/update_node_binaries b/third_party/node/update_node_binaries
+--- a/third_party/node/update_node_binaries
++++ b/third_party/node/update_node_binaries
+@@ -19,7 +19,7 @@ set -eu
+ cd "$(dirname "$0")"
+ 
+ BASE_URL="https://nodejs.org/dist"
+-NODE_VERSION="v24.12.0"
++NODE_VERSION="v24.17.0"
+ 
+ upload=false  # Default value

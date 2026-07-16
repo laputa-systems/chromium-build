@@ -1,0 +1,24 @@
+diff --git a/third_party/crashpad/crashpad/util/linux/socket.cc b/third_party/crashpad/crashpad/util/linux/socket.cc
+--- a/third_party/crashpad/crashpad/util/linux/socket.cc
++++ b/third_party/crashpad/crashpad/util/linux/socket.cc
+@@ -124,6 +124,10 @@
+   ucred* local_creds = nullptr;
+   std::vector<ScopedFileHandle> local_fds;
+   bool unhandled_cmsgs = false;
++#if defined(__linux__) && !defined(__GLIBC__)
++#pragma clang diagnostic push
++#pragma clang diagnostic ignored "-Wsign-compare"
++#endif
+ 
+   for (cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
+        cmsg;
+        cmsg = CMSG_NXTHDR(&msg, cmsg)) {
+@@ -154,6 +158,9 @@
+                << cmsg->cmsg_type;
+     unhandled_cmsgs = true;
+   }
++#if defined(__linux__) && !defined(__GLIBC__)
++#pragma clang diagnostic pop
++#endif
+ 
+   if (unhandled_cmsgs) {

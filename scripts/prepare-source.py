@@ -336,6 +336,10 @@ def main():
         "musl-fontconfig-random.patch": "The bundled fontconfig configuration claims glibc's random_r API is available; use its portable random() fallback on musl.",
         "musl-bindgen-clang22.patch": "Alpine's pinned libclang predates two Chromium warning names; bindgen must ignore unknown warning-option diagnostics.",
         "alpine-rust-bootstrap.patch": "The pinned Alpine Rust package is stable while Chromium 150 emits nightly-only -Z flags; enable its documented bootstrap compatibility mode only in Chromium's Rust wrapper.",
+        "alpine-node-version.patch": "The pinned Alpine Node package is v24.17.0 while this Chromium checkout records v24.12.0; keep the build-time version check enabled against the hermetic package actually installed in the image.",
+        "musl-crashpad-cdefs.patch": "Crashpad's ptrace compatibility header only needs glibc's sys/cdefs.h for its glibc-specific constants; avoid Alpine's deprecation warning on musl while retaining that include on glibc.",
+        "musl-crashpad-cmsg.patch": "musl's CMSG_NXTHDR macro compares size_t with ptrdiff_t; suppress that libc-header warning locally for Crashpad's Unix credential socket loop.",
+        "headless-no-crashpad-handler.patch": "The headless product does not collect crash reports; omit the Crashpad handler data dependency from Chrome, the crash app, and headless executables to keep the output graph and artifact minimal.",
     }
     for local_patch in args.local_patch:
         record = patch_file(

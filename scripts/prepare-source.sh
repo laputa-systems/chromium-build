@@ -66,6 +66,10 @@ SOURCE_DIR=$(find "$TEMP" -mindepth 3 -maxdepth 3 -type f -path '*/chrome/VERSIO
     --local-patch "$ROOT/config/patches/musl-fontconfig-random.patch" \
     --local-patch "$ROOT/config/patches/musl-bindgen-clang22.patch" \
     --local-patch "$ROOT/config/patches/alpine-rust-bootstrap.patch" \
+    --local-patch "$ROOT/config/patches/alpine-node-version.patch" \
+    --local-patch "$ROOT/config/patches/musl-crashpad-cdefs.patch" \
+    --local-patch "$ROOT/config/patches/musl-crashpad-cmsg.patch" \
+    --local-patch "$ROOT/config/patches/headless-no-crashpad-handler.patch" \
     --rust-target-triple "$rust_target_triple"
 
 mv "$SOURCE_DIR" "$SOURCE"

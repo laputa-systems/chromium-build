@@ -14,6 +14,7 @@ ARG NINJA_SOURCE_SIZE=240483
 RUN apk add --no-cache \
     bash=5.3.9-r1 \
     bison=3.8.2-r3 \
+    bsd-compat-headers=0.7.2-r6 \
     ca-certificates=20260611-r0 \
     cargo=1.96.0-r0 \
     ccache=4.13.6-r0 \

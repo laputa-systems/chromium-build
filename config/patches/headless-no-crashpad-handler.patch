@@ -1,0 +1,32 @@
+diff --git a/chrome/BUILD.gn b/chrome/BUILD.gn
+--- a/chrome/BUILD.gn
++++ b/chrome/BUILD.gn
+@@ -309,8 +309,6 @@ if (is_win) {
+         "//chrome/common:buildflags",
+       ]
+ 
+-      data_deps += [ "//components/crash/core/app:chrome_crashpad_handler" ]
+-
+       ldflags = []
+ 
+       # On Chrome OS builds put priority to the library in the installed
+diff --git a/components/crash/core/app/BUILD.gn b/components/crash/core/app/BUILD.gn
+--- a/components/crash/core/app/BUILD.gn
++++ b/components/crash/core/app/BUILD.gn
+@@ -87,7 +87,6 @@ static_library("app") {
+ 
+   if (is_linux || is_chromeos) {
+     sources += [ "crashpad_linux.cc" ]
+-    data_deps = [ ":chrome_crashpad_handler" ]
+   }
+ 
+   if (is_ios) {
+diff --git a/headless/BUILD.gn b/headless/BUILD.gn
+--- a/headless/BUILD.gn
++++ b/headless/BUILD.gn
+@@ -502,3 +502,0 @@
+-  if (is_linux || is_chromeos) {
+-    data_deps += [ "//components/crash/core/app:chrome_crashpad_handler" ]
+-  }
+ 
+   if (use_dbus) {

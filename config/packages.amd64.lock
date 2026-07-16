@@ -9,6 +9,7 @@
   "world": [
     "bash=5.3.9-r1",
     "bison=3.8.2-r3",
+    "bsd-compat-headers=0.7.2-r6",
     "ca-certificates=20260611-r0",
     "cargo=1.96.0-r0",
     "ccache=4.13.6-r0",
@@ -53,6 +54,7 @@
     "bash-5.3.9-r1",
     "binutils-2.45.1-r1",
     "bison-3.8.2-r3",
+    "bsd-compat-headers-0.7.2-r6",
     "brotli-libs-1.2.0-r1",
     "busybox-1.37.0-r31",
     "busybox-binsh-1.37.0-r31",
@@ -266,6 +268,6 @@
     "zstd-1.5.7-r2",
     "zstd-libs-1.5.7-r2"
   ],
-  "manifest_sha256": "3e72628231ff41a7c9af15f91425dbd762886916376f38d2273ea5086118fb69",
+  "manifest_sha256": "b61839f392a94e80c89683219ae258727ab4609b49ab36f7aaef252922497cb3",
   "status": "resolved"
 }

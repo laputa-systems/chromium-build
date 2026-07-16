@@ -1,0 +1,12 @@
+diff --git a/third_party/crashpad/crashpad/compat/linux/sys/ptrace.h b/third_party/crashpad/crashpad/compat/linux/sys/ptrace.h
+--- a/third_party/crashpad/crashpad/compat/linux/sys/ptrace.h
++++ b/third_party/crashpad/crashpad/compat/linux/sys/ptrace.h
+@@ -17,6 +17,8 @@
+ 
+ #include_next <sys/ptrace.h>
+ 
++#if defined(__GLIBC__)
+ #include <sys/cdefs.h>
++#endif
+ 
+ // https://sourceware.org/bugzilla/show_bug.cgi?id=22433
