@@ -48,7 +48,7 @@ class FixtureServer:
         owner = self
 
         class Handler(http.server.BaseHTTPRequestHandler):
-            def log_message(self, *_args):
+            def log_message(self, format: str, *args: object) -> None:
                 return
 
             def do_GET(self):
@@ -131,7 +131,7 @@ class HttpsServer:
         self.root = Path(root)
 
         class Handler(http.server.BaseHTTPRequestHandler):
-            def log_message(self, *_args):
+            def log_message(self, format: str, *args: object) -> None:
                 return
 
             def do_GET(self):

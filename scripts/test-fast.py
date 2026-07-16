@@ -36,13 +36,15 @@ def valid_png(value, expected_dimensions):
 
 
 class FixtureHandler(http.server.SimpleHTTPRequestHandler):
-    def log_message(self, *_args):
+    def log_message(self, format: str, *args: object) -> None:
         return
 
 
 class FixtureServer:
     def __init__(self, root):
-        handler = lambda *args, **kwargs: FixtureHandler(*args, directory=str(root), **kwargs)
+        def handler(*args, **kwargs):
+            return FixtureHandler(*args, directory=str(root), **kwargs)
+
         self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
 

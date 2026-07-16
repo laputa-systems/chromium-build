@@ -3,9 +3,7 @@
 
 import hashlib
 import json
-import os
 import sys
-from pathlib import Path
 
 
 def read_json(path):

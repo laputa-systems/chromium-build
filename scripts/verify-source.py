@@ -2,12 +2,12 @@
 """Validate the prepared Chromium tree for Gate C without network or Git."""
 
 import argparse
-import hashlib
 import json
 import os
 import re
 import sys
 from pathlib import Path
+
 
 
 VERSION_RE = re.compile(r"^(MAJOR|MINOR|BUILD|PATCH)=(\d+)\s*$", re.MULTILINE)
@@ -111,7 +111,8 @@ def patch_checks(args, lock):
     require(len(by_key) == len(provenance_entries), "patch provenance contains duplicate entries")
     for project, name, disposition_entry in entries:
         item = by_key.get((project, name))
-        require(item is not None, f"patch provenance is missing {project}:{name}")
+        if item is None:
+            raise Failure(f"patch provenance is missing {project}:{name}")
         require(SHA256_RE.fullmatch(item.get("sha256", "")), f"patch {name} has an invalid checksum")
         require(isinstance(item.get("strip_level"), int) and item["strip_level"] >= 0, f"patch {name} has no strip level")
         require(isinstance(item.get("offset"), int) and isinstance(item.get("fuzz"), int), f"patch {name} has no offset/fuzz record")
@@ -196,17 +197,20 @@ def unbundle_checks(args):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--source-root", type=Path, required=True)
-    parser.add_argument("--inputs-lock", type=Path, required=True)
-    parser.add_argument("--source-inputs", type=Path, required=True)
-    parser.add_argument("--patch-inventory", type=Path, required=True)
-    parser.add_argument("--patch-disposition", type=Path, required=True)
-    parser.add_argument("--patch-provenance", type=Path, required=True)
-    parser.add_argument("--pruning-report", type=Path, required=True)
-    parser.add_argument("--domain-report", type=Path, required=True)
-    parser.add_argument("--toolchain-selection", type=Path, required=True)
-    parser.add_argument("--unbundle-report", type=Path, required=True)
-    parser.add_argument("--output", type=Path, required=True)
+    root = Path(os.environ.get("CHROMIUM_BUILD_ROOT", "/opt/chromium-build"))
+    work = Path(os.environ.get("CHROMIUM_WORK_ROOT", "/work"))
+    metadata = Path(os.environ.get("CHROMIUM_METADATA_ROOT", work / "metadata"))
+    parser.add_argument("--source-root", type=Path, default=Path(os.environ.get("CHROMIUM_SOURCE_ROOT", work / "src")))
+    parser.add_argument("--inputs-lock", type=Path, default=root / "config/inputs.lock")
+    parser.add_argument("--source-inputs", type=Path, default=metadata / "source-inputs.json")
+    parser.add_argument("--patch-inventory", type=Path, default=root / "config/patch-inventory.json")
+    parser.add_argument("--patch-disposition", type=Path, default=root / "config/patch-disposition.json")
+    parser.add_argument("--patch-provenance", type=Path, default=metadata / "patches.json")
+    parser.add_argument("--pruning-report", type=Path, default=metadata / "pruning.json")
+    parser.add_argument("--domain-report", type=Path, default=metadata / "domain-substitution.json")
+    parser.add_argument("--toolchain-selection", type=Path, default=metadata / "toolchain-selection.json")
+    parser.add_argument("--unbundle-report", type=Path, default=metadata / "system-unbundle.json")
+    parser.add_argument("--output", type=Path, default=metadata / "gate-c-report.json")
     args = parser.parse_args()
 
     require(args.source_root.is_dir(), f"missing prepared source root {args.source_root}")

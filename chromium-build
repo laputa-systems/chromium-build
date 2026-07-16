@@ -115,17 +115,21 @@ run_fetch() {
         -e CHROMIUM_PROFILE="$PROFILE" \
         -e CHROMIUM_METADATA_ROOT=/work/metadata \
         -v "$WORK_VOLUME:/work" \
-        "$IMAGE" /opt/chromium-build/scripts/fetch-inputs.sh
+        "$IMAGE" python3 /opt/chromium-build/scripts/fetch-inputs.py
 }
 
 run_gate() {
     local gate=$1
     shift
     local -a browser_resources=()
-    if [ "$gate" = test-fast.sh ] || [ "$gate" = test-functional.sh ]; then
+    if [ "$gate" = test-fast-driver.py ] || [ "$gate" = test-functional-driver.py ]; then
         browser_resources+=(--tmpfs /dev/shm:rw,nosuid,nodev,noexec,size=1g)
         browser_resources+=(--tmpfs /tmp:rw,nosuid,nodev,size=256m)
     fi
+    local script_command=("/opt/chromium-build/scripts/$gate")
+    case "$gate" in
+        *.py) script_command=(python3 "${script_command[0]}") ;;
+    esac
     docker run --rm --network=none ${browser_resources[@]+"${browser_resources[@]}"} \
         -e CHROMIUM_ARCH="$ARCH" \
         -e CHROMIUM_PROFILE="$PROFILE" \
@@ -137,28 +141,28 @@ run_gate() {
         -e CCACHE_VOLUME="$CACHE_VOLUME" \
         -v "$WORK_VOLUME:/work" \
         -v "$CACHE_VOLUME:/ccache" \
-        "$IMAGE" "/opt/chromium-build/scripts/$gate" "$@"
+        "$IMAGE" "${script_command[@]}" "$@"
 }
 
 case "$command_name" in
     fetch) run_fetch ;;
-    prepare) run_gate prepare-source.sh ;;
-    gate-a) run_gate verify-environment.sh ;;
-    gate-b) run_gate run-probes.sh ;;
-    gate-c) run_gate verify-source.sh ;;
-    gate-d) run_gate generate-gn.sh ;;
-    gate-e) run_gate run-gate-e.sh ;;
-    gate-f) run_gate audit-chrome-graph.sh ;;
-    build) run_gate build.sh ;;
-    build-target) run_gate build-target.sh "$BUILD_TARGET" ;;
-    test-fast) run_gate test-fast.sh ;;
-    test) run_gate test-functional.sh ;;
+    prepare) run_gate prepare-source-driver.py ;;
+    gate-a) run_gate verify-environment.py ;;
+    gate-b) run_gate run-probes.py ;;
+    gate-c) run_gate verify-source.py ;;
+    gate-d) run_gate generate-gn.py ;;
+    gate-e) run_gate run-gate-e.py ;;
+    gate-f) run_gate audit-chrome-graph-driver.py ;;
+    build) run_gate build.py ;;
+    build-target) run_gate build-target.py "$BUILD_TARGET" ;;
+    test-fast) run_gate test-fast-driver.py ;;
+    test) run_gate test-functional-driver.py ;;
     poc)
-        run_gate verify-environment.sh
-        run_gate run-probes.sh
-        run_gate verify-source.sh
-        run_gate generate-gn.sh
-        run_gate run-gate-e.sh
-        run_gate audit-chrome-graph.sh
+        run_gate verify-environment.py
+        run_gate run-probes.py
+        run_gate verify-source.py
+        run_gate generate-gn.py
+        run_gate run-gate-e.py
+        run_gate audit-chrome-graph-driver.py
         ;;
 esac

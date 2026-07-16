@@ -4,19 +4,26 @@
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
+from http.client import HTTPMessage
 import json
 import os
 import tempfile
+from typing import IO
 import urllib.parse
 import urllib.request
 from pathlib import Path
+from urllib.request import Request
+
+from script_support import fail_main, require_file, require_network
 
 
 class HTTPSRedirectHandler(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, request, response, code, msg, headers, newurl):
+    def redirect_request(
+        self, req: Request, fp: IO[bytes], code: int, msg: str, headers: HTTPMessage, newurl: str
+    ) -> Request | None:
         if urllib.parse.urlparse(newurl).scheme != "https":
             raise RuntimeError(f"redirected to a non-HTTPS URL: {newurl}")
-        return super().redirect_request(request, response, code, msg, headers, newurl)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
 def locked_inputs(lock):
@@ -94,10 +101,19 @@ def fetch_one(item, inputs_root):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--lock", type=Path, required=True)
-    parser.add_argument("--inputs-root", type=Path, required=True)
-    parser.add_argument("--metadata", type=Path, required=True)
+    root = Path(os.environ.get("CHROMIUM_BUILD_ROOT", "/opt/chromium-build"))
+    work = Path(os.environ.get("CHROMIUM_WORK_ROOT", "/work"))
+    parser.add_argument("--lock", type=Path, default=root / "config/inputs.lock")
+    parser.add_argument("--inputs-root", type=Path, default=work / "inputs")
+    parser.add_argument(
+        "--metadata",
+        type=Path,
+        default=Path(os.environ.get("CHROMIUM_METADATA_ROOT", work / "metadata")),
+    )
     args = parser.parse_args()
+
+    require_network("fetch", "Fetch")
+    require_file(args.lock, f"missing {args.lock}")
 
     lock = json.loads(args.lock.read_text(encoding="utf-8"))
     args.inputs_root.mkdir(parents=True, exist_ok=True)
@@ -119,4 +135,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(fail_main("Fetch", main))

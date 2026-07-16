@@ -95,7 +95,7 @@ RUN python3 /opt/chromium-build/scripts/write-environment-metadata.py "$TARGET_A
     --output /opt/chromium-build-metadata/environment.json
 
 RUN CHROMIUM_ARCH="$TARGET_ARCH" CHROMIUM_METADATA_ROOT=/opt/chromium-build-metadata \
-    /opt/chromium-build/scripts/preflight-system-libraries.sh
+    python3 /opt/chromium-build/scripts/preflight-system-libraries.py
 
 ENV PATH="/opt/llvm-musl/bin:$PATH" \
     CC=/opt/llvm-musl/bin/clang \

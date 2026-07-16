@@ -545,9 +545,9 @@ def launch_chromium(binary, profile_dir, args, log_path, *, pipe=False):
                 except OSError:
                     pass
     try:
-        process._chromium_process_group = os.getpgid(process.pid)
+        setattr(process, "_chromium_process_group", os.getpgid(process.pid))
     except OSError:
-        process._chromium_process_group = None
+        setattr(process, "_chromium_process_group", None)
     log.close()
     if pipe_transport is not None:
         return process, CdpConnection(pipe_transport)

@@ -12,7 +12,11 @@ DOCKER ?= docker
 
 .NOTPARALLEL:
 .PHONY: image fetch prepare gate-a gate-b gate-c gate-d gate-e gate-f gates
-.PHONY: bootstrap full-build resume-build build-target cache-stats resume-check graph-breakdown
+.PHONY: bootstrap full-build resume-build build-target cache-stats resume-check graph-breakdown check-py
+
+check-py:
+	PYTHONPATH=scripts:tests uv run --with ruff --with ty ruff check scripts tests
+	PYTHONPATH=scripts:tests uv run --with ruff --with ty ty check scripts tests
 
 image:
 	$(CHROMIUM_BUILD) image
