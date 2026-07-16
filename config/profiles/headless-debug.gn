@@ -46,6 +46,7 @@ rtc_link_pipewire = false
 use_vaapi = false
 enable_vulkan = false
 enable_swiftshader = false
+enable_printing = false
 
 ffmpeg_branding = "Chrome"
 proprietary_codecs = true

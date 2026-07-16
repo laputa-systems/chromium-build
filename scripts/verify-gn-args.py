@@ -93,6 +93,7 @@ def main():
         "use_vaapi": False,
         "enable_vulkan": False,
         "enable_swiftshader": False,
+        "enable_printing": False,
         "ffmpeg_branding": "Chrome",
         "proprietary_codecs": True,
         "enable_widevine": False,

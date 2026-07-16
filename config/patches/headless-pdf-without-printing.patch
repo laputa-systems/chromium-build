@@ -1,0 +1,22 @@
+diff --git a/printing/BUILD.gn b/printing/BUILD.gn
+--- a/printing/BUILD.gn
++++ b/printing/BUILD.gn
+@@ -16,5 +16,3 @@
+ if (enable_printing_tests) {
+   import("//build/config/ios/bundle_data_from_filelist.gni")
+-} else {
+-  assert(enable_printing)
+ }
+diff --git a/chrome/browser/BUILD.gn b/chrome/browser/BUILD.gn
+--- a/chrome/browser/BUILD.gn
++++ b/chrome/browser/BUILD.gn
+@@ -1208,1 +1208,0 @@
+-      "//chrome/browser/printing",
+@@ -1506,6 +1505,7 @@
+ 
+   if (enable_printing) {
+     deps += [
++      "//chrome/browser/printing",
+       "//chrome/browser/printing:impl",
+       "//chrome/common/printing",
+       "//components/printing/browser/headless",

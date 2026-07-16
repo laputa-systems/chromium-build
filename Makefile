@@ -12,7 +12,7 @@ DOCKER ?= docker
 
 .NOTPARALLEL:
 .PHONY: image fetch prepare gate-a gate-b gate-c gate-d gate-e gate-f gates
-.PHONY: bootstrap full-build resume-build build-target cache-stats resume-check
+.PHONY: bootstrap full-build resume-build build-target cache-stats resume-check graph-breakdown
 
 image:
 	$(CHROMIUM_BUILD) image
@@ -62,3 +62,8 @@ cache-stats:
 resume-check:
 	$(DOCKER) run --rm --network=none -v $(WORK_VOLUME):/work $(IMAGE) \
 		sh -c 'cd /work/out/$(PROFILE) && ninja -n chrome 2>/dev/null | tail -1'
+
+graph-breakdown:
+	$(DOCKER) run --rm --network=none -v "$(CURDIR):/repo:ro" -v $(WORK_VOLUME):/work $(IMAGE) \
+		python3 /repo/scripts/build-task-breakdown.py \
+		--out /work/out/$(PROFILE) --target chrome

@@ -1,0 +1,5 @@
+diff --git a/chrome/browser/ui/blocked_content/BUILD.gn b/chrome/browser/ui/blocked_content/BUILD.gn
+--- a/chrome/browser/ui/blocked_content/BUILD.gn
++++ b/chrome/browser/ui/blocked_content/BUILD.gn
+@@ -112,1 +112,0 @@
+-      "//chrome/browser/printing",
