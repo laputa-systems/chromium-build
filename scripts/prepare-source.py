@@ -333,6 +333,7 @@ def main():
         "musl-mojo-cmsg-sign-compare.patch": "musl's CMSG_NXTHDR macro compares size_t with ptrdiff_t; suppress that libc-header warning locally for Mojo's POSIX socket ancillary-data loop.",
         "musl-webrtc-physical-socket.patch": "musl's CMSG_NXTHDR macro compares size_t with ptrdiff_t; suppress that libc-header warning locally for WebRTC's Unix socket implementation.",
         "musl-sys-poll-compat-overlay.patch": "Alpine's sys/poll.h is a warning-emitting redirect to poll.h; provide that compatibility header through Chromium's musl toolchain include overlay so every target gets the portable behavior.",
+        "musl-v8-sanitizer-header.patch": "Trap-only sanitizer flags define V8's feature macros, but this musl toolchain omits compiler-rt headers and Alpine's no-sanitizer-trap patch removes the callbacks that used them.",
         "headless-pdf-without-printing.patch": "PDFium still consumes shared printing primitives, but this headless product does not expose print-to-PDF; allow the lower-level dependency to build with printing features disabled.",
         "headless-no-printing-test-dep.patch": "The blocked-content interactive test is outside the headless product and unconditionally depends on Chrome's printing implementation; omit that test-only dependency when printing is disabled.",
         "headless-no-linux-v4l2.patch": "The headless product has no webcam support; omit Linux V4L2 sources while retaining the shared capture interfaces and optional PipeWire path.",

@@ -1,0 +1,6 @@
+diff --git a/v8/src/sandbox/testing.cc b/v8/src/sandbox/testing.cc
+--- a/v8/src/sandbox/testing.cc
++++ b/v8/src/sandbox/testing.cc
+@@ -47,1 +47,1 @@
+-#include <sanitizer/common_interface_defs.h>
++// Alpine's no-sanitizer-trap patch removes the callbacks that used this API.

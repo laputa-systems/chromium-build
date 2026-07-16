@@ -152,6 +152,8 @@ The Dockerfile installs the exact `world` entries, then compares the resolved in
 
 ### 4.3 Laputa LLVM toolchain
 
+Record quirks and capability gaps discovered with the custom prebuilt LLVM toolchain in [LLVM-TOOLCHAIN.md](LLVM-TOOLCHAIN.md); keep this plan focused on the build contract and acceptance criteria.
+
 Use the release artifacts from `laputa-systems/llvm-prebuilt-musl`:
 
 | CLI architecture | Linux architecture | Chromium CPU | LLVM archive SHA-256 |

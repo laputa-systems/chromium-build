@@ -27,6 +27,7 @@ LOCAL_PATCHES = (
     "musl-mojo-cmsg-sign-compare.patch",
     "musl-webrtc-physical-socket.patch",
     "musl-sys-poll-compat-overlay.patch",
+    "musl-v8-sanitizer-header.patch",
     "headless-pdf-without-printing.patch",
     "headless-no-printing-test-dep.patch",
     "headless-no-linux-v4l2.patch",
