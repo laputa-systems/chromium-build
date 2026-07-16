@@ -1,0 +1,25 @@
+diff --git a/components/gcm_driver/gcm_client_impl.cc b/components/gcm_driver/gcm_client_impl.cc
+--- a/components/gcm_driver/gcm_client_impl.cc
++++ b/components/gcm_driver/gcm_client_impl.cc
+@@ -403,21 +403,0 @@
+-  std::vector<GURL> endpoints;
+-  endpoints.push_back(gservices_settings_.GetMCSMainEndpoint());
+-  GURL fallback_endpoint = gservices_settings_.GetMCSFallbackEndpoint();
+-  if (fallback_endpoint.is_valid())
+-    endpoints.push_back(fallback_endpoint);
+-  connection_factory_ = internals_builder_->BuildConnectionFactory(
+-      endpoints, GetGCMBackoffPolicy(), get_socket_factory_callback_,
+-      io_task_runner_, &recorder_, network_connection_tracker_);
+-  connection_factory_->SetConnectionListener(this);
+-  mcs_client_ = internals_builder_->BuildMCSClient(
+-      chrome_build_info_.version, clock_, connection_factory_.get(),
+-      gcm_store_.get(), io_task_runner_, &recorder_);
+-
+-  mcs_client_->Initialize(
+-      base::BindRepeating(&GCMClientImpl::OnMCSError,
+-                          weak_ptr_factory_.GetWeakPtr()),
+-      base::BindRepeating(&GCMClientImpl::OnMessageReceivedFromMCS,
+-                          weak_ptr_factory_.GetWeakPtr()),
+-      base::BindRepeating(&GCMClientImpl::OnMessageSentToMCS,
+-                          weak_ptr_factory_.GetWeakPtr()),
+-      std::move(load_result_));

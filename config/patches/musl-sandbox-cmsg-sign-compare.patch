@@ -1,0 +1,40 @@
+diff --git a/sandbox/linux/syscall_broker/broker_simple_message.cc b/sandbox/linux/syscall_broker/broker_simple_message.cc
+--- a/sandbox/linux/syscall_broker/broker_simple_message.cc
++++ b/sandbox/linux/syscall_broker/broker_simple_message.cc
+@@ -180,29 +180,36 @@ ssize_t BrokerSimpleMessage::RecvMsgWithFlagsMultipleFds(
+   if (msg.msg_controllen > 0) {
+     struct cmsghdr* cmsg;
++#if defined(__linux__) && !defined(__GLIBC__)
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wsign-compare"
++#endif
+     for (cmsg = CMSG_FIRSTHDR(&msg); cmsg; cmsg = CMSG_NXTHDR(&msg, cmsg)) {
+       const size_t payload_len = cmsg->cmsg_len - CMSG_LEN(0);
+       if (cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SCM_RIGHTS) {
+         DCHECK_EQ(payload_len % sizeof(fd), 0u);
+         DCHECK(wire_fds.empty());
+         // SAFETY: `CMSG_DATA()` Control message API; accesses
+         // the data portion of the control message header cmsg. payload_len
+         // comes from cmsg_len which specifies the length of the data held by
+         // the control message. See:
+         // https://man.openbsd.org/CMSG_DATA.3#CMSG_DATA
+         wire_fds = UNSAFE_BUFFERS(base::span<int>(
+             reinterpret_cast<int*>(CMSG_DATA(cmsg)), payload_len / sizeof(fd)));
+         DCHECK_GE(wire_fds.data(), reinterpret_cast<int*>(&control_buffer[0]));
+         DCHECK_LE(&wire_fds.back(),
+                   UNSAFE_BUFFERS(reinterpret_cast<int*>(
+                       &control_buffer[kControlBufferSize - 1])));
+       }
+       if (cmsg->cmsg_level == SOL_SOCKET &&
+           cmsg->cmsg_type == SCM_CREDENTIALS) {
+         DCHECK_EQ(payload_len, sizeof(struct ucred));
+         DCHECK_EQ(pid, -1);
+         pid = reinterpret_cast<struct ucred*>(CMSG_DATA(cmsg))->pid;
+       }
+     }
++#if defined(__linux__) && !defined(__GLIBC__)
++#pragma GCC diagnostic pop
++#endif
+   }
+ 
+   if (msg.msg_flags & MSG_TRUNC || msg.msg_flags & MSG_CTRUNC) {

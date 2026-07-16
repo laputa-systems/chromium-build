@@ -1,0 +1,18 @@
+diff --git a/components/domain_reliability/uploader.cc b/components/domain_reliability/uploader.cc
+--- a/components/domain_reliability/uploader.cc
++++ b/components/domain_reliability/uploader.cc
+@@ -80,6 +80,10 @@ class DomainReliabilityUploaderImpl : public DomainReliabilityUploader {
+     if (discard_uploads_)
+       discarded_upload_count_++;
+ 
++#if defined(__clang__)
++#pragma clang diagnostic push
++#pragma clang diagnostic ignored "-Wunreachable-code"
++#endif
+     if (true) {
+       DVLOG(1) << "Discarding report instead of uploading.";
+       UploadResult result;
+@@ -158,0 +163,3 @@
++#if defined(__clang__)
++#pragma clang diagnostic pop
++#endif

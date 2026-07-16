@@ -1,0 +1,12 @@
+diff --git a/components/assist_ranker/ranker_url_fetcher.cc b/components/assist_ranker/ranker_url_fetcher.cc
+--- a/components/assist_ranker/ranker_url_fetcher.cc
++++ b/components/assist_ranker/ranker_url_fetcher.cc
+@@ -37,0 +38,4 @@
++#if defined(__clang__)
++#pragma clang diagnostic push
++#pragma clang diagnostic ignored "-Wunreachable-code"
++#endif
+@@ -96,0 +100,3 @@
++#if defined(__clang__)
++#pragma clang diagnostic pop
++#endif

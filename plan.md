@@ -1369,3 +1369,15 @@ After the first full build succeeds, record the measured disk high-water mark be
 - peak aggregate bytes, free-space margin, architecture, source/environment/profile identities, job/load settings, and the command used to measure them.
 
 Write the native arm64 result to `config/disk-budget.arm64.json`. Generate `config/disk-budget.amd64.json` only after a native amd64 measurement; never copy arm64 values. The first measurement is advisory, but later status checks should use it to warn before starting a multi-hour build and identify recoverable bytes from old profiles, test output, staging, download archives, and ccache.
+
+## 25. Overnight MVP execution prompt
+
+Use the following prompt when handing this repository to an autonomous coding agent:
+
+> Continue the current native arm64 headless-debug build toward the first functional MVP. Preserve the active Docker/OrbStack build container, named work volume, Ninja output, and ccache volume; never restart from a clean source tree or delete resumable output merely because the build is slow. Poll the build regularly and report meaningful progress, CPU utilization, cache behavior, disk margin, and exact failures.
+>
+> First complete the full Chromium `chrome` target. A successful full build means the build driver writes its completion report, the resolved executable exists in the persistent work volume, and the existing Gates A–F, Python checks, compiler/toolchain audits, and ELF/link audits remain passing. If compilation fails, diagnose the first real error, make the smallest source/configuration fix consistent with this plan, run the narrowest proof that reproduces the failure, rerun the relevant gate, and resume the same cached build. Do not disable security, sandboxing, runtime checks, or required browser functionality just to bypass an error. Record any custom LLVM-toolchain quirk in `LLVM-TOOLCHAIN.md` and update the plan only when the build contract changes.
+>
+> After the full build succeeds, run the short post-link acceptance path with `./chromium-build --arch arm64 --profile headless-debug test-fast`. Fix deterministic failures and repeat until it passes. Then run the complete offline functional headless path with `./chromium-build --arch arm64 --profile headless-debug test`; it must pass as the strict Linux test described in `TESTS-TODO.md`, including TCP and pipe CDP, screenshots, downloads, local extension/uBlock behavior, H.264/AAC media, HTTPS before and after media, sandbox evidence, cleanup, and `media-runtime.json`. Iterate on real failures until this functional headless milestone passes.
+>
+> Only after the functional headless tests pass, work through the remaining acceptance items in `TESTS-TODO.md`: review the media runtime and symbol-intersection baseline, rerun from the staged runtime, preserve all required reports, and update `plan.md` with evidence. Do not expand into Wayland/ALSA or unrelated deferred scope before the functional headless milestone is complete. Keep networking disabled for preparation, builds, tests, audits, and packaging; use only the locked fetch inputs when network access is genuinely required.

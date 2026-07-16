@@ -1,0 +1,12 @@
+diff --git a/components/translate/core/browser/translate_ranker_impl.cc b/components/translate/core/browser/translate_ranker_impl.cc
+--- a/components/translate/core/browser/translate_ranker_impl.cc
++++ b/components/translate/core/browser/translate_ranker_impl.cc
+@@ -230,0 +231,4 @@
++#if defined(__clang__)
++#pragma clang diagnostic push
++#pragma clang diagnostic ignored "-Wunreachable-code"
++#endif
+@@ -269,0 +274,3 @@
++#if defined(__clang__)
++#pragma clang diagnostic pop
++#endif

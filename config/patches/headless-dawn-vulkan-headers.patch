@@ -1,0 +1,32 @@
+diff --git a/gpu/command_buffer/service/BUILD.gn b/gpu/command_buffer/service/BUILD.gn
+--- a/gpu/command_buffer/service/BUILD.gn
++++ b/gpu/command_buffer/service/BUILD.gn
+@@ -514,6 +514,10 @@
+         "shared_image/dawn_ozone_image_representation.cc",
+         "shared_image/dawn_ozone_image_representation.h",
+       ]
++      deps += [
++        "//third_party/dawn/src/dawn/native",
++        "//third_party/libsync",
++        "//third_party/vulkan-headers/src:vulkan_headers",
++      ]
+     }
+   }
+
+diff --git a/gpu/command_buffer/service/shared_image/ozone_image_backing_factory.cc b/gpu/command_buffer/service/shared_image/ozone_image_backing_factory.cc
+--- a/gpu/command_buffer/service/shared_image/ozone_image_backing_factory.cc
++++ b/gpu/command_buffer/service/shared_image/ozone_image_backing_factory.cc
+@@ -95,9 +95,13 @@
+       ui::OzonePlatform::GetInstance()
+           ->GetSurfaceFactoryOzone()
+           ->CreateNativePixmap(gpu::kNullSurfaceHandle,
++#if BUILDFLAG(ENABLE_VULKAN)
+                                vulkan_context_provider
+                                    ? vulkan_context_provider->GetDeviceQueue()
+                                    : nullptr,
++#else
++                               nullptr,
++#endif  // BUILDFLAG(ENABLE_VULKAN)
+                                size, format, usage, size);
+ 
+   if (!pixmap.get()) {

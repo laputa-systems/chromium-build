@@ -29,6 +29,27 @@ Alpine's `cr148-v8-no-san-trap.patch` already removes V8's sanitizer death-callb
 
 This is an integration fix for the current profile, not evidence that the custom LLVM bundle supports ASan, MSan, UBSan runtime reporting, or sanitizer-instrumented builds. A future sanitizer profile must first add and validate matching compiler-rt headers, runtimes, linker behavior, and musl execution tests.
 
+## libc++ `vector<bool>` clone interaction
+
+The Laputa libc++ headers expose iteration over `std::vector<bool>` through a proxy reference type. Chromium's generic Mojo `CloneTraits<std::vector<T>>` passed that proxy to `mojo::Clone()`, which correctly rejected it as a non-copyable type when generated bindings cloned a Mojo `array<bool>`. The resulting failure was a compile-time static assertion in `mojo/public/cpp/bindings/clone_traits.h` while building `content/browser/webid/document_metadata.cc`.
+
+The local `musl-mojo-vector-bool-clone.patch` converts the proxy to `bool` only for `std::vector<bool>` before entering the generic clone path. The patch preserves normal cloning for all other vector element types and does not change Mojo wire representation or boolean semantics. This is a libc++ integration quirk exposed by the custom toolchain, not a reason to weaken the generated-binding type checks.
+
+## libc++ heterogeneous `raw_ref` lookup
+
+Laputa libc++ selects the const heterogeneous lookup overload for the
+`std::map<base::raw_ref<T>, ...>` used by the permissions implementation. The
+Chromium `std::less<raw_ref<T>>` specialization declared only `T&` overloads,
+even though `raw_ref` itself supports comparisons with const references. That
+made `map.find(const T&)` fail in `permission_request_manager.cc`. The local
+`musl-raw-ref-transparent-const.patch` adds the two const-reference overloads
+to the transparent comparator for non-const `T`. The constraint is necessary
+because `raw_ref<const T>` already turns Chromium's original `T&` overloads
+into const-reference overloads; without it libc++ diagnoses duplicate
+comparator signatures. The key type, ordering, and ownership model are
+unchanged; this only completes the comparator's advertised heterogeneous
+reference lookup surface.
+
 ## Preferred future improvements
 
 The cleanest long-term solution is a custom LLVM release that includes the compiler-rt sanitizer headers and the compatible musl sanitizer runtimes. Installing or copying only headers would make compilation pass but would not prove that sanitizer binaries can link or run correctly.

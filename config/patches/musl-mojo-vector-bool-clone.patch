@@ -1,0 +1,17 @@
+diff --git a/mojo/public/cpp/bindings/clone_traits.h b/mojo/public/cpp/bindings/clone_traits.h
+--- a/mojo/public/cpp/bindings/clone_traits.h
++++ b/mojo/public/cpp/bindings/clone_traits.h
+@@ -56,7 +56,12 @@ struct CloneTraits<std::vector<T>> {
+     std::vector<T> result;
+     result.reserve(input.size());
+     for (const auto& element : input) {
+-      result.push_back(mojo::Clone(element));
++      // std::vector<bool> exposes a proxy reference instead of bool.
++      if constexpr (std::same_as<T, bool>) {
++        result.push_back(static_cast<bool>(element));
++      } else {
++        result.push_back(mojo::Clone(element));
++      }
+     }
+
+     return result;
