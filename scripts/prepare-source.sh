@@ -51,6 +51,7 @@ SOURCE_DIR=$(find "$TEMP" -mindepth 3 -maxdepth 3 -type f -path '*/chrome/VERSIO
     --patches "$METADATA/patches" \
     --local-patch "$ROOT/config/patches/laputa-external-libcxx.patch" \
     --local-patch "$ROOT/config/patches/gate-e-hermetic-smoke.patch" \
+    --local-patch "$ROOT/config/patches/headless-no-devtools.patch" \
     --rust-target-triple "$rust_target_triple"
 
 mv "$SOURCE_DIR" "$SOURCE"

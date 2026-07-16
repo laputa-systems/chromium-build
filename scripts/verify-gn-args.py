@@ -126,7 +126,7 @@ def main():
     for name, result in probe["arguments"].items():
         if result["supported"]:
             expected_value = {
-                "devtools_skip_typecheck": True,
+                "devtools_skip_typecheck": False,
                 "devtools_bundle": False,
             }[name]
             if values.get(name) != expected_value:

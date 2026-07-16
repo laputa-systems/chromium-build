@@ -940,10 +940,7 @@ Ship a tiny Manifest V3 unpacked extension fixture containing no external resour
 
 ### 15.5 DevTools frontend test
 
-- Verify bundled DevTools frontend resources exist in the output.
-- Resolve/open the frontend URL associated with a local target.
-- Confirm its primary HTML/JavaScript resources load without an external network request.
-- Interactive human use is not automated beyond resource loading and protocol attachment.
+Deferred for the initial headless milestone. The first profile disables DevTools frontend generation and validates raw CDP only; bundled frontend resources and local frontend loading return with the later DevTools scope.
 
 ### 15.6 System-FFmpeg containment and media tests
 
@@ -1276,7 +1273,7 @@ Risk: source, object, link-temporary, ccache, or packaging growth causes a late 
 
 - Monolithic Chrome builds from the persistent volume.
 - Modern headless mode runs with sandboxing and host llvmpipe.
-- Raw CDP pipe/TCP, DevTools resources, downloads, screenshots, storage/network events, and local extension tests pass offline.
+- Raw CDP pipe/TCP, downloads, screenshots, storage/network events, and local extension tests pass offline. DevTools frontend resources are deferred from the initial headless profile.
 - `test-fast` supplies the short post-link acceptance loop; the complete focused `test` suite passes at the milestone without building upstream test suites.
 - System-FFmpeg H.264/AAC decode/containment tests pass without disturbing Chrome's static-libc++ identity or Mesa llvmpipe rendering.
 - ELF/link audits pass.
@@ -1326,3 +1323,22 @@ Packaging success from an ordinary cache-assisted build produces a candidate art
 - Prebuilt APK archival or a private Alpine snapshot repository.
 - Remote compiler caches, sccache, distributed compilation, and remote execution; the approved v1 cache is local stock Alpine ccache only.
 - Component builds until a pinned Laputa toolchain release provides validated shared musl libc++/libc++abi/unwind artifacts.
+
+## 24. Handoff state after starting the full build
+
+The implementation now includes the #14 full-build driver and the first #15 `test-fast` path. `chromium-build build` invokes only the persistent profile's `chrome` Ninja target, accepts independent `JOBS` and load-limit settings, records ccache statistics and free-space observations, preserves Ninja output on failure, and writes a completion report only after the executable resolves successfully. `build-target` supports narrow Ninja output or label rebuilds.
+
+The initial headless profile deliberately excludes the DevTools frontend and its resource packs. Raw CDP remains in scope. The source preparation patch also avoids the architecture-incompatible bundled DevTools `esbuild` path and keeps Alpine Rust as the compiler toolchain; Chromium's bundled Rust toolchain remains excluded.
+
+On the current native arm64 attempt, the clean prepared source passed Gates A–F. The full `chrome` build began and compiled more than 360 targets before stopping because the Docker filesystem reached `ENOSPC`. Ninja state was preserved for resumption. Several temporary clean work volumes were created during diagnosis; they must be pruned before the next build once Docker/OrbStack is available. Do not delete the preserved resumable work volume or clean its output as a speculative remedy.
+
+After the first full build succeeds, record the measured disk high-water mark before pruning anything. Capture at minimum:
+
+- source size and inode count;
+- profile `out/` size before and after the final link;
+- temporary bytes and aggregate filesystem usage during the final link;
+- ccache size, configured limit, compression ratio, and before/after statistics;
+- test-output, staging, and export sizes;
+- peak aggregate bytes, free-space margin, architecture, source/environment/profile identities, job/load settings, and the command used to measure them.
+
+Write the native arm64 result to `config/disk-budget.arm64.json`. Generate `config/disk-budget.amd64.json` only after a native amd64 measurement; never copy arm64 values. The first measurement is advisory, but later status checks should use it to warn before starting a multi-hour build and identify recoverable bytes from old profiles, test output, staging, download archives, and ccache.

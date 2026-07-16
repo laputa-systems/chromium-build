@@ -66,7 +66,7 @@ def main():
             "locations": locations,
         }
         if locations:
-            optional_lines.append(f"{name} = {'true' if name == 'devtools_skip_typecheck' else 'false'}")
+            optional_lines.append(f"{name} = false")
     if optional_lines:
         rendered = rendered.rstrip() + "\n\n" + "\n".join(optional_lines) + "\n"
 

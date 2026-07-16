@@ -52,3 +52,4 @@ proprietary_codecs = true
 enable_widevine = false
 
 optimize_webui = false
+enable_service_discovery = false

@@ -57,6 +57,8 @@ RUN set -eux; \
     test -f /opt/llvm-musl/lib/libc++abi.a; \
     test -f /opt/llvm-musl/lib/libunwind.a
 
+RUN addgroup -S chromium && adduser -S -D -H -G chromium chromium
+
 RUN set -eux; \
     mkdir -p /tmp/ninja-source /usr/local/bin; \
     curl -fsSL "$NINJA_SOURCE_URL" -o /tmp/ninja.tar.gz; \
@@ -77,6 +79,7 @@ RUN set -eux; \
 COPY config /opt/chromium-build/config
 COPY scripts /opt/chromium-build/scripts
 COPY tests/probes /opt/chromium-build/tests/probes
+COPY tests/fixtures /opt/chromium-build/tests/fixtures
 
 RUN set -eux; \
     mkdir -p /opt/chromium-build-metadata; \

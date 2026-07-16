@@ -1,0 +1,9 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Hermetic headless fixture</title>
+<body><main id="status">not-ready</main><script>
+document.cookie = "fixture_cookie=ok; SameSite=Lax";
+localStorage.setItem("fixture_storage", "ok");
+console.log("fixture-loaded");
+document.querySelector("#status").textContent = "ready";
+</script></body>

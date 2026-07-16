@@ -1,0 +1,47 @@
+diff --git a/content/browser/devtools/features.gni b/content/browser/devtools/features.gni
+--- a/content/browser/devtools/features.gni
++++ b/content/browser/devtools/features.gni
+@@ -6,2 +6,2 @@
+ # iOS and Fuchsia don't support DevTools front-end.
+-enable_devtools_frontend = !is_ios && !is_fuchsia
++enable_devtools_frontend = false
+diff --git a/content/shell/BUILD.gn b/content/shell/BUILD.gn
+--- a/content/shell/BUILD.gn
++++ b/content/shell/BUILD.gn
+@@ -614,1 +614,1 @@
+-  if (!is_android && !is_fuchsia && !is_ios) {
++  if (!is_android && !is_fuchsia && !is_ios && defined(enable_devtools_frontend) && enable_devtools_frontend) {
+diff --git a/extensions/BUILD.gn b/extensions/BUILD.gn
+--- a/extensions/BUILD.gn
++++ b/extensions/BUILD.gn
+@@ -242,1 +242,1 @@
+-  if (enable_extensions) {
++  if (enable_extensions && defined(enable_devtools_frontend) && enable_devtools_frontend) {
+diff --git a/headless/BUILD.gn b/headless/BUILD.gn
+--- a/headless/BUILD.gn
++++ b/headless/BUILD.gn
+@@ -104,1 +104,1 @@
+-  if (!is_fuchsia) {
++  if (!is_fuchsia && defined(enable_devtools_frontend) && enable_devtools_frontend) {
+diff --git a/ui/webui/examples/BUILD.gn b/ui/webui/examples/BUILD.gn
+--- a/ui/webui/examples/BUILD.gn
++++ b/ui/webui/examples/BUILD.gn
+@@ -126,1 +126,1 @@
+     "$root_gen_dir/chrome/webui_gallery_resources.pak",
+-    "$root_gen_dir/content/browser/devtools/devtools_resources.pak",
+@@ -141,1 +141,1 @@
+     "//chrome/browser/resources/webui_gallery:resources",
+-    "//content/browser/devtools:devtools_resources",
+diff --git a/chrome/browser/devtools/BUILD.gn b/chrome/browser/devtools/BUILD.gn
+--- a/chrome/browser/devtools/BUILD.gn
++++ b/chrome/browser/devtools/BUILD.gn
+@@ -363,1 +363,1 @@
+-    if (enable_service_discovery) {
++    if (defined(enable_service_discovery) && enable_service_discovery) {
+diff --git a/build/rust/std/BUILD.gn b/build/rust/std/BUILD.gn
+--- a/build/rust/std/BUILD.gn
++++ b/build/rust/std/BUILD.gn
+@@ -296,2 +296,2 @@
+         "--rustc-revision",
+-        rustc_revision,
++        "alpine-rust-1.96.0",
