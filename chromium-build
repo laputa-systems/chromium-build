@@ -15,9 +15,9 @@ fail() {
 
 usage() {
     printf '%s\n' \
-        'usage: chromium-build [--arch arm64|amd64] [--profile headless-debug] image|fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-f|poc' \
+        'usage: chromium-build [--arch arm64|amd64] [--profile headless-debug] image|fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-e|gate-f|poc' \
         '       chromium-build image [--arch arm64|amd64]' \
-        '       chromium-build fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-f|poc [--arch arm64|amd64]'
+        '       chromium-build fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-e|gate-f|poc [--arch arm64|amd64]'
 }
 
 command_name=
@@ -33,7 +33,7 @@ while [ "$#" -gt 0 ]; do
             PROFILE=$2
             shift 2
             ;;
-        image|fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-f|poc)
+        image|fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-e|gate-f|poc)
             [ -z "$command_name" ] || fail 'only one command may be selected'
             command_name=$1
             shift
@@ -132,12 +132,14 @@ case "$command_name" in
     gate-b) run_gate run-probes.sh ;;
     gate-c) run_gate verify-source.sh ;;
     gate-d) run_gate generate-gn.sh ;;
+    gate-e) run_gate run-gate-e.sh ;;
     gate-f) run_gate audit-chrome-graph.sh ;;
     poc)
         run_gate verify-environment.sh
         run_gate run-probes.sh
         run_gate verify-source.sh
         run_gate generate-gn.sh
+        run_gate run-gate-e.sh
         run_gate audit-chrome-graph.sh
         ;;
 esac

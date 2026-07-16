@@ -1,0 +1,58 @@
+diff --git a/tools/hermetic_smoke/BUILD.gn b/tools/hermetic_smoke/BUILD.gn
+new file mode 100644
+--- /dev/null
++++ b/tools/hermetic_smoke/BUILD.gn
+@@ -0,0 +1,13 @@
++executable("hermetic_smoke") {
++  sources = [ "hermetic_smoke.cc" ]
++  deps = [ "//build/config/compiler:compiler_buildflags" ]
++  configs -= [ "//build/config/compiler:no_exceptions" ]
++
++  # The profile disables exceptions globally; Gate E opts this tiny target in
++  # so the selected C++ runtime boundary is exercised explicitly.
++  cflags_cc = [
++    "-pthread",
++    "-fexceptions",
++  ]
++  ldflags = [ "-pthread" ]
++}
+diff --git a/tools/hermetic_smoke/hermetic_smoke.cc b/tools/hermetic_smoke/hermetic_smoke.cc
+new file mode 100644
+--- /dev/null
++++ b/tools/hermetic_smoke/hermetic_smoke.cc
+@@ -0,0 +1,35 @@
++#include "build/config/compiler/compiler_buildflags.h"
++#include <atomic>
++#include <mutex>
++#include <stdexcept>
++#include <thread>
++
++namespace {
++
++void require_value(int actual, int expected) {
++  if (actual != expected) {
++    throw std::runtime_error("hermetic smoke value mismatch");
++  }
++}
++
++}  // namespace
++
++int main() {
++  static_assert(!BUILDFLAG(CLANG_PGO_PROFILING));
++  std::mutex mutex;
++  std::atomic<int> result{0};
++
++  std::thread worker([&] {
++    thread_local int thread_value = 41;
++    std::lock_guard<std::mutex> lock(mutex);
++    result.store(thread_value + 1, std::memory_order_relaxed);
++  });
++  worker.join();
++
++  try {
++    require_value(result.load(std::memory_order_relaxed), 42);
++  } catch (const std::runtime_error&) {
++    return 1;
++  }
++  return 0;
++}

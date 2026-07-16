@@ -813,14 +813,16 @@ Add a renderer probe that creates a minimal surfaceless/headless EGL context usi
 
 ### Gate E: small GN build
 
-Add a repository-owned target under a clearly named source overlay such as `//tools/hermetic_smoke` that:
+Build and run the repository-owned `//tools/hermetic_smoke:hermetic_smoke` target through the generated Ninja graph. It:
 
-- is built by Chromium's generated Ninja graph;
-- uses generated Chromium build configuration headers;
+- is installed by the committed source overlay and built by Chromium's generated Ninja graph;
+- consumes the generated `compiler_buildflags.h` configuration header;
 - exercises C++ standard library, exceptions, TLS, and threads;
-- links the profile's Mesa dependencies and system-FFmpeg shim where it can remain small;
+- uses the same external static libc++/libc++abi/libunwind boundary as Chromium;
 - runs successfully inside the container;
 - remains tiny and does not depend on `//base`, `//content`, or another large Chromium library merely for symbolism.
+
+Gate B continues to exercise the profile's Mesa and system-FFmpeg link/runtime boundaries directly; Gate E deliberately does not add those libraries to the smoke target or to the `chrome` dependency closure.
 
 ### Gate F: Chrome graph dry-run and audit
 

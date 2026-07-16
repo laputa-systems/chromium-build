@@ -276,7 +276,7 @@ def main():
     parser.add_argument("--disposition", type=Path, required=True)
     parser.add_argument("--metadata", type=Path, required=True)
     parser.add_argument("--patches", type=Path, required=True)
-    parser.add_argument("--local-patch", type=Path, required=True)
+    parser.add_argument("--local-patch", type=Path, action="append", required=True)
     parser.add_argument("--rust-target-triple", required=True)
     args = parser.parse_args()
 
@@ -309,7 +309,36 @@ def main():
         args.patches,
     )
     ungoogled = apply_ungoogled(args.source, args.ungoogled_root, args.patches / "ungoogled")
-    local_patch = patch_file(args.source, args.local_patch, args.patches / "local", disposition.get("patch_application", {}).get("max_fuzz", 0))
+    local_patches = [
+        {
+            "name": item["name"],
+            "sha256": item["sha256"],
+            "conflict_record": {"upstream_sets": ["portablelinux"]},
+        }
+        for item in records
+        if item["project"] == "portablelinux" and item["state"] == "apply"
+    ]
+    local_patch_reasons = {
+        "laputa-external-libcxx.patch": "Chromium's use_custom_libcxx path builds the in-tree runtime; this patch redirects it to the validated Laputa static runtime.",
+        "gate-e-hermetic-smoke.patch": "Adds the repository-owned Gate E smoke target without making it a dependency of Chrome.",
+    }
+    for local_patch in args.local_patch:
+        record = patch_file(
+            args.source,
+            local_patch,
+            args.patches / "local",
+            disposition.get("patch_application", {}).get("max_fuzz", 0),
+        )
+        local_patches.append(
+            {
+                "name": local_patch.name,
+                **record,
+                "conflict_record": {
+                    "upstream_sets": ["alpine", "copium", "portablelinux"],
+                    "reason": local_patch_reasons.get(local_patch.name, "Repository-owned build boundary patch."),
+                },
+            }
+        )
     pruning_root = next(args.ungoogled_root.glob("ungoogled-chromium-*"))
     pruning_report = prune(args.source, pruning_root / "pruning.list")
     domain_report = substitute_domains(
@@ -348,25 +377,7 @@ def main():
             "ungoogled": ungoogled,
             "portablelinux": [item for item in records if item["project"] == "portablelinux"],
         },
-        "local_patches": [
-            *[
-                {
-                    "name": item["name"],
-                    "sha256": item["sha256"],
-                    "conflict_record": {"upstream_sets": ["portablelinux"]},
-                }
-                for item in records
-                if item["project"] == "portablelinux" and item["state"] == "apply"
-            ],
-            {
-                "name": args.local_patch.name,
-                **local_patch,
-                "conflict_record": {
-                    "upstream_sets": ["alpine", "copium", "portablelinux"],
-                    "reason": "Chromium's use_custom_libcxx path builds the in-tree runtime; this patch redirects it to the validated Laputa static runtime.",
-                },
-            },
-        ],
+        "local_patches": local_patches,
     }
     toolchain = {
         "status": "complete",

@@ -3,6 +3,7 @@ import("//build/args/headless.gn")
 target_os = "linux"
 target_cpu = "@TARGET_CPU@"
 host_cpu = "@TARGET_CPU@"
+root_extra_deps = [ "//tools/hermetic_smoke" ]
 
 is_clang = true
 is_musl = true

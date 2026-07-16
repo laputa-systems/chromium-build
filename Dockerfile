@@ -114,6 +114,8 @@ ENV PATH="/opt/llvm-musl/bin:$PATH" \
     CCACHE_MAXSIZE=10G \
     CCACHE_CC=/opt/llvm-musl/bin/clang \
     CCACHE_NAMESPACE=${TARGET_ARCH}-${LLVM_SHA256} \
+    CFLAGS=-Wno-unknown-warning-option \
+    CXXFLAGS=-Wno-unknown-warning-option \
     NETWORK_MODE=none
 
 WORKDIR /work

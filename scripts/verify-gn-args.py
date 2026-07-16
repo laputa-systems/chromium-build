@@ -54,6 +54,7 @@ def main():
         "target_os": "linux",
         "target_cpu": args.target_cpu,
         "host_cpu": args.target_cpu,
+        "root_extra_deps": ["//tools/hermetic_smoke"],
         "is_clang": True,
         "is_musl": True,
         "use_sysroot": False,
