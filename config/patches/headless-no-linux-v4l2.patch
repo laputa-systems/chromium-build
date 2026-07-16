@@ -1,0 +1,67 @@
+diff --git a/media/capture/video/linux/BUILD.gn b/media/capture/video/linux/BUILD.gn
+--- a/media/capture/video/linux/BUILD.gn
++++ b/media/capture/video/linux/BUILD.gn
+@@ -16,15 +16,4 @@
+   sources = [
+-    "scoped_v4l2_device_fd.cc",
+-    "scoped_v4l2_device_fd.h",
+-    "v4l2_capture_delegate.cc",
+-    "v4l2_capture_delegate.h",
+-    "v4l2_capture_device.h",
+-    "v4l2_capture_device_impl.cc",
+-    "v4l2_capture_device_impl.h",
+     "video_capture_device_factory_linux.cc",
+     "video_capture_device_factory_linux.h",
+-    "video_capture_device_factory_v4l2.cc",
+-    "video_capture_device_factory_v4l2.h",
+-    "video_capture_device_linux.cc",
+-    "video_capture_device_linux.h",
+   ]
+@@ -41,9 +30,1 @@
+-  if (is_linux) {
+-    sources += [
+-      "v4l2_capture_delegate_gpu_helper.cc",
+-      "v4l2_capture_delegate_gpu_helper.h",
+-      "v4l2_gpu_memory_buffer_tracker.cc",
+-      "v4l2_gpu_memory_buffer_tracker.h",
+-    ]
+-  }
+   public_deps = [
+diff --git a/media/capture/video/linux/video_capture_device_factory_linux.cc b/media/capture/video/linux/video_capture_device_factory_linux.cc
+--- a/media/capture/video/linux/video_capture_device_factory_linux.cc
++++ b/media/capture/video/linux/video_capture_device_factory_linux.cc
+@@ -8,2 +8,1 @@
+ #include "media/capture/capture_switches.h"
+-#include "media/capture/video/linux/video_capture_device_factory_v4l2.h"
+@@ -16,8 +15,8 @@
+ VideoCaptureDeviceFactoryLinux::VideoCaptureDeviceFactoryLinux(
+     scoped_refptr<base::SingleThreadTaskRunner> ui_task_runner)
+-    : factory_(std::make_unique<VideoCaptureDeviceFactoryV4L2>(ui_task_runner))
++    : factory_(nullptr)
+ #if defined(WEBRTC_USE_PIPEWIRE)
+       ,
+       webrtc_factory_(std::make_unique<VideoCaptureDeviceFactoryWebRtc>())
+ #endif  // defined(WEBRTC_USE_PIPEWIRE)
+ {
+ }
+@@ -37,8 +36,4 @@
+ #endif  // defined(WEBRTC_USE_PIPEWIRE)
+-  if (device_descriptor.capture_api ==
+-      VideoCaptureApi::LINUX_V4L2_SINGLE_PLANE) {
+-    return factory_->CreateDevice(device_descriptor);
+-  }
+   return VideoCaptureErrorOrDevice(
+       VideoCaptureError::kVideoCaptureSystemDeviceIdNotFound);
+@@ -54,4 +49,4 @@
+ #endif  // defined(WEBRTC_USE_PIPEWIRE)
+-  factory_->GetDevicesInfo(std::move(callback));
++  std::move(callback).Run({});
+ }
+@@ -62,1 +57,1 @@
+-  // Check again to see if we need to fall back to the V4L2 factory.
++  // PipeWire is the only Linux camera backend retained when enabled.
+@@ -67,2 +62,2 @@
+   } else {
+-    factory_->GetDevicesInfo(std::move(callback));
++    std::move(callback).Run({});
+   }

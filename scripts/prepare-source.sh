@@ -62,9 +62,10 @@ SOURCE_DIR=$(find "$TEMP" -mindepth 3 -maxdepth 3 -type f -path '*/chrome/VERSIO
     --local-patch "$ROOT/config/patches/musl-udp-cmsg-sign-compare.patch" \
     --local-patch "$ROOT/config/patches/musl-mojo-cmsg-sign-compare.patch" \
     --local-patch "$ROOT/config/patches/musl-webrtc-physical-socket.patch" \
-    --local-patch "$ROOT/config/patches/musl-dawn-system-event-poll.patch" \
+    --local-patch "$ROOT/config/patches/musl-sys-poll-compat-overlay.patch" \
     --local-patch "$ROOT/config/patches/headless-pdf-without-printing.patch" \
     --local-patch "$ROOT/config/patches/headless-no-printing-test-dep.patch" \
+    --local-patch "$ROOT/config/patches/headless-no-linux-v4l2.patch" \
     --local-patch "$ROOT/config/patches/musl-fontconfig-no-nls.patch" \
     --local-patch "$ROOT/config/patches/musl-fontconfig-random.patch" \
     --local-patch "$ROOT/config/patches/musl-bindgen-clang22.patch" \

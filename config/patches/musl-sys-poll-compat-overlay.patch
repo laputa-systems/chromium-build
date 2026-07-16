@@ -1,0 +1,27 @@
+diff --git a/build/config/musl-compat/include/sys/poll.h b/build/config/musl-compat/include/sys/poll.h
+new file mode 100644
+--- /dev/null
++++ b/build/config/musl-compat/include/sys/poll.h
+@@ -0,0 +1,6 @@
++#ifndef CHROMIUM_MUSL_SYS_POLL_H_
++#define CHROMIUM_MUSL_SYS_POLL_H_
++
++#include <poll.h>
++
++#endif
+
+diff --git a/build/toolchain/linux/unbundle/BUILD.gn b/build/toolchain/linux/unbundle/BUILD.gn
+--- a/build/toolchain/linux/unbundle/BUILD.gn
++++ b/build/toolchain/linux/unbundle/BUILD.gn
+@@ -17,1 +17,4 @@
+-  extra_ldflags = getenv("LDFLAGS")
++  extra_ldflags = getenv("LDFLAGS")
++  extra_cppflags += " -isystem " +
++                    rebase_path("//build/config/musl-compat/include",
++                                root_build_dir)
+@@ -35,1 +38,4 @@
+-  extra_ldflags = getenv("BUILD_LDFLAGS")
++  extra_ldflags = getenv("BUILD_LDFLAGS")
++  extra_cppflags += " -isystem " +
++                    rebase_path("//build/config/musl-compat/include",
++                                root_build_dir)

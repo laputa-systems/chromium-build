@@ -41,6 +41,16 @@ if ! "$GN" gen "$OUT" --root="$SOURCE_ROOT" --fail-on-unused-args --args="$args"
     fail "gn gen failed"
 fi
 
+overlay_header="$SOURCE_ROOT/build/config/musl-compat/include/sys/poll.h"
+overlay_token="-isystem ../../src/build/config/musl-compat/include"
+[ -f "$overlay_header" ] || fail "musl sys/poll.h overlay header is missing"
+[ -f "$OUT/toolchain.ninja" ] || fail "generated toolchain.ninja is missing"
+overlay_count=$(grep -F -- "$overlay_token" "$OUT/toolchain.ninja" | wc -l | tr -d ' ')
+[ "$overlay_count" -ge 3 ] || fail "generated compiler rules do not carry the musl poll overlay (found $overlay_count)"
+overlay_rules=$(grep -F -- "$overlay_token" "$OUT/toolchain.ninja")
+case "$overlay_rules" in *clang++*) ;; *) fail "C++ compiler rule lacks the musl poll overlay" ;; esac
+case "$overlay_rules" in *"clang "*) ;; *) fail "C compiler rule lacks the musl poll overlay" ;; esac
+
 canonical_tmp="$METADATA/.gn-args.canonical.txt.tmp-$$"
 if ! "$GN" args "$OUT" --root="$SOURCE_ROOT" --list --short >"$canonical_tmp" 2>"$METADATA/gn-args.log"; then
     cat "$METADATA/gn-args.log" >&2
@@ -91,7 +101,12 @@ cat > "$METADATA/.gate-d-report.tmp-$$" <<EOF
   "canonical_args": "$METADATA/gn-args.canonical.txt",
   "effective_args": "$METADATA/gn-args.effective.json",
   "gn_check": "$check_status",
-  "gn_check_detail": "$check_reason"
+  "gn_check_detail": "$check_reason",
+  "musl_poll_overlay": {
+    "header": "$overlay_header",
+    "ninja_token": "$overlay_token",
+    "compiler_rule_count": $overlay_count
+  }
 }
 EOF
 mv "$METADATA/.gate-d-report.tmp-$$" "$METADATA/gate-d-report.json"
