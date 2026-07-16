@@ -17,6 +17,7 @@ RUN apk add --no-cache \
     ca-certificates=20260611-r0 \
     cargo=1.96.0-r0 \
     ccache=4.13.6-r0 \
+    clang22-libclang=22.1.3-r2 \
     curl=8.21.0-r0 \
     ffmpeg-dev=8.1.2-r0 \
     file=5.47-r2 \

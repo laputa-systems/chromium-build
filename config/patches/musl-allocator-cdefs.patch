@@ -1,0 +1,8 @@
+diff --git a/base/allocator/partition_allocator/src/partition_alloc/shim/allocator_shim_internals.h b/base/allocator/partition_allocator/src/partition_alloc/shim/allocator_shim_internals.h
+--- a/base/allocator/partition_allocator/src/partition_alloc/shim/allocator_shim_internals.h
++++ b/base/allocator/partition_allocator/src/partition_alloc/shim/allocator_shim_internals.h
+@@ -12 +12,3 @@
+-#include <sys/cdefs.h>  // for __THROW
++#if defined(__GLIBC__)
++#include <sys/cdefs.h>  // for __THROW
++#endif

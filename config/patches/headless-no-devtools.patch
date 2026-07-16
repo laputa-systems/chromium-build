@@ -26,10 +26,10 @@ diff --git a/headless/BUILD.gn b/headless/BUILD.gn
 diff --git a/ui/webui/examples/BUILD.gn b/ui/webui/examples/BUILD.gn
 --- a/ui/webui/examples/BUILD.gn
 +++ b/ui/webui/examples/BUILD.gn
-@@ -126,1 +126,1 @@
+@@ -126,2 +126,1 @@
      "$root_gen_dir/chrome/webui_gallery_resources.pak",
 -    "$root_gen_dir/content/browser/devtools/devtools_resources.pak",
-@@ -141,1 +141,1 @@
+@@ -141,2 +141,1 @@
      "//chrome/browser/resources/webui_gallery:resources",
 -    "//content/browser/devtools:devtools_resources",
 diff --git a/chrome/browser/devtools/BUILD.gn b/chrome/browser/devtools/BUILD.gn

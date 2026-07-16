@@ -72,7 +72,8 @@ while IFS= read -r candidate; do
 done <"$desc"
 [ -n "$binary" ] || fail "GN did not report a runnable hermetic smoke binary"
 
-if ! "$READELF" -l "$binary" | grep -Fq '/lib/ld-musl-'; then
+program_headers=$("$READELF" -l "$binary")
+if ! printf '%s\n' "$program_headers" | grep -Fq '/lib/ld-musl-'; then
     fail "smoke binary does not use the musl dynamic loader"
 fi
 if "$READELF" -d "$binary" | grep -Eiq '(^|/)(libc\.so\.6|ld-linux|libstdc\+\+|libgcc(_s)?)(\.so|\.a|$)'; then

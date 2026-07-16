@@ -322,6 +322,13 @@ def main():
         "laputa-external-libcxx.patch": "Chromium's use_custom_libcxx path builds the in-tree runtime; this patch redirects it to the validated Laputa static runtime.",
         "gate-e-hermetic-smoke.patch": "Adds the repository-owned Gate E smoke target without making it a dependency of Chrome.",
         "headless-no-devtools.patch": "The initial headless product does not build or ship the DevTools frontend; raw CDP remains available.",
+        "musl-allocator-cdefs.patch": "Chromium's allocator shim includes glibc-only sys/cdefs.h even though its __THROW fallback already supports musl.",
+        "musl-allocator-cpp-noexcept.patch": "Chromium's allocator shim uses __THROW for C++ nothrow operators; the musl C fallback is empty, so match libc++'s noexcept declarations explicitly.",
+        "musl-allocator-libc-noexcept.patch": "Chromium's allocator C-symbol overrides must use an empty exception specification with musl's malloc declarations.",
+        "musl-perfetto-cmsg-sign-compare.patch": "musl's CMSG_NXTHDR macro compares size_t with ptrdiff_t; suppress that libc-header warning only for Perfetto's Unix socket implementation.",
+        "musl-unix-domain-socket-types.patch": "musl declares ancillary socket lengths as socklen_t; make Chromium's Unix-domain socket assignments explicit and suppress its CMSG_NXTHDR libc-header warning locally.",
+        "musl-bindgen-clang22.patch": "Alpine's pinned libclang predates two Chromium warning names; bindgen must ignore unknown warning-option diagnostics.",
+        "alpine-rust-bootstrap.patch": "The pinned Alpine Rust package is stable while Chromium 150 emits nightly-only -Z flags; enable its documented bootstrap compatibility mode only in Chromium's Rust wrapper.",
     }
     for local_patch in args.local_patch:
         record = patch_file(

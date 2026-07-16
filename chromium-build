@@ -120,12 +120,13 @@ run_fetch() {
 
 run_gate() {
     local gate=$1
+    shift
     local -a browser_resources=()
     if [ "$gate" = test-fast.sh ]; then
         browser_resources+=(--tmpfs /dev/shm:rw,nosuid,nodev,noexec,size=1g)
         browser_resources+=(--tmpfs /tmp:rw,nosuid,nodev,size=256m)
     fi
-    docker run --rm --network=none "${browser_resources[@]}" \
+    docker run --rm --network=none ${browser_resources[@]+"${browser_resources[@]}"} \
         -e CHROMIUM_ARCH="$ARCH" \
         -e CHROMIUM_PROFILE="$PROFILE" \
         -e BUILDER_IMAGE_DIGEST="$image_digest" \
@@ -136,7 +137,7 @@ run_gate() {
         -e CCACHE_VOLUME="$CACHE_VOLUME" \
         -v "$WORK_VOLUME:/work" \
         -v "$CACHE_VOLUME:/ccache" \
-        "$IMAGE" "/opt/chromium-build/scripts/$gate"
+        "$IMAGE" "/opt/chromium-build/scripts/$gate" "$@"
 }
 
 case "$command_name" in

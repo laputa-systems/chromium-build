@@ -1,0 +1,8 @@
+diff --git a/base/allocator/partition_allocator/src/partition_alloc/shim/allocator_shim_override_libc_symbols.h b/base/allocator/partition_allocator/src/partition_alloc/shim/allocator_shim_override_libc_symbols.h
+--- a/base/allocator/partition_allocator/src/partition_alloc/shim/allocator_shim_override_libc_symbols.h
++++ b/base/allocator/partition_allocator/src/partition_alloc/shim/allocator_shim_override_libc_symbols.h
+@@ -28,0 +29,4 @@
++#if !defined(__GLIBC__)
++#undef __THROW
++#define __THROW
++#endif

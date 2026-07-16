@@ -1,0 +1,15 @@
+diff --git a/base/allocator/partition_allocator/src/partition_alloc/shim/allocator_shim_override_cpp_symbols.h b/base/allocator/partition_allocator/src/partition_alloc/shim/allocator_shim_override_cpp_symbols.h
+--- a/base/allocator/partition_allocator/src/partition_alloc/shim/allocator_shim_override_cpp_symbols.h
++++ b/base/allocator/partition_allocator/src/partition_alloc/shim/allocator_shim_override_cpp_symbols.h
+@@ -70 +70 @@
+-                                           const std::nothrow_t&) __THROW {
++                                           const std::nothrow_t&) noexcept {
+@@ -79 +79 @@
+-                                             const std::nothrow_t&) __THROW {
++                                             const std::nothrow_t&) noexcept {
+@@ -136 +136 @@
+-                                           const std::nothrow_t&) __THROW {
++                                           const std::nothrow_t&) noexcept {
+@@ -190 +190 @@
+-                                             const std::nothrow_t&) __THROW {
++                                             const std::nothrow_t&) noexcept {

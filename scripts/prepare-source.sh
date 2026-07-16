@@ -52,6 +52,13 @@ SOURCE_DIR=$(find "$TEMP" -mindepth 3 -maxdepth 3 -type f -path '*/chrome/VERSIO
     --local-patch "$ROOT/config/patches/laputa-external-libcxx.patch" \
     --local-patch "$ROOT/config/patches/gate-e-hermetic-smoke.patch" \
     --local-patch "$ROOT/config/patches/headless-no-devtools.patch" \
+    --local-patch "$ROOT/config/patches/musl-allocator-cdefs.patch" \
+    --local-patch "$ROOT/config/patches/musl-allocator-cpp-noexcept.patch" \
+    --local-patch "$ROOT/config/patches/musl-allocator-libc-noexcept.patch" \
+    --local-patch "$ROOT/config/patches/musl-perfetto-cmsg-sign-compare.patch" \
+    --local-patch "$ROOT/config/patches/musl-unix-domain-socket-types.patch" \
+    --local-patch "$ROOT/config/patches/musl-bindgen-clang22.patch" \
+    --local-patch "$ROOT/config/patches/alpine-rust-bootstrap.patch" \
     --rust-target-triple "$rust_target_triple"
 
 mv "$SOURCE_DIR" "$SOURCE"

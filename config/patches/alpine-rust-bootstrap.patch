@@ -1,0 +1,5 @@
+diff --git a/build/rust/gni_impl/rustc_wrapper.py b/build/rust/gni_impl/rustc_wrapper.py
+--- a/build/rust/gni_impl/rustc_wrapper.py
++++ b/build/rust/gni_impl/rustc_wrapper.py
+@@ -393,0 +394,1 @@
++  env.setdefault('RUSTC_BOOTSTRAP', '1')

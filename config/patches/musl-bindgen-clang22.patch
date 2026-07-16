@@ -1,0 +1,5 @@
+diff --git a/build/rust/gni_impl/run_bindgen.py b/build/rust/gni_impl/run_bindgen.py
+--- a/build/rust/gni_impl/run_bindgen.py
++++ b/build/rust/gni_impl/run_bindgen.py
+@@ -115,0 +116,1 @@
++    genargs.append('-Wno-unknown-warning-option')
