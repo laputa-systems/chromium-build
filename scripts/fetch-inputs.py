@@ -31,6 +31,9 @@ def locked_inputs(lock):
     return [chromium] + [
         dict(value, name=name)
         for name, value in lock["source_inputs"].items()
+    ] + [
+        dict(value, name=name)
+        for name, value in lock.get("test_inputs", {}).items()
     ]
 
 

@@ -97,6 +97,7 @@ def main():
         "proprietary_codecs": True,
         "enable_widevine": False,
         "optimize_webui": False,
+        "node_version_check": False,
     }
     for name, value in expected.items():
         if values.get(name) != value:

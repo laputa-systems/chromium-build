@@ -57,6 +57,13 @@ SOURCE_DIR=$(find "$TEMP" -mindepth 3 -maxdepth 3 -type f -path '*/chrome/VERSIO
     --local-patch "$ROOT/config/patches/musl-allocator-libc-noexcept.patch" \
     --local-patch "$ROOT/config/patches/musl-perfetto-cmsg-sign-compare.patch" \
     --local-patch "$ROOT/config/patches/musl-unix-domain-socket-types.patch" \
+    --local-patch "$ROOT/config/patches/musl-stack-trace-noexecinfo.patch" \
+    --local-patch "$ROOT/config/patches/musl-cookie-string-view-iterator.patch" \
+    --local-patch "$ROOT/config/patches/musl-udp-cmsg-sign-compare.patch" \
+    --local-patch "$ROOT/config/patches/musl-mojo-cmsg-sign-compare.patch" \
+    --local-patch "$ROOT/config/patches/musl-webrtc-physical-socket.patch" \
+    --local-patch "$ROOT/config/patches/musl-fontconfig-no-nls.patch" \
+    --local-patch "$ROOT/config/patches/musl-fontconfig-random.patch" \
     --local-patch "$ROOT/config/patches/musl-bindgen-clang22.patch" \
     --local-patch "$ROOT/config/patches/alpine-rust-bootstrap.patch" \
     --rust-target-triple "$rust_target_triple"

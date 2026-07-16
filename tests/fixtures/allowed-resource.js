@@ -1,0 +1,1 @@
+window.allowedResourceExecuted = true;

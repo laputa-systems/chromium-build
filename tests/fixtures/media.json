@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "filename": "media.mp4",
+  "size": 2203,
+  "sha256": "2fb583ce921c433229e731d8a8b9790458093293e9fee52d4072b972cacdef50",
+  "codecs": ["h264", "aac"],
+  "provenance": "Generated from a 16x16 solid-color frame and one second of silent mono audio with FFmpeg 8.1.1."
+}

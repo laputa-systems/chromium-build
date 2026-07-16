@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "certificate": {
+    "filename": "https-cert.pem",
+    "sha256": "f981e93699179a6ccda7fab27f7d76aa964a6cb5f09c57d8e8410125d7241573",
+    "der_sha256": "2b1f4455a70e559feb36d1f4f885c83ebdbca0f483003c48f5dac967e64f0de2",
+    "spki_sha256": "IcC0QZ2zhpXmyBwnRUJPts/upldBvr4U01eU8CN3jF0="
+  },
+  "key": {
+    "filename": "https-key.pem",
+    "sha256": "5aec0fd91d5ec23bbf102031c2b4178cddf2b8a8ccc59d58a75cf882e1393490"
+  }
+}

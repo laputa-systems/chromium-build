@@ -19,6 +19,7 @@ RUN apk add --no-cache \
     ccache=4.13.6-r0 \
     clang22-libclang=22.1.3-r2 \
     curl=8.21.0-r0 \
+    expat-dev=2.8.2-r0 \
     ffmpeg-dev=8.1.2-r0 \
     file=5.47-r2 \
     findutils=4.10.0-r1 \

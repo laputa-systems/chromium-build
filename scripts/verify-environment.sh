@@ -86,6 +86,13 @@ if fetch.get("chromium_version") != lock["chromium"]["version"]:
 chromium_entry = next((item for item in fetch.get("entries", []) if item.get("name") == "chromium"), None)
 if chromium_entry is None or chromium_entry.get("sha512") != lock["chromium"]["archive_sha512"]:
     raise SystemExit(f"{sys.argv[3]}: source archive digest does not match input lock")
+for name, expected in lock.get("test_inputs", {}).items():
+    entry = next((item for item in fetch.get("entries", []) if item.get("name") == name), None)
+    if entry is None:
+        raise SystemExit(f"{sys.argv[3]}: test input is missing: {name}")
+    for key in ("filename", "size", "sha512"):
+        if entry.get(key) != expected[key]:
+            raise SystemExit(f"{sys.argv[3]}: test input {name} does not match lock field {key}")
 PY
 
 architecture_toolchain_json=$($PYTHON - "$LOCK" "$ARCH" <<'PY'

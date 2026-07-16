@@ -1,0 +1,6 @@
+diff --git a/third_party/fontconfig/include/meson-config.h b/third_party/fontconfig/include/meson-config.h
+--- a/third_party/fontconfig/include/meson-config.h
++++ b/third_party/fontconfig/include/meson-config.h
+@@ -12,1 +12,1 @@
+-#define ENABLE_NLS 1
++/* #undef ENABLE_NLS */

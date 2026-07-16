@@ -1,0 +1,89 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Hermetic browser acceptance</title>
+<style>
+  body { font: 16px sans-serif; margin: 2rem; }
+  #status { white-space: pre; }
+</style>
+<body>
+<main id="status">starting</main>
+<a id="download" download="fixture-download.txt" href="__DOWNLOAD_URL__">download</a>
+<video id="video" muted playsinline></video>
+<canvas id="canvas" width="16" height="16"></canvas>
+<script>
+  const state = {
+    allowed: false,
+    blocked: false,
+    blockedExecuted: false,
+    extension: false,
+    mutation: false,
+    media: {},
+  };
+  window.functionalState = state;
+  console.log("functional-fixture-start");
+  const observer = new MutationObserver(() => { state.mutation = true; });
+  observer.observe(document.querySelector("#status"), {childList: true, subtree: true});
+
+  const blocked = document.createElement("script");
+  blocked.src = "__BLOCKED_URL__";
+  blocked.onload = () => { state.blocked = false; };
+  blocked.onerror = () => { state.blocked = !state.blockedExecuted; };
+  document.head.appendChild(blocked);
+  setTimeout(() => { state.blocked = !state.blockedExecuted; }, 1200);
+
+  const allowed = document.createElement("script");
+  allowed.src = "__ALLOWED_URL__";
+  allowed.onload = () => { state.allowed = window.allowedResourceExecuted === true; };
+  document.head.appendChild(allowed);
+
+  const video = document.querySelector("#video");
+  video.src = "__MEDIA_URL__";
+  state.media.canPlay = video.canPlayType('video/mp4; codecs="avc1.42E01E, mp4a.40.2"');
+  video.addEventListener("loadedmetadata", () => {
+    state.media.metadata = video.videoWidth > 0 && video.videoHeight > 0;
+    video.play().catch(error => { state.media.playError = String(error); });
+  });
+  video.addEventListener("playing", () => {
+    const context = document.querySelector("#canvas").getContext("2d");
+    context.drawImage(video, 0, 0, 16, 16);
+    const pixels = context.getImageData(0, 0, 16, 16).data;
+    state.media.framePixels = Array.from(pixels).reduce((sum, value) => sum + value, 0);
+    state.media.playing = true;
+  });
+  const audio = document.createElement("audio");
+  audio.muted = true;
+  audio.src = "__MEDIA_URL__";
+  audio.addEventListener("loadedmetadata", () => { state.media.audioMetadata = audio.duration > 0; });
+
+  const repeatMedia = async () => {
+    for (let cycle = 0; cycle < 3; cycle += 1) {
+      const probe = document.createElement("video");
+      probe.muted = true;
+      probe.src = "__MEDIA_URL__";
+      document.body.appendChild(probe);
+      await new Promise(resolve => {
+        probe.addEventListener("loadedmetadata", resolve, {once: true});
+        probe.addEventListener("error", resolve, {once: true});
+      });
+      if (probe.readyState >= 1) {
+        try { await probe.play(); } catch (_) { }
+        probe.currentTime = 0;
+      }
+      probe.pause();
+      probe.removeAttribute("src");
+      probe.load();
+      probe.remove();
+      state.media.repeatCycles = cycle + 1;
+    }
+  };
+  repeatMedia().catch(error => { state.media.repeatError = String(error); });
+
+  const finish = () => {
+    state.extension = document.documentElement.dataset.fixtureExtension === "loaded";
+    document.querySelector("#status").textContent = JSON.stringify(state);
+    window.functionalReady = true;
+    console.log("functional-fixture-ready", state);
+  };
+  setTimeout(finish, 5000);
+</script>
+</body>

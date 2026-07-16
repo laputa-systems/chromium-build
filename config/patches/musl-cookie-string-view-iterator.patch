@@ -1,0 +1,12 @@
+diff --git a/net/cookies/cookie_util.cc b/net/cookies/cookie_util.cc
+--- a/net/cookies/cookie_util.cc
++++ b/net/cookies/cookie_util.cc
+@@ -855,1 +855,1 @@
+-  std::string::const_iterator i = header_value.begin();
++  std::string_view::const_iterator i = header_value.begin();
+@@ -864,1 +864,1 @@
+-    std::string::const_iterator cookie_name_beginning = i;
++    std::string_view::const_iterator cookie_name_beginning = i;
+@@ -872,1 +872,1 @@
+-      std::string::const_iterator cookie_value_beginning = i;
++      std::string_view::const_iterator cookie_value_beginning = i;

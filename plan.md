@@ -891,7 +891,7 @@ Tests use only repository-owned fixtures and local loopback services. No test re
 Tests are tiered by iteration cost:
 
 - `test-fast` performs only launch, raw CDP handshake, one local navigation, JavaScript evaluation, screenshot validation, and clean shutdown. It is the default post-link loop and must not invoke extension, media, complete DevTools, ELF, provenance, or package checks.
-- `test` performs all functional subsections below and is required at milestones and before `audit`/`package`.
+- `test` runs one Python standard-library crawl-like scenario that covers the functional subsections below, with a TCP/WebSocket phase and a compact CDP-pipe phase inside the same runner. It is required at milestones and before `audit`/`package`.
 - Upstream Chromium unit, browser, Web, layout, performance, and end-to-end suites are not built or run in v1. Repository-owned focused tests provide acceptance evidence for this deliberately narrow product.
 
 ### 15.1 Test server and profile isolation
@@ -907,6 +907,8 @@ Tests are tiered by iteration cost:
 ### 15.2 CDP pipe test
 
 Use a small standard-library client for Chromium's NUL-delimited JSON remote-debugging pipe protocol over the required inherited file descriptors. Validate:
+
+The consolidated runner uses the pipe phase for transport, target, navigation, evaluation, and screenshot checks; the TCP phase below owns the shared browser-behavior assertions so the same scenario is not duplicated.
 
 - browser version and protocol handshake;
 - creation and attachment to a page target;
@@ -970,6 +972,26 @@ Do not require physical audio output in `headless-debug`; ALSA is intentionally 
 - Verify screenshot pixels are non-empty and deterministic enough for a coarse sanity assertion, not a brittle pixel-perfect upstream test.
 - Confirm the browser and renderer processes start without `--no-sandbox`.
 - Fail clearly if the runtime does not allow unprivileged user namespaces. Do not add a setuid sandbox fallback.
+
+### 15.8 Current implementation status
+
+Covered by the repository-owned runner:
+
+- 15.1 profile isolation, loopback fixture serving, non-root launch, deterministic flags, bounded `/dev/shm`, and disposable `/tmp` are wired through `test-fast`/`test`.
+- 15.2 pipe transport, 15.3 TCP transport, storage/network/console/DOM/download/screenshot behavior, and target cleanup are exercised in one full run.
+- 15.4 real pinned uBlock plus a local Manifest V3 extension are loaded offline; CDP observes the extension context and target.
+- 15.6 has a checksummed H.264/AAC fixture, repeated media lifecycle cycles, codec/frame assertions, local HTTPS navigation before and after media, `/proc` library-map collection, and a dynamic-symbol intersection report in strict Linux runs.
+- 15.7 has GPU diagnostics, non-empty screenshot checks, sandbox evidence, no-`--no-sandbox` enforcement, and an unprivileged-user-namespace check.
+
+Still pending until the completed Linux Chrome build is available:
+
+- Run strict `test` with Alpine system FFmpeg and Mesa llvmpipe; the macOS smoke run cannot prove either Linux-specific property.
+- Review and baseline the generated FFmpeg/Chrome symbol-intersection report, including OpenSSL/BoringSSL and allocator/exception collisions.
+- Confirm the staged runtime repeats the same media, HTTPS, renderer, and sandbox checks after packaging.
+
+Deferred by design:
+
+- 15.5 DevTools frontend loading remains deferred because the current profile disables frontend generation. Raw CDP is covered.
 
 ## 16. ELF, link, and dependency audits
 
@@ -1275,6 +1297,7 @@ Risk: source, object, link-temporary, ccache, or packaging growth causes a late 
 - Modern headless mode runs with sandboxing and host llvmpipe.
 - Raw CDP pipe/TCP, downloads, screenshots, storage/network events, and local extension tests pass offline. DevTools frontend resources are deferred from the initial headless profile.
 - `test-fast` supplies the short post-link acceptance loop; the complete focused `test` suite passes at the milestone without building upstream test suites.
+- The strict Linux `test` run also emits `media-runtime.json` with loaded process-tree maps and reviewed Chrome/FFmpeg dynamic-symbol intersections.
 - System-FFmpeg H.264/AAC decode/containment tests pass without disturbing Chrome's static-libc++ identity or Mesa llvmpipe rendering.
 - ELF/link audits pass.
 
@@ -1326,7 +1349,9 @@ Packaging success from an ordinary cache-assisted build produces a candidate art
 
 ## 24. Handoff state after starting the full build
 
-The implementation now includes the #14 full-build driver and the first #15 `test-fast` path. `chromium-build build` invokes only the persistent profile's `chrome` Ninja target, accepts independent `JOBS` and load-limit settings, records ccache statistics and free-space observations, preserves Ninja output on failure, and writes a completion report only after the executable resolves successfully. `build-target` supports narrow Ninja output or label rebuilds.
+The implementation now includes the #14 full-build driver and the #15 `test-fast` and consolidated `test` paths. `chromium-build build` invokes only the persistent profile's `chrome` Ninja target, accepts independent `JOBS` and load-limit settings, records ccache statistics and free-space observations, preserves Ninja output on failure, and writes a completion report only after the executable resolves successfully. `build-target` supports narrow Ninja output or label rebuilds.
+
+The full functional runner uses only Python standard-library CDP transports, a loopback fixture server, a pinned offline uBlock archive, a tiny local extension, and one minimal H.264/AAC fixture. Its Chromium lifecycle uses a dedicated process group and descendant cleanup so both normal and failing runs reap browser processes.
 
 The initial headless profile deliberately excludes the DevTools frontend and its resource packs. Raw CDP remains in scope. The source preparation patch also avoids the architecture-incompatible bundled DevTools `esbuild` path and keeps Alpine Rust as the compiler toolchain; Chromium's bundled Rust toolchain remains excluded.
 

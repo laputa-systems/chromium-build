@@ -14,6 +14,7 @@
     "ccache=4.13.6-r0",
     "clang22-libclang=22.1.3-r2",
     "curl=8.21.0-r0",
+    "expat-dev=2.8.2-r0",
     "ffmpeg-dev=8.1.2-r0",
     "file=5.47-r2",
     "findutils=4.10.0-r1",
@@ -66,6 +67,8 @@
     "clang22-libs-22.1.3-r2",
     "curl-8.21.0-r0",
     "dbus-libs-1.16.2-r2",
+    "expat-2.8.2-r0",
+    "expat-dev-2.8.2-r0",
     "ffmpeg-dev-8.1.2-r0",
     "ffmpeg-libavcodec-8.1.2-r0",
     "ffmpeg-libavdevice-8.1.2-r0",
@@ -262,6 +265,6 @@
     "zstd-1.5.7-r2",
     "zstd-libs-1.5.7-r2"
   ],
-  "manifest_sha256": "5bc517a400c6e4b10090d1398b5a586745328207b73ffea70a11cf89ca5f602e",
+  "manifest_sha256": "99f269da3b15891fa8512731938c0ca895e0d63f048be935c1c6772b73f13f9f",
   "status": "resolved"
 }

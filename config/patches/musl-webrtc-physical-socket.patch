@@ -1,0 +1,19 @@
+diff --git a/third_party/webrtc/rtc_base/physical_socket_server.cc b/third_party/webrtc/rtc_base/physical_socket_server.cc
+--- a/third_party/webrtc/rtc_base/physical_socket_server.cc
++++ b/third_party/webrtc/rtc_base/physical_socket_server.cc
+@@ -49,1 +49,3 @@
+-#include <sys/poll.h>
++#if !defined(__linux__) || defined(__GLIBC__)
++#include <sys/poll.h>
++#endif
+@@ -599,2 +601,6 @@
+     struct cmsghdr* cmsg;
++#if defined(__linux__) && !defined(__GLIBC__)
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wsign-compare"
++#endif
+     for (cmsg = CMSG_FIRSTHDR(&msg); cmsg; cmsg = CMSG_NXTHDR(&msg, cmsg)) {
+@@ -623,0 +629,3 @@
++#if defined(__linux__) && !defined(__GLIBC__)
++#pragma GCC diagnostic pop
++#endif

@@ -38,6 +38,15 @@
       "sha512": "7b8316b95c103a1a992d48839ff4c460fde655707fc6e150cf0ec916d64df19ee002a3396d177134bba5fd6e3fefcd930a0f3d49bd23ad51bd459502ef1a5533"
     }
   },
+  "test_inputs": {
+    "ublock_origin": {
+      "version": "1.72.0",
+      "filename": "uBlock0_1.72.0.chromium.zip",
+      "url": "https://github.com/gorhill/uBlock/releases/download/1.72.0/uBlock0_1.72.0.chromium.zip",
+      "size": 4617915,
+      "sha512": "ce98b58145bc1263ca919e9e329b2b402257d8b8eef325ec2b83392812f69ed62aba41866a3a7daecc166f2b5a18392467e9aae5af9d208b51cf1b02cc20d121"
+    }
+  },
   "source_identity": {
     "schema": 1,
     "chromium_version": "150.0.7871.114",

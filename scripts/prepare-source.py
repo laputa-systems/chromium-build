@@ -327,6 +327,13 @@ def main():
         "musl-allocator-libc-noexcept.patch": "Chromium's allocator C-symbol overrides must use an empty exception specification with musl's malloc declarations.",
         "musl-perfetto-cmsg-sign-compare.patch": "musl's CMSG_NXTHDR macro compares size_t with ptrdiff_t; suppress that libc-header warning only for Perfetto's Unix socket implementation.",
         "musl-unix-domain-socket-types.patch": "musl declares ancillary socket lengths as socklen_t; make Chromium's Unix-domain socket assignments explicit and suppress its CMSG_NXTHDR libc-header warning locally.",
+        "musl-stack-trace-noexecinfo.patch": "Alpine's no-execinfo patch guards most stack symbolization but leaves one direct stream call; provide the same non-symbolizing fallback on musl.",
+        "musl-cookie-string-view-iterator.patch": "Chromium's cookie parser mixes std::string and std::string_view iterator types; libc++ keeps these iterator types distinct on musl.",
+        "musl-udp-cmsg-sign-compare.patch": "musl's CMSG_NXTHDR macro compares size_t with ptrdiff_t; suppress that libc-header warning locally for Chromium's UDP ancillary-data loop.",
+        "musl-mojo-cmsg-sign-compare.patch": "musl's CMSG_NXTHDR macro compares size_t with ptrdiff_t; suppress that libc-header warning locally for Mojo's POSIX socket ancillary-data loop.",
+        "musl-webrtc-physical-socket.patch": "Alpine musl warns on WebRTC's glibc-oriented sys/poll.h redirect and CMSG_NXTHDR size comparison; keep the include portable and suppress the libc-header warning locally.",
+        "musl-fontconfig-no-nls.patch": "The bundled fontconfig archive enables NLS in its generated configuration, which requires the absent gettext development header; Chromium does not need fontconfig's translation catalogs.",
+        "musl-fontconfig-random.patch": "The bundled fontconfig configuration claims glibc's random_r API is available; use its portable random() fallback on musl.",
         "musl-bindgen-clang22.patch": "Alpine's pinned libclang predates two Chromium warning names; bindgen must ignore unknown warning-option diagnostics.",
         "alpine-rust-bootstrap.patch": "The pinned Alpine Rust package is stable while Chromium 150 emits nightly-only -Z flags; enable its documented bootstrap compatibility mode only in Chromium's Rust wrapper.",
     }

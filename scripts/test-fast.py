@@ -7,10 +7,9 @@ import hashlib
 import http.server
 import json
 import os
-import secrets
 import shutil
 import socket
-import subprocess
+import struct
 import sys
 import tempfile
 import threading
@@ -19,6 +18,21 @@ import urllib.parse
 import urllib.request
 import urllib.error
 from pathlib import Path
+
+from browser_test_support import CdpConnection, WebSocket, chromium_args, launch_chromium, terminate_process
+
+
+def write_json(path, value):
+    path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
+
+
+def valid_png(value, expected_dimensions):
+    data = base64.b64decode(value)
+    if len(data) < 33 or not data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return False, data
+    length = struct.unpack(">I", data[8:12])[0]
+    dimensions = struct.unpack(">II", data[16:24]) if data[12:16] == b"IHDR" and length == 13 else None
+    return dimensions == expected_dimensions, data
 
 
 class FixtureHandler(http.server.SimpleHTTPRequestHandler):
@@ -46,87 +60,6 @@ class FixtureServer:
         self.thread.join()
 
 
-class WebSocket:
-    def __init__(self, url):
-        parsed = urllib.parse.urlparse(url)
-        self.sock = socket.create_connection((parsed.hostname, parsed.port), timeout=10)
-        key = base64.b64encode(secrets.token_bytes(16)).decode()
-        path = parsed.path or "/"
-        self.sock.sendall((
-            f"GET {path} HTTP/1.1\r\nHost: {parsed.hostname}:{parsed.port}\r\n"
-            f"Upgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: {key}\r\n"
-            "Sec-WebSocket-Version: 13\r\n\r\n"
-        ).encode())
-        response = self._read_http_headers()
-        if b" 101 " not in response:
-            raise RuntimeError(f"WebSocket handshake failed: {response!r}")
-        self.buffer = b""
-
-    def _read_http_headers(self):
-        while b"\r\n\r\n" not in self.buffer:
-            self.buffer += self.sock.recv(4096)
-        headers, self.buffer = self.buffer.split(b"\r\n\r\n", 1)
-        return headers
-
-    def send(self, value):
-        payload = json.dumps(value, separators=(",", ":")).encode()
-        mask = secrets.token_bytes(4)
-        masked = bytes(byte ^ mask[index % 4] for index, byte in enumerate(payload))
-        length = len(payload)
-        if length < 126:
-            header = bytes((0x81, 0x80 | length))
-        elif length < 65536:
-            header = bytes((0x81, 0xFE)) + length.to_bytes(2, "big")
-        else:
-            header = bytes((0x81, 0xFF)) + length.to_bytes(8, "big")
-        self.sock.sendall(header + mask + masked)
-
-    def receive(self):
-        while len(self.buffer) < 2:
-            self.buffer += self.sock.recv(4096)
-        first, second = self.buffer[:2]
-        self.buffer = self.buffer[2:]
-        length = second & 0x7F
-        if length == 126:
-            while len(self.buffer) < 2:
-                self.buffer += self.sock.recv(4096)
-            length = int.from_bytes(self.buffer[:2], "big")
-            self.buffer = self.buffer[2:]
-        elif length == 127:
-            while len(self.buffer) < 8:
-                self.buffer += self.sock.recv(4096)
-            length = int.from_bytes(self.buffer[:8], "big")
-            self.buffer = self.buffer[8:]
-        mask = b""
-        if second & 0x80:
-            while len(self.buffer) < 4:
-                self.buffer += self.sock.recv(4096)
-            mask, self.buffer = self.buffer[:4], self.buffer[4:]
-        while len(self.buffer) < length:
-            self.buffer += self.sock.recv(4096)
-        payload, self.buffer = self.buffer[:length], self.buffer[length:]
-        if mask:
-            payload = bytes(byte ^ mask[index % 4] for index, byte in enumerate(payload))
-        if first & 0x0F == 8:
-            raise RuntimeError("Chrome closed the CDP socket")
-        return json.loads(payload)
-
-    def close(self):
-        self.sock.close()
-
-
-def cdp_call(ws, method, params=None, identifier=[0]):
-    identifier[0] += 1
-    current = identifier[0]
-    ws.send({"id": current, "method": method, "params": params or {}})
-    while True:
-        message = ws.receive()
-        if message.get("id") == current:
-            if "error" in message:
-                raise RuntimeError(f"{method}: {message['error']}")
-            return message.get("result", {})
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--chrome", required=True, type=Path)
@@ -137,8 +70,20 @@ def main():
         raise SystemExit("test-fast refuses root; run the browser as the build/test user")
     args.output.mkdir(parents=True, exist_ok=True)
     user_data = Path(tempfile.mkdtemp(prefix="fast-profile-", dir=args.output))
+    report_path = args.output / "test-fast.json"
+    report = {
+        "schema": 2,
+        "status": "running",
+        "network": "loopback-only",
+        "chrome": str(args.chrome),
+        "platform": sys.platform,
+    }
+    write_json(report_path, report)
     process = None
-    ws = None
+    connection = None
+    run_error = None
+    result = None
+    cleanup = None
     started = time.monotonic()
     try:
         with FixtureServer(args.fixtures) as server:
@@ -146,11 +91,13 @@ def main():
             port.bind(("127.0.0.1", 0))
             debug_port = port.getsockname()[1]
             port.close()
-            process = subprocess.Popen([
-                str(args.chrome), "--headless=new", "--remote-debugging-address=127.0.0.1",
-                f"--remote-debugging-port={debug_port}", f"--user-data-dir={user_data}",
-                "--no-first-run", "--no-default-browser-check", "about:blank",
-            ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            log_path = args.output / "test-fast-chromium.log"
+            process, _ = launch_chromium(
+                args.chrome,
+                user_data,
+                chromium_args(user_data, port=debug_port),
+                log_path,
+            )
             version = None
             deadline = time.monotonic() + 15
             while time.monotonic() < deadline:
@@ -163,38 +110,72 @@ def main():
                         break
                     time.sleep(0.1)
             if not version:
-                stderr = process.stderr.read() if process.stderr else ""
-                raise RuntimeError(f"Chrome DevTools endpoint did not start: {stderr[-2000:]}")
+                log = log_path.read_text(encoding="utf-8", errors="replace")
+                raise RuntimeError(f"Chrome DevTools endpoint did not start: {log[-2000:]}")
             new_target = urllib.request.Request(
                 f"http://127.0.0.1:{debug_port}/json/new?{urllib.parse.quote(server.url, safe=':/?=&')}",
                 method="PUT",
             )
             with urllib.request.urlopen(new_target) as response:
                 target = json.load(response)
-            ws = WebSocket(target["webSocketDebuggerUrl"])
-            cdp_call(ws, "Runtime.enable")
-            cdp_call(ws, "Page.enable")
-            cdp_call(ws, "Network.enable")
-            cdp_call(ws, "Page.navigate", {"url": server.url})
-            result = cdp_call(ws, "Runtime.evaluate", {"expression": "document.querySelector('#status').textContent", "returnByValue": True})
+            connection = CdpConnection(WebSocket(target["webSocketDebuggerUrl"]))
+            connection.call("Runtime.enable")
+            connection.call("Page.enable")
+            connection.call("Network.enable")
+            navigation = connection.call("Page.navigate", {"url": server.url})
+            frame_id = navigation.get("frameId")
+            if not frame_id:
+                raise RuntimeError("fast fixture navigation returned no frame ID")
+            connection.wait_event(
+                "Page.frameNavigated",
+                predicate=lambda event: event.get("params", {}).get("frame", {}).get("id") == frame_id,
+                timeout=15,
+            )
+            connection.wait_event("Page.domContentEventFired", timeout=15)
+            result = connection.call("Runtime.evaluate", {"expression": "document.querySelector('#status').textContent", "returnByValue": True})
             if result["result"]["value"] != "ready":
                 raise RuntimeError("fixture DOM was not updated")
-            screenshot = cdp_call(ws, "Page.captureScreenshot", {"format": "png"})["data"]
+            dimensions = tuple(connection.call("Runtime.evaluate", {"expression": "[window.innerWidth, window.innerHeight]", "returnByValue": True})["result"]["value"])
+            screenshot = connection.call("Page.captureScreenshot", {"format": "png"})["data"]
             screenshot_path = args.output / "fast-screenshot.png"
-            screenshot_path.write_bytes(base64.b64decode(screenshot))
-            if screenshot_path.stat().st_size < 100 or screenshot_path.read_bytes()[:8] != b"\x89PNG\r\n\x1a\n":
+            screenshot_ok, screenshot_bytes = valid_png(screenshot, dimensions)
+            screenshot_path.write_bytes(screenshot_bytes)
+            if not screenshot_ok:
                 raise RuntimeError("Chrome returned an invalid screenshot")
-            cdp_call(ws, "Browser.close")
+            connection.call("Browser.close")
         process.wait(timeout=10)
-        report = {"schema": 1, "status": "complete", "network": "loopback-only", "duration_seconds": time.monotonic() - started, "version": version, "screenshot": str(screenshot_path)}
-        (args.output / "test-fast.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+        report.update(
+            {
+                "status": "complete",
+                "version": version,
+                "screenshot": str(screenshot_path),
+                "screenshot_sha256": hashlib.sha256(screenshot_bytes).hexdigest(),
+            }
+        )
+    except BaseException as error:
+        run_error = error
+        report["status"] = "failed"
+        report["error"] = str(error)
+        raise
     finally:
-        if ws:
-            ws.close()
-        if process and process.poll() is None:
-            process.terminate()
-            process.wait(timeout=5)
-        shutil.rmtree(user_data, ignore_errors=True)
+        if connection:
+            connection.close()
+        if process:
+            cleanup = terminate_process(process)
+        else:
+            cleanup = terminate_process(None)
+        report["cleanup"] = cleanup
+        report["duration_seconds"] = time.monotonic() - started
+        if run_error is None and report["status"] == "complete" and cleanup["ok"]:
+            shutil.rmtree(user_data, ignore_errors=True)
+        else:
+            report["profile"] = str(user_data)
+        if not cleanup["ok"] and run_error is None:
+            report["status"] = "failed"
+            report["error"] = f"Chromium cleanup failed: {cleanup}"
+        write_json(report_path, report)
+        if not cleanup["ok"] and run_error is None:
+            raise RuntimeError(f"Chromium cleanup failed: {cleanup}")
 
 
 if __name__ == "__main__":

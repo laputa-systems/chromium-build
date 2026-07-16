@@ -1,0 +1,10 @@
+diff --git a/base/debug/stack_trace.cc b/base/debug/stack_trace.cc
+--- a/base/debug/stack_trace.cc
++++ b/base/debug/stack_trace.cc
+@@ -363,1 +363,5 @@
+-  OutputToStreamWithPrefixImpl(os, prefix_string);
++#if defined(__GLIBC__) && !defined(_AIX)
++  OutputToStreamWithPrefixImpl(os, prefix_string);
++#else
++  *os << prefix_string << "StackTrace::OutputToStream not implemented.";
++#endif
