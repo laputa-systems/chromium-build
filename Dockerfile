@@ -16,7 +16,7 @@ RUN apk add --no-cache \
     bison=3.8.2-r3 \
     bsd-compat-headers=0.7.2-r6 \
     ca-certificates=20260611-r0 \
-    cargo=1.96.0-r0 \
+    cargo=1.96.1-r0 \
     ccache=4.13.6-r0 \
     clang22-libclang=22.1.3-r2 \
     curl=8.21.0-r0 \
@@ -25,6 +25,7 @@ RUN apk add --no-cache \
     file=5.47-r2 \
     findutils=4.10.0-r1 \
     flex=2.6.4-r8 \
+    font-noto=2026.06.01-r0 \
     gn=0_git20260401-r2 \
     go=1.26.3-r0 \
     gperf=3.3-r0 \
@@ -39,10 +40,11 @@ RUN apk add --no-cache \
     perl=5.42.2-r0 \
     pkgconf=2.5.1-r0 \
     python3=3.14.5-r0 \
-    rust=1.96.0-r0 \
+    rust=1.96.1-r0 \
     rust-bindgen=0.72.1-r1 \
-    rustfmt=1.96.0-r0 \
+    rustfmt=1.96.1-r0 \
     tar=1.35-r5 \
+    util-linux-dev=2.42.1-r0 \
     xz=5.8.3-r0 \
     zstd=1.5.7-r2
 
@@ -83,6 +85,7 @@ COPY config /opt/chromium-build/config
 COPY scripts /opt/chromium-build/scripts
 COPY tests/probes /opt/chromium-build/tests/probes
 COPY tests/fixtures /opt/chromium-build/tests/fixtures
+COPY tests/test_browser_test_support.py /opt/chromium-build/tests/test_browser_test_support.py
 
 RUN set -eux; \
     mkdir -p /opt/chromium-build-metadata; \

@@ -19,6 +19,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import browser_test_support as support
 
 
+def temporary_directory():
+    parent = os.environ.get("CHROMIUM_TEST_TMPDIR")
+    if parent:
+        return tempfile.TemporaryDirectory(dir=parent)
+    return tempfile.TemporaryDirectory()
+
+
 def websocket_frame(opcode, payload, *, final=True, masked=False):
     first = (0x80 if final else 0) | opcode
     length = len(payload)
@@ -213,7 +220,7 @@ class BrowserTestSupportTests(unittest.TestCase):
                     pass
 
     def test_pipe_launch_does_not_inherit_unrelated_descriptor(self):
-        with tempfile.TemporaryDirectory() as directory:
+        with temporary_directory() as directory:
             root = Path(directory)
             child = root / "fake-chrome"
             child.write_text(
@@ -269,7 +276,7 @@ class BrowserTestSupportTests(unittest.TestCase):
                 os.environ.update(old_environment)
 
     def test_terminate_process_escalates_and_cleans_process_group(self):
-        with tempfile.TemporaryDirectory() as directory:
+        with temporary_directory() as directory:
             root = Path(directory)
             child = root / "stubborn-chrome"
             child.write_text(

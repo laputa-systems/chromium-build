@@ -1,0 +1,7 @@
+diff --git a/chrome/browser/devtools/BUILD.gn b/chrome/browser/devtools/BUILD.gn
+--- a/chrome/browser/devtools/BUILD.gn
++++ b/chrome/browser/devtools/BUILD.gn
+@@ -25,1 +25,0 @@
+-if (enable_devtools_frontend) {
+@@ -57,1 +56,0 @@
+-}

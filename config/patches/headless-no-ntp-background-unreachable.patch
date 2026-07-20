@@ -1,0 +1,11 @@
+diff --git a/components/themes/ntp_background_service.cc b/components/themes/ntp_background_service.cc
+--- a/components/themes/ntp_background_service.cc
++++ b/components/themes/ntp_background_service.cc
+@@ -92,4 +92,7 @@ void NtpBackgroundService::FetchCollectionInfo(
+     const std::string& filtering_label) {
+   // If a request is currently in progress, drop the new request.
++#if defined(__clang__)
++#pragma clang diagnostic ignored "-Wunreachable-code"
++#endif
+     return;
+   collection_error_info_.ClearError();

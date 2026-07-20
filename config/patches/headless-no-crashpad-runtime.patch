@@ -1,0 +1,12 @@
+diff --git a/components/crash/core/app/crashpad_linux.cc b/components/crash/core/app/crashpad_linux.cc
+--- a/components/crash/core/app/crashpad_linux.cc
++++ b/components/crash/core/app/crashpad_linux.cc
+@@ -139,5 +139,8 @@ bool PlatformCrashpadInitialization(
+     base::FilePath* database_path) {
+   DCHECK_EQ(initial_client, browser_process);
+   DCHECK(initial_arguments.empty());
++#if !BUILDFLAG(IS_CHROMEOS)
++  return false;
++#endif
+ 
+   // Not used on Linux.

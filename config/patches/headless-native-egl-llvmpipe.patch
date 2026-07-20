@@ -1,0 +1,10 @@
+diff --git a/ui/ozone/platform/headless/headless_surface_factory.cc b/ui/ozone/platform/headless/headless_surface_factory.cc
+--- a/ui/ozone/platform/headless/headless_surface_factory.cc
++++ b/ui/ozone/platform/headless/headless_surface_factory.cc
+@@ -235,5 +235,6 @@ std::vector<gl::GLImplementationParts>
+ HeadlessSurfaceFactory::GetAllowedGLImplementations() {
+   return std::vector<gl::GLImplementationParts>{
++      gl::GLImplementationParts(gl::kGLImplementationEGLGLES2),
+       gl::GLImplementationParts(gl::kGLImplementationEGLANGLE),
+   };
+ }

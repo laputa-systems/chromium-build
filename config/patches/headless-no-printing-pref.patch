@@ -1,0 +1,13 @@
+diff --git a/chrome/browser/renderer_context_menu/render_view_context_menu.cc b/chrome/browser/renderer_context_menu/render_view_context_menu.cc
+--- a/chrome/browser/renderer_context_menu/render_view_context_menu.cc
++++ b/chrome/browser/renderer_context_menu/render_view_context_menu.cc
+@@ -4408,6 +4408,10 @@ bool RenderViewContextMenu::IsPrintPreviewEnabled() const {
+   if (IsGlicWindow(this, browser_context_) &&
+       base::FeatureList::IsEnabled(features::kGlicPrintMenuItem)) {
++#if BUILDFLAG(ENABLE_PRINTING)
+     return GetPrefs(browser_context_)->GetBoolean(prefs::kPrintingEnabled) &&
+            (source_web_contents_ && !source_web_contents_->IsCrashed());
++#else
++    return false;
++#endif
+   }

@@ -1,0 +1,7 @@
+diff --git a/chrome/browser/about_flags.cc b/chrome/browser/about_flags.cc
+--- a/chrome/browser/about_flags.cc
++++ b/chrome/browser/about_flags.cc
+@@ -11138,0 +11138,1 @@
++#if BUILDFLAG(ENABLE_PRINTING)
+@@ -11145,0 +11145,1 @@
++#endif  // BUILDFLAG(ENABLE_PRINTING)

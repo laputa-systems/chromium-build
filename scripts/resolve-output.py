@@ -26,6 +26,11 @@ def main() -> None:
         text=True,
     )
     if result.returncode:
+        if args.label == "//chrome:chrome":
+            chrome = args.out / "chrome"
+            if chrome.is_file() and os.access(chrome, os.X_OK):
+                print(chrome)
+                return
         raise ScriptFailure(f"GN could not describe {args.label}")
     for raw in result.stdout.splitlines():
         candidate = raw.strip()

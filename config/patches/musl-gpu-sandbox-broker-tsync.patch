@@ -1,0 +1,27 @@
+diff --git a/sandbox/linux/syscall_broker/broker_process.h b/sandbox/linux/syscall_broker/broker_process.h
+--- a/sandbox/linux/syscall_broker/broker_process.h
++++ b/sandbox/linux/syscall_broker/broker_process.h
+@@ -71,1 +71,2 @@
+-  bool Fork(BrokerSideCallback broker_process_init_callback);
++  bool Fork(BrokerSideCallback broker_process_init_callback,
++            bool allow_threads = false);
+diff --git a/sandbox/linux/syscall_broker/broker_process.cc b/sandbox/linux/syscall_broker/broker_process.cc
+--- a/sandbox/linux/syscall_broker/broker_process.cc
++++ b/sandbox/linux/syscall_broker/broker_process.cc
+@@ -102,1 +102,2 @@
+-bool BrokerProcess::Fork(BrokerSideCallback broker_process_init_callback) {
++bool BrokerProcess::Fork(BrokerSideCallback broker_process_init_callback,
++                         bool allow_threads) {
+@@ -106,1 +107,2 @@
+-  DCHECK_EQ(1, base::GetNumberOfThreads(base::GetCurrentProcessHandle()));
++  DCHECK(allow_threads ||
++         base::GetNumberOfThreads(base::GetCurrentProcessHandle()) == 1);
+diff --git a/sandbox/policy/linux/sandbox_linux.cc b/sandbox/policy/linux/sandbox_linux.cc
+--- a/sandbox/policy/linux/sandbox_linux.cc
++++ b/sandbox/policy/linux/sandbox_linux.cc
+@@ -563,2 +563,3 @@
+-  CHECK(broker_process_->Fork(
+-      base::BindOnce(&UpdateProcessTypeAndEnableSandbox, options)));
++  CHECK(broker_process_->Fork(
++      base::BindOnce(&UpdateProcessTypeAndEnableSandbox, options),
++      options.allow_threads_during_sandbox_init));

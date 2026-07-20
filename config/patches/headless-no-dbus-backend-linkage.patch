@@ -1,0 +1,51 @@
+diff --git a/chrome/browser/chrome_browser_main_linux.cc b/chrome/browser/chrome_browser_main_linux.cc
+--- a/chrome/browser/chrome_browser_main_linux.cc
++++ b/chrome/browser/chrome_browser_main_linux.cc
+@@ -22,1 +22,3 @@
+-#include "device/bluetooth/dbus/bluez_dbus_manager.h"
++#if BUILDFLAG(USE_DBUS) && !BUILDFLAG(IS_CHROMEOS)
++#include "device/bluetooth/dbus/bluez_dbus_manager.h"
++#endif
+@@ -113,1 +113,1 @@
+-#else
++#elif BUILDFLAG(USE_DBUS)
+diff --git a/chrome/browser/BUILD.gn b/chrome/browser/BUILD.gn
+--- a/chrome/browser/BUILD.gn
++++ b/chrome/browser/BUILD.gn
+@@ -4671,1 +4671,4 @@ static_library("browser") {
+     }
++    else {
++      sources += [ "platform_util_linux_no_dbus.cc" ]
++    }
+diff --git a/chrome/browser/platform_util_linux_no_dbus.cc b/chrome/browser/platform_util_linux_no_dbus.cc
+new file mode 100644
+--- /dev/null
++++ b/chrome/browser/platform_util_linux_no_dbus.cc
+@@ -0,0 +1,20 @@
++// Copyright 2026 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#include "chrome/browser/platform_util.h"
++#include "chrome/browser/platform_util_internal.h"
++
++namespace platform_util {
++
++namespace internal {
++
++void PlatformOpenVerifiedItem(const base::FilePath&, OpenItemType) {}
++
++}  // namespace internal
++
++void ShowItemInFolder(Profile*, const base::FilePath&) {}
++
++void OpenExternal(const GURL&) {}
++
++}  // namespace platform_util
+diff --git a/chrome/browser/metrics/BUILD.gn b/chrome/browser/metrics/BUILD.gn
+--- a/chrome/browser/metrics/BUILD.gn
++++ b/chrome/browser/metrics/BUILD.gn
+@@ -476,1 +476,2 @@ source_set("impl") {
+-  if (is_linux || is_chromeos) {
++  if (is_chromeos ||
++      (is_linux && defined(use_dbus) && use_dbus)) {

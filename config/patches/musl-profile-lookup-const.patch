@@ -1,0 +1,12 @@
+diff --git a/chrome/browser/ui/startup/profile_launch_observer.cc b/chrome/browser/ui/startup/profile_launch_observer.cc
+--- a/chrome/browser/ui/startup/profile_launch_observer.cc
++++ b/chrome/browser/ui/startup/profile_launch_observer.cc
+@@ -73,7 +73,8 @@ void ProfileLaunchObserver::OnProfileWillBeDestroyed(Profile* profile) {
+ 
+ bool ProfileLaunchObserver::HasBeenLaunchedAndBrowserOpenInternal(
+     const Profile* profile) const {
+-  return opened_profiles_.contains(profile) &&
++  return opened_profiles_.contains(const_cast<Profile*>(profile)) &&
++         launched_profiles_.contains(const_cast<Profile*>(profile));
+ }
+ 

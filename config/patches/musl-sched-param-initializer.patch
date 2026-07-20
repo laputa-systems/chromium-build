@@ -1,0 +1,8 @@
+diff --git a/base/threading/platform_thread.h b/base/threading/platform_thread.h
+--- a/base/threading/platform_thread.h
++++ b/base/threading/platform_thread.h
+@@ -365,2 +365,2 @@
+-  static constexpr struct sched_param kRealTimeAudioPrio = {8};
+-  static constexpr struct sched_param kRealTimeDisplayPrio = {6};
++  static constexpr struct sched_param kRealTimeAudioPrio = {8, 0, {}, 0};
++  static constexpr struct sched_param kRealTimeDisplayPrio = {6, 0, {}, 0};

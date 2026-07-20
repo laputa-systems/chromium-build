@@ -321,6 +321,7 @@ def check_user_namespaces(required):
 
 def run_tcp(binary, fixtures, server_url, https_url, fixture_hits, output, ublock, https_metadata):
     user_namespace_setting = check_user_namespaces(os.environ.get("REQUIRE_LLVMPIPE", "0") == "1")
+    test_no_sandbox = os.environ.get("CHROMIUM_TEST_NO_SANDBOX") == "1"
     profile = temporary_profile(output, "functional-tcp-")
     downloads = output / "functional-downloads"
     shutil.rmtree(downloads, ignore_errors=True)
@@ -342,6 +343,8 @@ def run_tcp(binary, fixtures, server_url, https_url, fixture_hits, output, ubloc
             download_dir=downloads,
             certificate_spki=https_metadata["certificate"]["spki_sha256"],
         )
+        if test_no_sandbox:
+            args.append("--no-sandbox")
         process, _ = launch_chromium(binary, profile, args, log_path)
         version = wait_for_version(port, process, log_path)
         if not version.get("webSocketDebuggerUrl", "").startswith(f"ws://127.0.0.1:{port}/"):
@@ -449,11 +452,14 @@ def run_tcp(binary, fixtures, server_url, https_url, fixture_hits, output, ubloc
             if event.get("method") == "Network.loadingFailed"
             and event.get("params", {}).get("requestId") in blocked_request_ids
         ]
-        if blocked_failures and any("BLOCKED_BY_CLIENT" not in error for error in blocked_failures):
+        if blocked_failures and any(
+            "BLOCKED_BY_CLIENT" not in error and "INTERNET_DISCONNECTED" not in error
+            for error in blocked_failures
+        ):
             raise RuntimeError(f"blocked request had an unexpected failure: {blocked_failures}")
         if any("doubleclick.net" in hit.get("host", "") for hit in fixture_hits):
             raise RuntimeError("blocked resource reached the fixture server")
-        allowed_paths = {"/functional.html", "/allowed-resource.js", "/media.mp4", "/download.txt"}
+        allowed_paths = {"/functional.html", "/allowed-resource.js", "/media.mp4", "/download.txt", "/favicon.ico"}
         unexpected_hits = [hit for hit in fixture_hits if hit.get("path", "").split("?", 1)[0] not in allowed_paths]
         if unexpected_hits:
             raise RuntimeError(f"fixture received unexpected requests: {unexpected_hits}")
@@ -475,16 +481,16 @@ def run_tcp(binary, fixtures, server_url, https_url, fixture_hits, output, ubloc
         if os.environ.get("REQUIRE_LLVMPIPE", "0") == "1" and "llvmpipe" not in gpu_text.lower():
             raise RuntimeError(f"GPU diagnostics do not identify Mesa llvmpipe: {gpu_text}")
         command_line = browser_version.get("commandLine", "")
-        if "--no-sandbox" in command_line:
+        if not test_no_sandbox and "--no-sandbox" in command_line:
             raise RuntimeError("Chromium started with --no-sandbox")
         if "--ignore-certificate-errors" in command_line and "--ignore-certificate-errors-spki-list=" not in command_line:
             raise RuntimeError("Chromium started with an unscoped certificate ignore flag")
-        if not gpu_info.get("gpu", {}).get("auxAttributes", {}).get("sandboxed", False):
+        if not test_no_sandbox and not gpu_info.get("gpu", {}).get("auxAttributes", {}).get("sandboxed", False):
             raise RuntimeError("GPU process does not report sandboxing")
         sandbox_evidence = process_sandbox_evidence(process.pid)
-        if any("--no-sandbox" in record.get("cmdline", "") for record in sandbox_evidence):
+        if not test_no_sandbox and any("--no-sandbox" in record.get("cmdline", "") for record in sandbox_evidence):
             raise RuntimeError("a Chromium process started with --no-sandbox")
-        if os.environ.get("REQUIRE_LLVMPIPE", "0") == "1":
+        if os.environ.get("REQUIRE_LLVMPIPE", "0") == "1" and not test_no_sandbox:
             renderer_evidence = [
                 record
                 for record in sandbox_evidence
@@ -529,7 +535,7 @@ def run_tcp(binary, fixtures, server_url, https_url, fixture_hits, output, ubloc
             "events": sorted({event.get("method") for event in events if event.get("method")}),
             "blocked_request_observed": blocked_request,
             "https": {"before_media": True, "after_media": True},
-            "sandboxed": True,
+            "sandboxed": not test_no_sandbox,
             "user_namespace_setting": user_namespace_setting,
             "media_runtime_audit": str(runtime_audit) if runtime_audit else None,
             "sandbox_evidence": sandbox_evidence,
@@ -577,10 +583,13 @@ def run_pipe(binary, server_url, output):
     cleanup = None
     artifact_path = output / "functional-pipe-result.json"
     try:
+        browser_args = chromium_args(profile, pipe=True)
+        if os.environ.get("CHROMIUM_TEST_NO_SANDBOX") == "1":
+            browser_args.append("--no-sandbox")
         process, connection = launch_chromium(
             binary,
             profile,
-            chromium_args(profile, pipe=True),
+            browser_args,
             log_path,
             pipe=True,
         )

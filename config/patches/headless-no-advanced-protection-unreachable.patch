@@ -1,0 +1,21 @@
+diff --git a/chrome/browser/safe_browsing/advanced_protection_status_manager_desktop.cc b/chrome/browser/safe_browsing/advanced_protection_status_manager_desktop.cc
+--- a/chrome/browser/safe_browsing/advanced_protection_status_manager_desktop.cc
++++ b/chrome/browser/safe_browsing/advanced_protection_status_manager_desktop.cc
+@@ -70,6 +70,10 @@ void AdvancedProtectionStatusManagerDesktop::MaybeRefreshOnStartUp() {
+   RecordStartupUma(is_under_advanced_protection_);
+   NotifyObserversStatusChanged();
+ 
++#if defined(__clang__)
++#pragma clang diagnostic push
++#pragma clang diagnostic ignored "-Wunreachable-code"
++#endif
+   if (false) {
+     if (is_under_advanced_protection_) {
+       ScheduleNextRefresh();
+@@ -83,2 +87,5 @@
+   }
++#if defined(__clang__)
++#pragma clang diagnostic pop
++#endif
+ }
+ }

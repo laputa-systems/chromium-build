@@ -1,0 +1,27 @@
+diff --git a/chrome/browser/ui/webui/devtools/BUILD.gn b/chrome/browser/ui/webui/devtools/BUILD.gn
+--- a/chrome/browser/ui/webui/devtools/BUILD.gn
++++ b/chrome/browser/ui/webui/devtools/BUILD.gn
+@@ -7,1 +7,1 @@
+-if (enable_devtools_frontend) {
++if (enable_devtools_frontend || enable_devtools_browser) {
+diff --git a/content/browser/BUILD.gn b/content/browser/BUILD.gn
+--- a/content/browser/BUILD.gn
++++ b/content/browser/BUILD.gn
+@@ -3662,1 +3662,1 @@
+-  if (enable_devtools_frontend) {
++  if (enable_devtools_frontend || enable_devtools_browser) {
+@@ -3669,4 +3669,6 @@
+-    deps += [
++    if (enable_devtools_frontend) {
++      deps += [
+       "//content/browser/devtools:devtools_resources",
+       "//content/browser/devtools:devtools_resources_extern",
+-    ]
++      ]
++    }
+diff --git a/chrome/browser/extensions/BUILD.gn b/chrome/browser/extensions/BUILD.gn
+--- a/chrome/browser/extensions/BUILD.gn
++++ b/chrome/browser/extensions/BUILD.gn
+@@ -1582,1 +1582,1 @@
+-  if (enable_devtools_frontend) {
++  if (enable_devtools_frontend || enable_devtools_browser) {

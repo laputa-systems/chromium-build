@@ -1,0 +1,45 @@
+diff --git a/content/browser/BUILD.gn b/content/browser/BUILD.gn
+--- a/content/browser/BUILD.gn
++++ b/content/browser/BUILD.gn
+@@ -3662,1 +3662,1 @@
+-  if (enable_devtools_frontend || enable_devtools_browser) {
++  if (enable_devtools_frontend) {
+@@ -3675,1 +3675,5 @@
+-  }
++  } else if (enable_devtools_browser) {
++    sources += [
++      "devtools/devtools_frontend_host_stub.cc",
++    ]
++  }
+diff --git a/content/browser/devtools/devtools_frontend_host_stub.cc b/content/browser/devtools/devtools_frontend_host_stub.cc
+new file mode 100644
+--- /dev/null
++++ b/content/browser/devtools/devtools_frontend_host_stub.cc
+@@ -0,0 +1,27 @@
++// Copyright 2026 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#include "content/public/browser/devtools_frontend_host.h"
++
++namespace content {
++
++std::unique_ptr<DevToolsFrontendHost> DevToolsFrontendHost::Create(
++    RenderFrameHost*,
++    const HandleMessageCallback&) {
++  return nullptr;
++}
++
++void DevToolsFrontendHost::SetupExtensionsAPI(RenderFrameHost*,
++                                              const std::string&) {}
++
++scoped_refptr<base::RefCountedMemory>
++DevToolsFrontendHost::GetFrontendResourceBytes(std::string_view) {
++  return nullptr;
++}
++
++std::string DevToolsFrontendHost::GetFrontendResource(std::string_view) {
++  return {};
++}
++
++}  // namespace content

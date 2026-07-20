@@ -985,11 +985,12 @@ Covered by the repository-owned runner:
 - 15.6 has a checksummed H.264/AAC fixture, repeated media lifecycle cycles, codec/frame assertions, local HTTPS navigation before and after media, `/proc` library-map collection, and a dynamic-symbol intersection report in strict Linux runs.
 - 15.7 has GPU diagnostics, non-empty screenshot checks, sandbox evidence, no-`--no-sandbox` enforcement, and an unprivileged-user-namespace check.
 
-Still pending until the completed Linux Chrome build is available:
+Completed against the native arm64 Alpine build:
 
-- Run strict `test` with Alpine system FFmpeg and Mesa llvmpipe; the macOS smoke run cannot prove either Linux-specific property.
-- Review and baseline the generated FFmpeg/Chrome symbol-intersection report, including OpenSSL/BoringSSL and allocator/exception collisions.
-- Confirm the staged runtime repeats the same media, HTTPS, renderer, and sandbox checks after packaging.
+- Strict `test` passed with Alpine system FFmpeg and Mesa llvmpipe. The staged result is `/work/test-output/headless-debug/test.json` with TCP and pipe phases complete, H.264/AAC metadata and playback, three media lifecycle cycles, nonzero video pixels, uBlock enforcement, HTTPS before and after media, and no surviving Chromium processes.
+- The reviewed `/work/test-output/headless-debug/media-runtime.json` baseline records the three loaded Alpine `libav*` libraries, no bundled `libffmpeg.so`, and no high-risk Chrome/media symbol intersections. Later runs compare against `/work/metadata/media-runtime-baseline.json` and report no drift.
+- `make stage-runtime` transactionally stages the six required headless runtime files with checksums in `runtime-manifest.json`; `make test-staged` passed the same strict test from `/work/stage/headless-debug/chrome`.
+- The final GPU evidence is native Mesa `(gl=egl-gles2,angle=none)` llvmpipe, `sandboxed=true`, `processCrashCount=0`, and renderer processes with `Seccomp=2`. No `--no-sandbox` flag was observed.
 
 Deferred by design:
 
@@ -1349,15 +1350,13 @@ Packaging success from an ordinary cache-assisted build produces a candidate art
 - Remote compiler caches, sccache, distributed compilation, and remote execution; the approved v1 cache is local stock Alpine ccache only.
 - Component builds until a pinned Laputa toolchain release provides validated shared musl libc++/libc++abi/unwind artifacts.
 
-## 24. Handoff state after starting the full build
+## 24. Current handoff state
 
-The implementation now includes the #14 full-build driver and the #15 `test-fast` and consolidated `test` paths. `chromium-build build` invokes only the persistent profile's `chrome` Ninja target, accepts independent `JOBS` and load-limit settings, records ccache statistics and free-space observations, preserves Ninja output on failure, and writes a completion report only after the executable resolves successfully. `build-target` supports narrow Ninja output or label rebuilds.
+The native arm64 `headless-debug` MVP is complete in the persistent work volume. The full `chrome` target passed Gates E/F and is cached at `/work/out/headless-debug/chrome`. `make check-py`, `make test-fast`, strict `make test-functional`, `make stage-runtime`, and strict `make test-staged` all pass. The final staged test is the acceptance result recorded in `/work/test-output/headless-debug/test.json`.
 
-The full functional runner uses only Python standard-library CDP transports, a loopback fixture server, a pinned offline uBlock archive, a tiny local extension, and one minimal H.264/AAC fixture. Its Chromium lifecycle uses a dedicated process group and descendant cleanup so both normal and failing runs reap browser processes.
+The final browser evidence is native Mesa `(gl=egl-gles2,angle=none)` llvmpipe, GPU `sandboxed=true`, GPU `processCrashCount=0`, renderer `Seccomp=2`, H.264/AAC playback with `framePixels=143104` and `repeatCycles=3`, TCP and pipe CDP, uBlock/extension behavior, HTTPS before and after media, downloads, screenshots, and cleanup. The reviewed media baseline is `/work/metadata/media-runtime-baseline.json`.
 
-The initial headless profile deliberately excludes the DevTools frontend and its resource packs. Raw CDP remains in scope. The source preparation patch also avoids the architecture-incompatible bundled DevTools `esbuild` path and keeps Alpine Rust as the compiler toolchain; Chromium's bundled Rust toolchain remains excluded.
-
-On the current native arm64 attempt, the clean prepared source passed Gates A–F. The full `chrome` build began and compiled more than 360 targets before stopping because the Docker filesystem reached `ENOSPC`. Ninja state was preserved for resumption. Several temporary clean work volumes were created during diagnosis; they must be pruned before the next build once Docker/OrbStack is available. Do not delete the preserved resumable work volume or clean its output as a speculative remedy.
+`make stage-runtime` creates a fresh six-file runtime directory with checksummed `runtime-manifest.json`; `make test-staged` runs the same strict acceptance directly against the staged Chrome. `LLVM-TOOLCHAIN.md` records custom prebuilt LLVM quirks. The active work and ccache volumes remain reusable for later packaging/audit work.
 
 After the first full build succeeds, record the measured disk high-water mark before pruning anything. Capture at minimum:
 

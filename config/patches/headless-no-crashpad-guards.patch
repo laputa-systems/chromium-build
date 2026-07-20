@@ -1,0 +1,15 @@
+diff --git a/chrome/app/chrome_main_delegate.cc b/chrome/app/chrome_main_delegate.cc
+--- a/chrome/app/chrome_main_delegate.cc
++++ b/chrome/app/chrome_main_delegate.cc
+@@ -1482,7 +1482,8 @@ void ChromeMainDelegate::PreSandboxStartup() {
+ #else
+-    crash_reporter::InitializeCrashpad(process_type.empty(), process_type);
+-    crash_reporter::SetFirstChanceExceptionHandler(
+-        v8::TryHandleWebAssemblyTrapPosix);
++    if (crash_reporter::InitializeCrashpad(process_type.empty(), process_type)) {
++      crash_reporter::SetFirstChanceExceptionHandler(
++          v8::TryHandleWebAssemblyTrapPosix);
++    }
+ #endif  // BUILDFLAG(IS_ANDROID)
+   }
+ #endif  // BUILDFLAG(IS_POSIX) && !BUILDFLAG(IS_MAC)

@@ -293,6 +293,8 @@ def chromium_args(
         "--user-data-dir=" + str(profile_dir),
         "--no-first-run",
         "--no-default-browser-check",
+        "--enable-logging=stderr",
+        "--use-gl=egl",
         "--use-mock-keychain",
         "--disable-blink-features=AutomationControlled",
         "--disable-features=Translate,DialMediaRouteProvider,MediaRouter,OptimizationHints,GlobalMediaControls,PaintHolding,AvoidUnnecessaryBeforeUnloadCheckSync,HttpsUpgrades",
@@ -459,6 +461,12 @@ def terminate_process(process):
 
 
 def _pid_is_alive(pid):
+    try:
+        status = (Path(f"/proc/{pid}") / "status").read_text(encoding="utf-8")
+        if any(line.startswith("State:") and "\tZ" in line for line in status.splitlines()):
+            return False
+    except OSError:
+        pass
     try:
         os.kill(pid, 0)
     except OSError:

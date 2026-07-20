@@ -1,0 +1,19 @@
+diff --git a/content/gpu/gpu_main.cc b/content/gpu/gpu_main.cc
+--- a/content/gpu/gpu_main.cc
++++ b/content/gpu/gpu_main.cc
+@@ -515,3 +515,4 @@
+-  // SandboxLinux::InitializeSandbox() must always be called
+-  // with only one thread.
+-  sandbox::policy::SandboxLinux::Options sandbox_options;
++  // SandboxLinux::InitializeSandbox() normally requires one thread, but the
++  // GPU process initializes native Mesa helper threads before this point.
++  sandbox::policy::SandboxLinux::Options sandbox_options;
++  sandbox_options.allow_threads_during_sandbox_init = true;
+diff --git a/gpu/ipc/service/gpu_init.cc b/gpu/ipc/service/gpu_init.cc
+--- a/gpu/ipc/service/gpu_init.cc
++++ b/gpu/ipc/service/gpu_init.cc
+@@ -433,1 +433,3 @@
+-  bool gpu_sandbox_start_early = gpu_preferences_.gpu_sandbox_start_early;
++  // Native Mesa creates helper threads during EGL initialization; start the
++  // GPU sandbox before GL so its broker is forked while single-threaded.
++  bool gpu_sandbox_start_early = true;

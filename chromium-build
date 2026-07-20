@@ -15,9 +15,9 @@ fail() {
 
 usage() {
     printf '%s\n' \
-        'usage: chromium-build [--arch arm64|amd64] [--profile headless-debug] image|fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-e|gate-f|poc|build|build-target|test-fast|test' \
+        'usage: chromium-build [--arch arm64|amd64] [--profile headless-debug] image|fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-e|gate-f|poc|build|build-target|stage-runtime|test-fast|test|test-staged' \
         '       chromium-build image [--arch arm64|amd64]' \
-        '       chromium-build fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-e|gate-f|poc|build|test-fast|test [--arch arm64|amd64]' \
+        '       chromium-build fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-e|gate-f|poc|build|stage-runtime|test-fast|test|test-staged [--arch arm64|amd64]' \
         '       chromium-build build-target <ninja-output-or-label> [--arch arm64|amd64]'
 }
 
@@ -34,7 +34,7 @@ while [ "$#" -gt 0 ]; do
             PROFILE=$2
             shift 2
             ;;
-        image|fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-e|gate-f|poc|build|test-fast|test)
+        image|fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-e|gate-f|poc|build|stage-runtime|test-fast|test|test-staged)
             [ -z "$command_name" ] || fail 'only one command may be selected'
             command_name=$1
             shift
@@ -123,6 +123,7 @@ run_gate() {
     shift
     local -a browser_resources=()
     if [ "$gate" = test-fast-driver.py ] || [ "$gate" = test-functional-driver.py ]; then
+        browser_resources+=(--privileged)
         browser_resources+=(--tmpfs /dev/shm:rw,nosuid,nodev,noexec,size=1g)
         browser_resources+=(--tmpfs /tmp:rw,nosuid,nodev,size=256m)
     fi
@@ -130,6 +131,11 @@ run_gate() {
     case "$gate" in
         *.py) script_command=(python3 "${script_command[0]}") ;;
     esac
+    local -a test_environment=()
+    if [ "$command_name" = test-staged ]; then
+        test_environment+=(-e "CHROMIUM_TEST_CHROME=/work/stage/$PROFILE/chrome")
+        test_environment+=(-e "MEDIA_RUNTIME_BASELINE=/work/metadata/media-runtime-baseline.json")
+    fi
     docker run --rm --network=none ${browser_resources[@]+"${browser_resources[@]}"} \
         -e CHROMIUM_ARCH="$ARCH" \
         -e CHROMIUM_PROFILE="$PROFILE" \
@@ -138,7 +144,9 @@ run_gate() {
         -e APK_MANIFEST="/opt/chromium-build-metadata/packages.$ARCH.txt" \
         -e ENVIRONMENT_METADATA="/opt/chromium-build-metadata/environment.json" \
         -e SYSTEM_LIBRARY_PREFLIGHT="/opt/chromium-build-metadata/system-library-preflight.json" \
+        -e EGL_PLATFORM=surfaceless \
         -e CCACHE_VOLUME="$CACHE_VOLUME" \
+        ${test_environment[@]+"${test_environment[@]}"} \
         -v "$WORK_VOLUME:/work" \
         -v "$CACHE_VOLUME:/ccache" \
         "$IMAGE" "${script_command[@]}" "$@"
@@ -155,8 +163,10 @@ case "$command_name" in
     gate-f) run_gate audit-chrome-graph-driver.py ;;
     build) run_gate build.py ;;
     build-target) run_gate build-target.py "$BUILD_TARGET" ;;
+    stage-runtime) run_gate stage-runtime.py --chrome "/work/out/$PROFILE/chrome" --output "/work/stage/$PROFILE" ;;
     test-fast) run_gate test-fast-driver.py ;;
     test) run_gate test-functional-driver.py ;;
+    test-staged) run_gate test-functional-driver.py ;;
     poc)
         run_gate verify-environment.py
         run_gate run-probes.py

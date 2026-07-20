@@ -12,7 +12,7 @@ DOCKER ?= docker
 
 .NOTPARALLEL:
 .PHONY: image fetch prepare gate-a gate-b gate-c gate-d gate-e gate-f gates
-.PHONY: bootstrap full-build resume-build build-target test-fast test-functional cache-stats resume-check graph-breakdown check-py
+.PHONY: bootstrap full-build resume-build build-target stage-runtime test-fast test-functional test-staged cache-stats resume-check graph-breakdown check-py
 
 check-py:
 	PYTHONPATH=scripts:tests uv run --with ruff --with ty ruff check scripts tests
@@ -59,11 +59,17 @@ build-target:
 	@test -n "$(TARGET)" || (echo 'usage: make build-target TARGET=obj/path.o' >&2; exit 2)
 	$(CHROMIUM_BUILD) build-target "$(TARGET)"
 
+stage-runtime:
+	$(CHROMIUM_BUILD) stage-runtime
+
 test-fast:
 	$(CHROMIUM_BUILD) test-fast
 
 test-functional:
 	$(CHROMIUM_BUILD) test
+
+test-staged:
+	$(CHROMIUM_BUILD) test-staged
 
 cache-stats:
 	$(DOCKER) run --rm --network=none -v $(CACHE_VOLUME):/ccache $(IMAGE) \

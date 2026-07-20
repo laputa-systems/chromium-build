@@ -1,0 +1,9 @@
+diff --git a/media/capture/video/video_capture_buffer_tracker_factory_impl.cc b/media/capture/video/video_capture_buffer_tracker_factory_impl.cc
+--- a/media/capture/video/video_capture_buffer_tracker_factory_impl.cc
++++ b/media/capture/video/video_capture_buffer_tracker_factory_impl.cc
+@@ -17,2 +17,0 @@
+-#elif BUILDFLAG(IS_LINUX)
+-#include "media/capture/video/linux/v4l2_gpu_memory_buffer_tracker.h"
+@@ -46,1 +46,1 @@
+-      return std::make_unique<V4L2GpuMemoryBufferTracker>();
++      return nullptr;

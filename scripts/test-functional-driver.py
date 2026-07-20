@@ -24,10 +24,22 @@ def main() -> None:
         raise ScriptFailure("functional test requires NETWORK_MODE=none")
     require_file(metadata / f"build-{profile}.json", "Chrome build has not passed")
     require_directory(root / "tests/fixtures", "fixtures are missing")
+    test_tmp = work / f"test-tmp/{profile}"
+    test_tmp.mkdir(parents=True, exist_ok=True)
+    test_tmp.chmod(0o777)
+    os.environ["CHROMIUM_TEST_TMPDIR"] = str(test_tmp)
     run(["python3", "-m", "unittest", "discover", "-s", str(root / "tests"), "-p", "test_*.py"])
-    chrome = run(["python3", str(root / "scripts/resolve-output.py"), str(out), "//chrome:chrome"], capture_output=True).stdout.strip()
-    if not chrome:
-        raise ScriptFailure("cannot resolve Chrome")
+    staged_chrome = os.environ.get("CHROMIUM_TEST_CHROME")
+    if staged_chrome:
+        chrome = staged_chrome
+        require_file(Path(chrome), "staged Chrome is missing")
+    else:
+        chrome = run(["python3", str(root / "scripts/resolve-output.py"), str(out), "//chrome:chrome"], capture_output=True).stdout.strip()
+        if not chrome:
+            raise ScriptFailure("cannot resolve Chrome")
+    baseline = metadata / "media-runtime-baseline.json"
+    if baseline.is_file():
+        os.environ.setdefault("MEDIA_RUNTIME_BASELINE", str(baseline))
     ublock = inputs / "uBlock0_1.72.0.chromium.zip"
     require_file(ublock, f"pinned uBlock archive is missing: {ublock}")
     output.mkdir(parents=True, exist_ok=True)
@@ -45,8 +57,8 @@ def main() -> None:
         str(ublock),
         "--output",
         str(output),
-        "--require-llvmpipe",
         "--require-media",
+        "--require-llvmpipe",
     ]
     if os.geteuid() == 0 and shutil.which("su"):
         command = ["su", "chromium", "-s", "/bin/sh", "-c", "exec " + " ".join(subprocess.list2cmdline([item]) for item in command)]

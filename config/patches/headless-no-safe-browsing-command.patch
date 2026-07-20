@@ -1,0 +1,13 @@
+diff --git a/chrome/browser/ui/webui/browser_command/browser_command_handler.cc b/chrome/browser/ui/webui/browser_command/browser_command_handler.cc
+--- a/chrome/browser/ui/webui/browser_command/browser_command_handler.cc
++++ b/chrome/browser/ui/webui/browser_command/browser_command_handler.cc
+@@ -94,6 +94,9 @@ void BrowserCommandHandler::CanExecuteCommand(
+     case Command::kOpenSafetyCheck:
+       can_execute = !enterprise_util::IsBrowserManaged(profile_);
+       break;
++    case Command::kOpenSafeBrowsingEnhancedProtectionSettings:
++      can_execute = false;
++      break;
+     case Command::kOpenFeedbackForm:
+       can_execute = true;
+       break;

@@ -43,11 +43,18 @@
     state.media.metadata = video.videoWidth > 0 && video.videoHeight > 0;
     video.play().catch(error => { state.media.playError = String(error); });
   });
-  video.addEventListener("playing", () => {
+  const sampleVideoFrame = () => {
     const context = document.querySelector("#canvas").getContext("2d");
     context.drawImage(video, 0, 0, 16, 16);
     const pixels = context.getImageData(0, 0, 16, 16).data;
     state.media.framePixels = Array.from(pixels).reduce((sum, value) => sum + value, 0);
+  };
+  video.addEventListener("playing", () => {
+    if (typeof video.requestVideoFrameCallback === "function") {
+      video.requestVideoFrameCallback(sampleVideoFrame);
+    } else {
+      requestAnimationFrame(sampleVideoFrame);
+    }
     state.media.playing = true;
   });
   const audio = document.createElement("audio");
