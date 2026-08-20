@@ -92,7 +92,8 @@ def main() -> None:
         raise ScriptFailure("Ninja is not version 1.12.1")
     if "statically linked" not in run(["file", str(ninja)], capture_output=True).stdout:
         raise ScriptFailure("Ninja is not statically linked")
-    if toolchain["version"] not in run([str(llvm_root / "bin/ld.lld"), "--version"], capture_output=True).stdout:
+    lld_version = toolchain.get("lld_version", toolchain["version"])
+    if lld_version not in run([str(llvm_root / "bin/ld.lld"), "--version"], capture_output=True).stdout:
         raise ScriptFailure("LLD version is not locked")
     config_hashes = []
     for name in ("clang.cfg", "clang++.cfg"):

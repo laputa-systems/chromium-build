@@ -77,6 +77,12 @@ LOCAL_PATCHES = (
     "musl-gpu-sandbox-tsync.patch",
     "musl-gpu-sandbox-broker-tsync.patch",
     "musl-gpu-pwritev2-sandbox.patch",
+    "musl-abseil-clang23-lifetime-capture.patch",
+    "musl-abseil-clang23-unused-template.patch",
+    "musl-clang23-unused-template-global.patch",
+    "musl-clang23-lifetime-capture.patch",
+    "musl-clang23-function-view-pointer-bool.patch",
+    "musl-clang23-omnibox-nodiscard.patch",
 )
 
 

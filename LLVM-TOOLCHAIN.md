@@ -1,13 +1,15 @@
 # Custom LLVM toolchain notes
 
-This repository uses the pinned Laputa `llvm-prebuilt-musl` release rather than Alpine's compiler packages or Chromium's downloaded toolchain. The current arm64 input is LLVM 22.1.8, installed at `/opt/llvm-musl`, with archive SHA-256 `675f9cf871313a5672a63882d4d30dd6dd55df0aa9caee70970542eb03a23da3`.
+This repository uses the pinned Laputa `llvm-prebuilt-musl` release rather than Alpine's compiler packages or Chromium's downloaded toolchain. The current arm64 input is LLVM 23.1.0-rc2 (release `llvm-musl-23.1.0-rc2-6eb5fb9`), installed at `/opt/llvm-musl`, with archive SHA-256 `0c9bd6f0fefa26dbdb7d6ed568f3799b558428b1ce1264656aa328fc6fd9e32d`.
+
+The release's Clang driver reports `23.1.0-rc2`; its LLD binary reports `23.1.0`. Both values are locked separately so Gate A validates the exact tool versions without discarding the release identifier. The release's config files omit the toolchain library search path and C++ ABI/unwind defaults, so the image adds `-L/opt/llvm-musl/lib` to both effective configs and `-lc++abi`/`-lunwind` to `clang++.cfg`; their post-overlay hashes are locked in `config/inputs.lock`.
 
 Record quirks discovered in the custom prebuilt toolchain here. Keep build fixes in the source patch stack only when they are required to integrate Chromium with a deliberate property or omission of this toolchain; do not silently broaden the toolchain or weaken validation to make an isolated compile pass.
 
 ## Current properties
 
 - `clang` and `clang++` report the musl target triple and live under `/opt/llvm-musl/bin`.
-- The Clang resource directory is `/opt/llvm-musl/lib/clang/22`.
+- The Clang resource directory is `/opt/llvm-musl/lib/clang/23`.
 - The bundle provides the static libc++/libc++abi/unwind archives and compiler-rt builtins needed by the normal Chromium profile.
 - The image uses Alpine's ccache only as a wrapper; the compiler and LLVM binutils remain the Laputa tools.
 - The bundle does not provide compiler-rt sanitizer interface headers such as `sanitizer/common_interface_defs.h` or `sanitizer/asan_interface.h`.

@@ -1,0 +1,13 @@
+diff --git a/base/compiler_specific.h b/base/compiler_specific.h
+--- a/base/compiler_specific.h
++++ b/base/compiler_specific.h
+@@ -809,7 +809,9 @@
+ //   }
+ // ```
+-#if __has_cpp_attribute(clang::lifetime_capture_by)
++#if __has_cpp_attribute(clang::lifetime_capture_by_this)
++#define LIFETIME_CAPTURE_BY(x) [[clang::lifetime_capture_by_this]]
++#elif __has_cpp_attribute(clang::lifetime_capture_by)
+ #define LIFETIME_CAPTURE_BY(x) [[clang::lifetime_capture_by(x)]]
+ #else
+ #define LIFETIME_CAPTURE_BY(x)

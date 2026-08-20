@@ -4,9 +4,9 @@ ARG BASE_IMAGE=alpine@sha256:e7a1a92a5bfeee40966aea60f0796b0e7917cc3559154270183
 FROM ${BASE_IMAGE}
 
 ARG TARGET_ARCH=arm64
-ARG LLVM_URL=https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-22.1.8/clang+llvm-22.1.8-aarch64-linux-musl.tar.xz
-ARG LLVM_SHA256=675f9cf871313a5672a63882d4d30dd6dd55df0aa9caee70970542eb03a23da3
-ARG LLVM_SIZE=73611888
+ARG LLVM_URL=https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-23.1.0-rc2-6eb5fb9/clang+llvm-23.1.0-rc2-aarch64-linux-musl.tar.xz
+ARG LLVM_SHA256=0c9bd6f0fefa26dbdb7d6ed568f3799b558428b1ce1264656aa328fc6fd9e32d
+ARG LLVM_SIZE=91229132
 ARG NINJA_SOURCE_URL=https://github.com/ninja-build/ninja/archive/refs/tags/v1.12.1.tar.gz
 ARG NINJA_SOURCE_SHA256=821bdff48a3f683bc4bb3b6f0b5fe7b2d647cf65d52aeb63328c91a6c6df285a
 ARG NINJA_SOURCE_SIZE=240483
@@ -55,9 +55,12 @@ RUN set -eux; \
     echo "$LLVM_SHA256  /tmp/llvm.tar.xz" | sha256sum -c -; \
     tar -xJf /tmp/llvm.tar.xz -C /opt/llvm-musl --strip-components=1; \
     rm -f /tmp/llvm.tar.xz; \
+    printf '%s\n' '-L/opt/llvm-musl/lib' >> /opt/llvm-musl/bin/clang.cfg; \
+    printf '%s\n' '-L/opt/llvm-musl/lib' >> /opt/llvm-musl/bin/clang++.cfg; \
+    printf '%s\n' '-lc++abi' '-lunwind' >> /opt/llvm-musl/bin/clang++.cfg; \
     expected_triple=$([ "$TARGET_ARCH" = arm64 ] && echo aarch64-unknown-linux-musl || echo x86_64-unknown-linux-musl); \
     test "$(/opt/llvm-musl/bin/clang -dumpmachine)" = "$expected_triple"; \
-    /opt/llvm-musl/bin/clang --version | grep -F 22.1.8; \
+    /opt/llvm-musl/bin/clang --version | grep -F 23.1.0-rc2; \
     test -f /opt/llvm-musl/lib/libc++.a; \
     test -f /opt/llvm-musl/lib/libc++abi.a; \
     test -f /opt/llvm-musl/lib/libunwind.a

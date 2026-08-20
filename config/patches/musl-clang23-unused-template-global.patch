@@ -1,0 +1,11 @@
+diff --git a/build/config/compiler/BUILD.gn b/build/config/compiler/BUILD.gn
+--- a/build/config/compiler/BUILD.gn
++++ b/build/config/compiler/BUILD.gn
+@@ -10,1 +10,2 @@
+ import("//build/config/clang/clang.gni")
++import("//build/config/linux/musl.gni")
+@@ -696,1 +696,4 @@
+     cflags_cc += [ "-Wno-trigraphs" ]
++    if (is_musl) {
++      cflags_cc += [ "-Wno-unused-template" ]
++    }

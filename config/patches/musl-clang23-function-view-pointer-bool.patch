@@ -1,0 +1,15 @@
+diff --git a/third_party/webrtc/api/function_view.h b/third_party/webrtc/api/function_view.h
+--- a/third_party/webrtc/api/function_view.h
++++ b/third_party/webrtc/api/function_view.h
+@@ -78,4 +78,10 @@ class FunctionView<RetT(ArgT...)> final {
+   FunctionView(F&& f)
+-      : call_(f ? CallFunPtr<typename std::remove_pointer<F>::type> : nullptr) {
++      : call_(CallFunPtr<typename std::remove_pointer<F>::type>) {
++    if constexpr (std::is_pointer<
++                      typename std::remove_reference<F>::type>::value) {
++      if (f == nullptr) {
++        call_ = nullptr;
++      }
++    }
+     f_.fun_ptr = reinterpret_cast<void (*)()>(f);
+   }

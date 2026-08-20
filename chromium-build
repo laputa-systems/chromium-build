@@ -64,16 +64,16 @@ case "$ARCH" in
     arm64)
         platform=linux/arm64
         base_image=alpine@sha256:e7a1a92a5bfeee40966aea60f0796b0e7917cc35591542701834f03a68fa3d18
-        llvm_url=https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-22.1.8/clang+llvm-22.1.8-aarch64-linux-musl.tar.xz
-        llvm_sha256=675f9cf871313a5672a63882d4d30dd6dd55df0aa9caee70970542eb03a23da3
-        llvm_size=73611888
+        llvm_url=https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-23.1.0-rc2-6eb5fb9/clang+llvm-23.1.0-rc2-aarch64-linux-musl.tar.xz
+        llvm_sha256=0c9bd6f0fefa26dbdb7d6ed568f3799b558428b1ce1264656aa328fc6fd9e32d
+        llvm_size=91229132
         ;;
     amd64)
         platform=linux/amd64
         base_image=alpine@sha256:79ff19e9084a00eece421b2523fb93e22d730e2c0e525905de047e848e56d95f
-        llvm_url=https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-22.1.8/clang+llvm-22.1.8-x86_64-linux-musl.tar.xz
-        llvm_sha256=ac0bd443a1933bbd2c0efbedf6ebc97ff8ca2469e5ba65eadb966fb75f65dd1c
-        llvm_size=78039176
+        llvm_url=https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-23.1.0-rc2-6eb5fb9/clang+llvm-23.1.0-rc2-x86_64-linux-musl.tar.xz
+        llvm_sha256=36647cca0bf57d206a6ce757d07a9d8489ef6ccf283a2cc7f740d1cba99a088b
+        llvm_size=99139524
         ;;
 esac
 

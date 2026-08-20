@@ -383,6 +383,12 @@ def main():
         "musl-gpu-sandbox-tsync.patch": "Chromium initializes native Mesa GPU helper threads before installing seccomp; enable the existing GPU TSYNC option so those threads enter the GPU sandbox together.",
         "musl-gpu-sandbox-broker-tsync.patch": "The native Mesa GPU process has helper threads before Chromium forks its syscall broker; pass the existing GPU TSYNC option through broker startup instead of tripping the generic single-thread assertion.",
         "musl-gpu-pwritev2-sandbox.patch": "Alpine musl's GPU path uses pwritev2 (syscall 287); allow that specific harmless file-write syscall in Chromium's existing GPU seccomp policy so the GPU remains sandboxed.",
+        "musl-abseil-clang23-lifetime-capture.patch": "Clang 23 deprecates Abseil's lifetime_capture_by(this) spelling; use the replacement lifetime_capture_by_this attribute while preserving the lifetime-capture diagnostic.",
+        "musl-abseil-clang23-unused-template.patch": "Clang 23 diagnoses Abseil's intentionally uninstantiated type-dependent log-format overload as unused; suppress only that warning around the two overloads.",
+        "musl-clang23-unused-template-global.patch": "Clang 23 diagnoses intentionally uninstantiated type-dependent templates across the musl Chromium graph; suppress only this warning for the Clang musl compiler config while retaining -Werror for other diagnostics.",
+        "musl-clang23-lifetime-capture.patch": "Clang 23 deprecates Chromium's lifetime_capture_by(this) spelling; use lifetime_capture_by_this when available while retaining the legacy fallback for older compilers.",
+        "musl-clang23-function-view-pointer-bool.patch": "Clang 23 diagnoses the always-true function-reference branch in WebRTC's nullable function-pointer view constructor; keep null handling for pointer arguments without applying pointer-bool conversion to function references.",
+        "musl-clang23-omnibox-nodiscard.patch": "Clang 23 diagnoses the intentionally discarded iterator returned by Omnibox's action-match insertion as nodiscard; explicitly discard the insertion result while preserving the existing match insertion.",
     }
     for local_patch in args.local_patch:
         record = patch_file(

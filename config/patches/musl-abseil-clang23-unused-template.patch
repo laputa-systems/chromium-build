@@ -1,0 +1,24 @@
+diff --git a/third_party/abseil-cpp/absl/log/internal/log_format.cc b/third_party/abseil-cpp/absl/log/internal/log_format.cc
+--- a/third_party/abseil-cpp/absl/log/internal/log_format.cc
++++ b/third_party/abseil-cpp/absl/log/internal/log_format.cc
+@@ -49,6 +49,11 @@
+ namespace log_internal {
+ namespace {
+ 
++#if defined(__clang__)
++#pragma clang diagnostic push
++#pragma clang diagnostic ignored "-Wunused-template"
++#endif
++
+ // This templated function avoids compiler warnings about tautological
+ // comparisons when log_internal::Tid is unsigned. It can be replaced with a
+ // constexpr if once the minimum C++ version Abseil supports is C++17.
+@@ -70,4 +75,8 @@
+  if (tid > -100000 && tid < 1000000) *p++ = ' ';
+ }
+ 
++#if defined(__clang__)
++#pragma clang diagnostic pop
++#endif
++
+ // The fields before the filename are all fixed-width except for the thread ID,

@@ -5,7 +5,7 @@
 Build a repeatable, Docker/OrbStack-contained ungoogled-chromium environment that:
 
 - builds natively for Linux musl;
-- uses the Laputa LLVM 22.1.8 musl toolchain for every C and C++ compilation, archive operation, and link;
+- uses the Laputa LLVM 23.1.0-rc2 musl toolchain for every C and C++ compilation, archive operation, and link;
 - produces Chromium-owned ELF artifacts with no glibc, libstdc++, libgcc, or other GNU runtime dependency, with one narrowly audited exception for the copied stock-Alpine FFmpeg dependency closure;
 - uses direct, checksummed source archives rather than Git clones or Chromium `depot_tools` checkouts;
 - persists the prepared source tree and Ninja output in Docker named volumes, never performance-sensitive host bind mounts;
@@ -130,7 +130,7 @@ The trimmed Chromium archive is preferred because it omits multi-gigabyte materi
 - Commit the resulting installed-package manifest and compare it during image validation.
 - Use only Alpine 3.24 repositories. Do not mix edge packages into the environment.
 
-Alpine 3.24 provides the matching Chromium 150 generation of GN, Rust, ccache, FFmpeg, and related libraries. Ninja 1.12.1 is built from its locked upstream source with the external musl toolchain. The current lock resolves Rust `1.96.0-r0` and ccache `4.13.6-r0`; the exact architecture-specific resolved locks remain authoritative if metadata changes. The Rust compiler package itself depends on Alpine GCC, libstdc++, and libgcc in the builder, which is the explicitly approved Rust-toolchain exception described above. Stock ccache independently uses the approved builder-only GNU/GPL exception. The custom C/C++ compiler remains LLVM 22.1.8 even if Alpine packages compiler-adjacent libraries built with another LLVM 22 patch release.
+Alpine 3.24 provides the matching Chromium 150 generation of GN, Rust, ccache, FFmpeg, and related libraries. Ninja 1.12.1 is built from its locked upstream source with the external musl toolchain. The current lock resolves Rust `1.96.0-r0` and ccache `4.13.6-r0`; the exact architecture-specific resolved locks remain authoritative if metadata changes. The Rust compiler package itself depends on Alpine GCC, libstdc++, and libgcc in the builder, which is the explicitly approved Rust-toolchain exception described above. Stock ccache independently uses the approved builder-only GNU/GPL exception. The custom C/C++ compiler remains LLVM 23.1.0-rc2 even if Alpine packages compiler-adjacent libraries built with another LLVM 22 patch release.
 
 Do not request Alpine `build-base`, GCC, G++, binutils, Clang, or LLD as generic build dependencies. Install individual development packages. The approved Alpine Rust package currently pulls GCC/libstdc++/libgcc transitively into the builder; retain them only because APK dependency resolution requires them. Do not add their directories ahead of `/opt/llvm-musl` in `PATH`, do not set any compiler variable to them, and fail if a Chromium compile/link command uses them. A transitive builder runtime may enter the shipped bundle only through the exact FFmpeg-exception closure.
 
@@ -158,8 +158,8 @@ Use the release artifacts from `laputa-systems/llvm-prebuilt-musl`:
 
 | CLI architecture | Linux architecture | Chromium CPU | LLVM archive SHA-256 |
 | --- | --- | --- | --- |
-| `arm64` | `aarch64` | `arm64` | `675f9cf871313a5672a63882d4d30dd6dd55df0aa9caee70970542eb03a23da3` |
-| `amd64` | `x86_64` | `x64` | `ac0bd443a1933bbd2c0efbedf6ebc97ff8ca2469e5ba65eadb966fb75f65dd1c` |
+| `arm64` | `aarch64` | `arm64` | `0c9bd6f0fefa26dbdb7d6ed568f3799b558428b1ce1264656aa328fc6fd9e32d` |
+| `amd64` | `x86_64` | `x64` | `36647cca0bf57d206a6ce757d07a9d8489ef6ccf283a2cc7f740d1cba99a088b` |
 
 The canonical hermetic input is the published release archive plus its committed URL, filename, size, and SHA-256. This matches the release-artifact pattern demonstrated by `~/d/laputa-systems/mirror/Dockerfile`. The neighboring `~/d/laputa-systems/llvm-prebuilt-musl` checkout is provenance and a development reference only; an ordinary image build must not read mutable files from that checkout or require it as an implicit Docker build context.
 
@@ -180,7 +180,7 @@ Extract to `/opt/llvm-musl`. The environment sets absolute paths for:
 
 The builder image must fail validation unless `clang --version`, `ld.lld --version`, the target triple, Clang resource directory, libc++ headers, compiler-rt builtins, libc++.a, libc++abi.a, and libunwind.a all match the expected artifact.
 
-The toolchain currently installs `clang.cfg`/`clang++.cfg` defaults for LLD and the C++ ABI/unwind libraries. Treat these files as inputs: record their hashes, print their contents during validation, and account for their injected flags when constructing Chromium's runtime-library config. Do not add duplicate `-lc++abi`/`-lunwind` flags merely because the same libraries are named in this plan.
+The LLVM 23.1.0-rc2 release ships `clang.cfg`/`clang++.cfg` without the runtime-library defaults needed by this image. The image overlay records the release files' hashes, then adds `/opt/llvm-musl/lib` search paths and the `clang++` `-lc++abi`/`-lunwind` defaults. Treat both the release files and the overlay as inputs: print their effective contents during validation and account for the injected flags when constructing Chromium's runtime-library config.
 
 ## 5. Proposed repository structure
 
@@ -1352,11 +1352,11 @@ Packaging success from an ordinary cache-assisted build produces a candidate art
 
 ## 24. Current handoff state
 
-The native arm64 `headless-debug` MVP is complete in the persistent work volume. The full `chrome` target passed Gates E/F and is cached at `/work/out/headless-debug/chrome`. `make check-py`, `make test-fast`, strict `make test-functional`, `make stage-runtime`, and strict `make test-staged` all pass. The final staged test is the acceptance result recorded in `/work/test-output/headless-debug/test.json`.
+The native arm64 `headless-debug` MVP is complete in the persistent work volume and was reverified with Laputa LLVM 23.1.0-rc2 (arm64 archive SHA-256 `0c9bd6f0fefa26dbdb7d6ed568f3799b558428b1ce1264656aa328fc6fd9e32d`). The full `chrome` target is cached at `/work/out/headless-debug/chrome`; Gates A–F, `make test-fast`, strict `make test-functional`, `make stage-runtime`, and strict `make test-staged` all pass. The final staged test is recorded in `/work/test-output/headless-debug/test.json`.
 
 The final browser evidence is native Mesa `(gl=egl-gles2,angle=none)` llvmpipe, GPU `sandboxed=true`, GPU `processCrashCount=0`, renderer `Seccomp=2`, H.264/AAC playback with `framePixels=143104` and `repeatCycles=3`, TCP and pipe CDP, uBlock/extension behavior, HTTPS before and after media, downloads, screenshots, and cleanup. The reviewed media baseline is `/work/metadata/media-runtime-baseline.json`.
 
-`make stage-runtime` creates a fresh six-file runtime directory with checksummed `runtime-manifest.json`; `make test-staged` runs the same strict acceptance directly against the staged Chrome. `LLVM-TOOLCHAIN.md` records custom prebuilt LLVM quirks. The active work and ccache volumes remain reusable for later packaging/audit work.
+`make stage-runtime` creates a fresh six-file runtime directory with checksummed `runtime-manifest.json`; `make test-staged` runs the same strict acceptance directly against the staged Chrome. The current builder image is `sha256:2c6a09e4299c413d3429ff05502e7cd30802c24e907e2918c304c03f19becb71`. Host `make check-py` remains blocked by the existing 48-violation Ruff baseline; targeted Python compilation, shell/JSON validation, and `git diff --check` pass. `LLVM-TOOLCHAIN.md` records custom LLVM quirks. The active work and ccache volumes remain reusable for later packaging/audit work.
 
 After the first full build succeeds, record the measured disk high-water mark before pruning anything. Capture at minimum:
 
@@ -1377,6 +1377,6 @@ Use the following prompt when handing this repository to an autonomous coding ag
 >
 > First complete the full Chromium `chrome` target. A successful full build means the build driver writes its completion report, the resolved executable exists in the persistent work volume, and the existing Gates A–F, Python checks, compiler/toolchain audits, and ELF/link audits remain passing. If compilation fails, diagnose the first real error, make the smallest source/configuration fix consistent with this plan, run the narrowest proof that reproduces the failure, rerun the relevant gate, and resume the same cached build. Do not disable security, sandboxing, runtime checks, or required browser functionality just to bypass an error. Record any custom LLVM-toolchain quirk in `LLVM-TOOLCHAIN.md` and update the plan only when the build contract changes.
 >
-> After the full build succeeds, run the short post-link acceptance path with `./chromium-build --arch arm64 --profile headless-debug test-fast`. Fix deterministic failures and repeat until it passes. Then run the complete offline functional headless path with `./chromium-build --arch arm64 --profile headless-debug test`; it must pass as the strict Linux test described in `TESTS-TODO.md`, including TCP and pipe CDP, screenshots, downloads, local extension/uBlock behavior, H.264/AAC media, HTTPS before and after media, sandbox evidence, cleanup, and `media-runtime.json`. Iterate on real failures until this functional headless milestone passes.
+> After the full build succeeds, run the short post-link acceptance path with `./chromium-build --arch arm64 --profile headless-debug test-fast`. Fix deterministic failures and repeat until it passes. Then run the complete offline functional headless path with `./chromium-build --arch arm64 --profile headless-debug test`; it must pass the strict Linux checks, including TCP and pipe CDP, screenshots, downloads, local extension/uBlock behavior, H.264/AAC media, HTTPS before and after media, sandbox evidence, cleanup, and `media-runtime.json`. Iterate on real failures until this functional headless milestone passes.
 >
-> Only after the functional headless tests pass, work through the remaining acceptance items in `TESTS-TODO.md`: review the media runtime and symbol-intersection baseline, rerun from the staged runtime, preserve all required reports, and update `plan.md` with evidence. Do not expand into Wayland/ALSA or unrelated deferred scope before the functional headless milestone is complete. Keep networking disabled for preparation, builds, tests, audits, and packaging; use only the locked fetch inputs when network access is genuinely required.
+> Only after the functional headless tests pass, review the media runtime and symbol-intersection baseline, rerun from the staged runtime, preserve all required reports, and update `plan.md` with evidence. Do not expand into Wayland/ALSA or unrelated deferred scope before the functional headless milestone is complete. Keep networking disabled for preparation, builds, tests, audits, and packaging; use only the locked fetch inputs when network access is genuinely required.

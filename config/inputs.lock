@@ -68,28 +68,29 @@
     }
   },
   "toolchain": {
-    "version": "22.1.8",
+    "version": "23.1.0-rc2",
+    "lld_version": "23.1.0",
     "root": "/opt/llvm-musl",
-    "clang_cfg_sha256": "a559cebb4529d700d0233e553c117990d4cd3e59936e15bbf21b9a49a65ea486",
-    "clangxx_cfg_sha256": "a760de264e4ee315f74cb79c1971d21e12e31d37fb45691a2efeb45d5a56a44a",
+    "clang_cfg_sha256": "8b29c8fab4c026894addf1cee2cda0792072ef0edd9694f840dd3b65db6963b1",
+    "clangxx_cfg_sha256": "61396367eeb93c9695591c055f25d4925cd147e6dcb7d4cf7b9c0408e31aa7a8",
     "architectures": {
       "arm64": {
         "linux_arch": "aarch64",
         "chromium_cpu": "arm64",
         "target_triple": "aarch64-unknown-linux-musl",
-        "archive_filename": "clang+llvm-22.1.8-aarch64-linux-musl.tar.xz",
-        "archive_size": 73611888,
-        "archive_url": "https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-22.1.8/clang+llvm-22.1.8-aarch64-linux-musl.tar.xz",
-        "archive_sha256": "675f9cf871313a5672a63882d4d30dd6dd55df0aa9caee70970542eb03a23da3"
+        "archive_filename": "clang+llvm-23.1.0-rc2-aarch64-linux-musl.tar.xz",
+        "archive_size": 91229132,
+        "archive_url": "https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-23.1.0-rc2-6eb5fb9/clang+llvm-23.1.0-rc2-aarch64-linux-musl.tar.xz",
+        "archive_sha256": "0c9bd6f0fefa26dbdb7d6ed568f3799b558428b1ce1264656aa328fc6fd9e32d"
       },
       "amd64": {
         "linux_arch": "x86_64",
         "chromium_cpu": "x64",
         "target_triple": "x86_64-unknown-linux-musl",
-        "archive_filename": "clang+llvm-22.1.8-x86_64-linux-musl.tar.xz",
-        "archive_size": 78039176,
-        "archive_url": "https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-22.1.8/clang+llvm-22.1.8-x86_64-linux-musl.tar.xz",
-        "archive_sha256": "ac0bd443a1933bbd2c0efbedf6ebc97ff8ca2469e5ba65eadb966fb75f65dd1c"
+        "archive_filename": "clang+llvm-23.1.0-rc2-x86_64-linux-musl.tar.xz",
+        "archive_size": 99139524,
+        "archive_url": "https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-23.1.0-rc2-6eb5fb9/clang+llvm-23.1.0-rc2-x86_64-linux-musl.tar.xz",
+        "archive_sha256": "36647cca0bf57d206a6ce757d07a9d8489ef6ccf283a2cc7f740d1cba99a088b"
       }
     }
   },

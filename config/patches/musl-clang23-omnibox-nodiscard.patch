@@ -1,0 +1,8 @@
+diff --git a/components/omnibox/browser/autocomplete_result.cc b/components/omnibox/browser/autocomplete_result.cc
+--- a/components/omnibox/browser/autocomplete_result.cc
++++ b/components/omnibox/browser/autocomplete_result.cc
+@@ -856,2 +856,2 @@
+-        *matches_.insert(matches_.begin() + i + 1,
+-                         matches_[i].CreateActionMatch(j));
++        static_cast<void>(matches_.insert(
++            matches_.begin() + i + 1, matches_[i].CreateActionMatch(j)));
