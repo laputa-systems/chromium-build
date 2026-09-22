@@ -2,11 +2,16 @@
 set -euo pipefail
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+PLATFORM=linux
 ARCH=arm64
-PROFILE=headless-debug
+PROFILE=
 IMAGE=${CHROMIUM_BUILDER_IMAGE:-}
 WORK_VOLUME=${CHROMIUM_WORK_VOLUME:-}
 CACHE_VOLUME=${CHROMIUM_CACHE_VOLUME:-}
+APP_PATH=
+JOBS=
+YES=0
+LATEST=0
 
 fail() {
     echo "chromium-build: $*" >&2
@@ -15,15 +20,21 @@ fail() {
 
 usage() {
     printf '%s\n' \
-        'usage: chromium-build [--arch arm64|amd64] [--profile headless-debug] image|fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-e|gate-f|poc|build|build-target|stage-runtime|test-fast|test|test-staged' \
+        'usage: chromium-build [--platform linux|macos] [--arch arm64|amd64] [--profile PROFILE] command' \
         '       chromium-build image [--arch arm64|amd64]' \
         '       chromium-build fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-e|gate-f|poc|build|stage-runtime|test-fast|test|test-staged [--arch arm64|amd64]' \
-        '       chromium-build build-target <ninja-output-or-label> [--arch arm64|amd64]'
+        '       chromium-build build-target <ninja-output-or-label> [--arch arm64|amd64]' \
+        '       chromium-build --platform macos doctor|smoke-preflight|update-lock|fetch|prepare|configure|build|cache-stats|stage-runtime|test-staged [--arch arm64]'
 }
 
 command_name=
 while [ "$#" -gt 0 ]; do
     case "$1" in
+        --platform)
+            [ "$#" -ge 2 ] || fail '--platform needs a value'
+            PLATFORM=$2
+            shift 2
+            ;;
         --arch)
             [ "$#" -ge 2 ] || fail '--arch needs a value'
             ARCH=$2
@@ -34,7 +45,25 @@ while [ "$#" -gt 0 ]; do
             PROFILE=$2
             shift 2
             ;;
-        image|fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-e|gate-f|poc|build|stage-runtime|test-fast|test|test-staged)
+        --app)
+            [ "$#" -ge 2 ] || fail '--app needs a value'
+            APP_PATH=$2
+            shift 2
+            ;;
+        --jobs)
+            [ "$#" -ge 2 ] || fail '--jobs needs a value'
+            JOBS=$2
+            shift 2
+            ;;
+        --yes)
+            YES=1
+            shift
+            ;;
+        --latest)
+            LATEST=1
+            shift
+            ;;
+        image|fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-e|gate-f|poc|build|cache-stats|stage-runtime|test-fast|test|test-staged|doctor|smoke-preflight|update-lock|configure|reset|status)
             [ -z "$command_name" ] || fail 'only one command may be selected'
             command_name=$1
             shift
@@ -57,8 +86,34 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 [ -n "$command_name" ] || { usage >&2; exit 2; }
-case "$ARCH" in arm64|amd64) ;; *) fail "unsupported architecture $ARCH" ;; esac
-[ "$PROFILE" = headless-debug ] || fail "Gate A/B/C/D/F only support headless-debug"
+case "$ARCH" in
+    aarch64) ARCH=arm64 ;;
+    arm64|amd64) ;;
+    *) fail "unsupported architecture $ARCH" ;;
+esac
+case "$PLATFORM" in
+    macos)
+        [ "$ARCH" = arm64 ] || fail 'macOS supports native arm64 only'
+        PROFILE=${PROFILE:-macos-release}
+        [ "$PROFILE" = macos-release ] || fail 'macOS supports the macos-release profile only'
+        native_args=(--repo-root "$ROOT" --platform macos --arch "$ARCH" --profile "$PROFILE" --command "$command_name")
+        [ "$YES" = 1 ] && native_args+=(--yes)
+        [ "$LATEST" = 1 ] && native_args+=(--latest)
+        [ -n "$APP_PATH" ] && native_args+=(--app "$APP_PATH")
+        [ -n "$JOBS" ] && native_args+=(--jobs "$JOBS")
+        if [ "$command_name" = build-target ]; then
+            fail 'build-target is currently Linux-only; use macOS build to produce the release target'
+        fi
+        exec "${CHROMIUM_PYTHON:-python3}" "$ROOT/scripts/macos_backend.py" "${native_args[@]}"
+        ;;
+    linux)
+        PROFILE=${PROFILE:-headless-debug}
+        [ "$PROFILE" = headless-debug ] || fail "Gate A/B/C/D/F only support headless-debug"
+        ;;
+    *)
+        fail "unsupported platform $PLATFORM"
+        ;;
+esac
 
 case "$ARCH" in
     arm64)

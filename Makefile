@@ -1,5 +1,10 @@
 ARCH ?= arm64
+PLATFORM ?= linux
+ifeq ($(PLATFORM),macos)
+PROFILE ?= macos-release
+else
 PROFILE ?= headless-debug
+endif
 IMAGE ?= ungoogled-chromium-builder:150.0.7871.114-$(ARCH)
 WORK_VOLUME ?= ungoogled-chromium-work-$(ARCH)
 CACHE_VOLUME ?= ungoogled-chromium-ccache-$(ARCH)
@@ -7,12 +12,13 @@ CACHE_VOLUME ?= ungoogled-chromium-ccache-$(ARCH)
 CHROMIUM_BUILD = CHROMIUM_BUILDER_IMAGE=$(IMAGE) \
     CHROMIUM_WORK_VOLUME=$(WORK_VOLUME) \
     CHROMIUM_CACHE_VOLUME=$(CACHE_VOLUME) \
-    ./chromium-build --arch $(ARCH) --profile $(PROFILE)
+    ./chromium-build --platform $(PLATFORM) --arch $(ARCH) --profile $(PROFILE)
 DOCKER ?= docker
 
 .NOTPARALLEL:
 .PHONY: image fetch prepare gate-a gate-b gate-c gate-d gate-e gate-f gates
 .PHONY: bootstrap full-build resume-build build-target stage-runtime test-fast test-functional test-staged cache-stats resume-check graph-breakdown check-py
+.PHONY: macos-doctor macos-smoke-preflight macos-update-lock macos-fetch macos-prepare macos-configure macos-cache-stats macos-build macos-stage-runtime macos-test-staged
 
 check-py:
 	PYTHONPATH=scripts:tests uv run --with ruff --with ty ruff check scripts tests
@@ -83,3 +89,33 @@ graph-breakdown:
 	$(DOCKER) run --rm --network=none -v "$(CURDIR):/repo:ro" -v $(WORK_VOLUME):/work $(IMAGE) \
 		python3 /repo/scripts/build-task-breakdown.py \
 		--out /work/out/$(PROFILE) --target chrome
+
+macos-doctor:
+	./chromium-build --platform macos --arch arm64 --profile macos-release doctor
+
+macos-smoke-preflight:
+	MACOS_COMPILER_CACHE=off ./chromium-build --platform macos --arch arm64 --profile macos-release smoke-preflight
+
+macos-update-lock:
+	./chromium-build --platform macos --arch arm64 --profile macos-release update-lock --latest
+
+macos-fetch:
+	./chromium-build --platform macos --arch arm64 --profile macos-release fetch
+
+macos-prepare:
+	./chromium-build --platform macos --arch arm64 --profile macos-release prepare
+
+macos-configure:
+	./chromium-build --platform macos --arch arm64 --profile macos-release configure
+
+macos-cache-stats:
+	./chromium-build --platform macos --arch arm64 --profile macos-release cache-stats
+
+macos-build:
+	./chromium-build --platform macos --arch arm64 --profile macos-release build
+
+macos-stage-runtime:
+	./chromium-build --platform macos --arch arm64 --profile macos-release stage-runtime
+
+macos-test-staged:
+	./chromium-build --platform macos --arch arm64 --profile macos-release test-staged

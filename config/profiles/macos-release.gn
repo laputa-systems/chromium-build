@@ -1,0 +1,47 @@
+# Native Apple Silicon desktop profile. The macOS backend substitutes the
+# placeholders from its locked host-tool selection before running GN.
+target_os = "mac"
+target_cpu = "@TARGET_CPU@"
+host_cpu = "@TARGET_CPU@"
+
+is_clang = true
+clang_base_path = "@LLVM_ROOT@"
+clang_version = "@CLANG_MAJOR@"
+# Xcode 27's SDK ships TAPI targets that the bundled lld does not understand
+# yet. Keep Chromium's pinned LLVM compiler, but let its Apple driver invoke
+# the Xcode linker for SDK-aware links.
+use_lld = false
+
+is_debug = false
+is_component_build = false
+is_official_build = false
+is_chrome_branded = false
+symbol_level = 1
+blink_symbol_level = 0
+v8_symbol_level = 0
+
+# The Xcode linker path is required for the Xcode 27 SDK; Chromium's LTO
+# configuration requires lld, so leave LTO off for this native profile.
+use_thin_lto = false
+chrome_pgo_phase = 0
+
+# Keep the ordinary Chromium desktop product. Headless operation is selected
+# by acceptance launches, never by changing this release configuration.
+enable_extensions = true
+enable_printing = true
+enable_pdf = true
+enable_widevine = false
+# Ship only the US English resource set. Chromium emits this locale as the
+# native macOS `en.lproj` output through the compatibility hook in the backend.
+macos_single_locale = "en-US"
+# US English does not need Chromium's gender-suffixed translation variants.
+translate_genders = false
+safe_browsing_mode = 0
+enable_service_discovery = false
+use_official_google_api_keys = false
+google_api_key = ""
+google_default_client_id = ""
+google_default_client_secret = ""
+
+# Do not lower the deployment target to the host version. Chromium's macOS
+# defaults and the selected Xcode SDK remain authoritative.

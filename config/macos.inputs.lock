@@ -1,0 +1,76 @@
+{
+  "architecture": "arm64",
+  "chromium": {
+    "commit": "78e5e45d4bb41035e17ea4da2cc257f496416ac9",
+    "devtools_revision": "511172b786248e29d7493bf954faa57f834dc5b3",
+    "main_branch_position": 1681091,
+    "source": {
+      "filename": "chromium-153.0.8010.52.tar.xz",
+      "sha512": "257eef0ec51874ab51ae1d577f1c6efe2b756718aeac404c36686661ef9b7ae22d37eab1efde2338f960b415101b0de4e0182e86a8edfc4ab06a8ee812e8b707",
+      "size": 4121270828,
+      "url": "https://commondatastorage.googleapis.com/chromium-browser-official/chromium-153.0.8010.52.tar.xz"
+    },
+    "version": "153.0.8010.52"
+  },
+  "depot_tools": {
+    "commit": "55a39e603bee1ad299545508bc96e2a5d29d3cc4",
+    "repository": "https://chromium.googlesource.com/chromium/tools/depot_tools.git"
+  },
+  "llvm": {
+    "minimum": "23.1.0",
+    "preferred": "23.1.1",
+    "selection": "prefer-exact-23.1.1-among-chromium-explicit-homebrew-candidates"
+  },
+  "macos_reference": {
+    "adaptation": "reference only; version-mismatched packaging changes are not imported",
+    "commit": "038db2b41f7aeb00bbceb2f5a56912b26eb5b284",
+    "compatible_with_chromium": false,
+    "patches_applied": [],
+    "repository": "https://github.com/ungoogled-software/ungoogled-chromium-macos.git",
+    "version": "152.0.7977.82"
+  },
+  "patch_policy": {
+    "core_ungoogled": "apply complete series in declared order",
+    "excluded": [
+      "portablelinux",
+      "alpine",
+      "copium",
+      "musl",
+      "headless"
+    ],
+    "macos_reference": "do not apply version-mismatched packaging patches"
+  },
+  "platform": "macos",
+  "resolved_at": "2026-09-21T19:12:38.537939+00:00",
+  "rust": {
+    "components": [
+      "rust-src",
+      "llvm-tools-preview"
+    ],
+    "toolchain": "nightly-2026-09-15"
+  },
+  "schema": 1,
+  "status": "resolved",
+  "test_inputs": {
+    "ublock_origin": {
+      "filename": "uBlock0_1.72.0.chromium.zip",
+      "sha256": "c2900bbe9a783e645389cdeb19be632a033ad11d8bee7a94b0d0c316a20a2b05",
+      "sha512": "ce98b58145bc1263ca919e9e329b2b402257d8b8eef325ec2b83392812f69ed62aba41866a3a7daecc166f2b5a18392467e9aae5af9d208b51cf1b02cc20d121",
+      "size": 4617915,
+      "url": "https://github.com/gorhill/uBlock/releases/download/1.72.0/uBlock0_1.72.0.chromium.zip",
+      "version": "1.72.0"
+    }
+  },
+  "ungoogled": {
+    "commit": "a638756eb14c8b6ce64b4b2a067afea5d4207bf4",
+    "patch_series_sha256": "4ff99a455ee8e0b6f66c167ebb0b79ec063daa1038ce5bc659a485965d7abae7",
+    "release": "153.0.8010.52-1",
+    "revision": 1,
+    "source": {
+      "filename": "ungoogled-a638756eb14c8b6ce64b4b2a067afea5d4207bf4.tar.gz",
+      "sha512": "0b0bbeb1d213cc6ae1764ea628ae32fb2762419b4a554f0a4f6ba40d56df103e67ea0972cbbb5f4c0954fd6c22913badc081dcb6ebc87a3152b65f617a854efb",
+      "size": 671665,
+      "url": "https://github.com/ungoogled-software/ungoogled-chromium/archive/a638756eb14c8b6ce64b4b2a067afea5d4207bf4.tar.gz"
+    }
+  }
+}

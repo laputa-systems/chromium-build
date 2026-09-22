@@ -1,0 +1,147 @@
+name: macOS 26 native smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-26-native-smoke
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      CHROMIUM_WORK_ROOT: /Volumes/dev/d/chromium-build/.work/macos-arm64
+      MACOS_COMPILER_CACHE: off
+      MACOS_MIN_FREE_GB: "10"
+      RUSTUP_HOME: /Volumes/dev/d/chromium-build/.work/macos-arm64/tools/rustup
+      CARGO_HOME: /Volumes/dev/d/chromium-build/.work/macos-arm64/cache/cargo
+      HOMEBREW_CACHE: /Volumes/dev/d/chromium-build/.work/macos-arm64/cache/homebrew
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+
+    steps:
+      - name: Clone into the policy work root
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo mkdir -p /Volumes/dev/d
+          sudo chown "$(id -u):$(id -g)" /Volumes/dev /Volumes/dev/d
+          git clone --depth=1 --no-tags --filter=blob:none \
+            --branch "$GITHUB_REF_NAME" \
+            "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" \
+            /Volumes/dev/d/chromium-build
+
+      - name: Provision ephemeral LLVM and Rust prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$CARGO_HOME/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+          mkdir -p "$CHROMIUM_WORK_ROOT/tools/rustup" "$CARGO_HOME" "$HOMEBREW_CACHE"
+
+          if ! command -v rustup >/dev/null 2>&1; then
+            brew install rustup-init
+            "$(brew --prefix rustup-init)/bin/rustup-init" -y --no-modify-path
+          fi
+          command -v rustup >/dev/null 2>&1
+          rustup toolchain install nightly-2026-09-15 \
+            --profile minimal \
+            --component rust-src \
+            --component llvm-tools-preview \
+            --no-self-update
+          rustup run nightly-2026-09-15 rustc --version --verbose
+
+          echo "DEVELOPER_DIR=$(xcode-select -p)" >> "$GITHUB_ENV"
+          llvm_formula=""
+          for formula in llvm@23 llvm; do
+            if brew list --formula "$formula" >/dev/null 2>&1; then
+              llvm_formula="$formula"
+              break
+            fi
+          done
+          if [ -z "$llvm_formula" ]; then
+            if brew info --formula llvm@23 >/dev/null 2>&1; then
+              llvm_formula=llvm@23
+            else
+              llvm_formula=llvm
+            fi
+            brew install "$llvm_formula"
+          fi
+
+          llvm_root="$(brew --prefix "$llvm_formula")"
+          if ! python3 -c 'import re, sys; text=sys.stdin.read(); match=re.search(r"version (\d+)\.(\d+)(?:\.(\d+))?", text); sys.exit(0 if match and tuple(int(match.group(i) or 0) for i in range(1, 4)) >= (23, 1, 0) else 1)' < <("$llvm_root/bin/clang" --version); then
+            if [ "$llvm_formula" != llvm@23 ] && brew info --formula llvm@23 >/dev/null 2>&1; then
+              llvm_formula=llvm@23
+              brew install "$llvm_formula"
+              llvm_root="$(brew --prefix "$llvm_formula")"
+            else
+              brew upgrade "$llvm_formula"
+              llvm_root="$(brew --prefix "$llvm_formula")"
+            fi
+          fi
+          "$llvm_root/bin/clang" --version
+          LLVM_ROOT="$llvm_root"
+          echo "LLVM_ROOT=$LLVM_ROOT" >> "$GITHUB_ENV"
+          echo "PATH=$CARGO_HOME/bin:$LLVM_ROOT/bin:/opt/homebrew/bin:/usr/local/bin:$PATH" >> "$GITHUB_ENV"
+
+      - name: Run macOS host-only preflight
+        working-directory: /Volumes/dev/d/chromium-build
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset CCACHE_DIR SCCACHE_DIR RBE_service GOMA_service RECLIENT_service SISO_service || true
+          ./chromium-build --platform macos --arch arm64 --profile macos-release smoke-preflight
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(
+              Path("/Volumes/dev/d/chromium-build/.work/macos-arm64/metadata/doctor.json")
+              .read_text(encoding="utf-8")
+          )
+          assert report["status"] == "complete", report
+          assert report["preflight_scope"] == "host-only-smoke", report
+          macos_version = tuple(int(part) for part in report["checks"]["macos"]["version"].split("."))
+          llvm_version = tuple(int(part) for part in report["checks"]["llvm"]["version"].split("."))
+          assert macos_version >= (26, 0, 0), report
+          assert llvm_version >= (23, 1, 0), report
+          assert report["checks"]["compiler_cache"]["status"] == "disabled", report
+          assert all(item["status"] == "skipped" for item in report["references"].values()), report
+          PY
+
+      - name: Compile tiny arm64 toolchain smoke
+        working-directory: /Volumes/dev/d/chromium-build
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset CCACHE_DIR SCCACHE_DIR RBE_service GOMA_service RECLIENT_service SISO_service || true
+          smoke_root="$CHROMIUM_WORK_ROOT/smoke"
+          mkdir -p "$smoke_root"
+          cat > "$smoke_root/toolchain_smoke.cc" <<'EOF'
+          #include <array>
+          #include <cstdint>
+
+          int main() {
+            constexpr std::array<std::uint32_t, 2> values{26, 1};
+            return values[0] == 26 && values[1] == 1 ? 0 : 1;
+          }
+          EOF
+          sdk_path="$(xcrun --sdk macosx --show-sdk-path)"
+          "$LLVM_ROOT/bin/clang++" \
+            -target arm64-apple-macos26.0 \
+            -isysroot "$sdk_path" \
+            -mmacosx-version-min=26.0 \
+            -Wall -Werror \
+            -c "$smoke_root/toolchain_smoke.cc" \
+            -o "$smoke_root/toolchain_smoke.o"
+          "$LLVM_ROOT/bin/clang++" \
+            -target arm64-apple-macos26.0 \
+            -isysroot "$sdk_path" \
+            -mmacosx-version-min=26.0 \
+            "$smoke_root/toolchain_smoke.cc" \
+            -o "$smoke_root/toolchain_smoke"
+          "$smoke_root/toolchain_smoke"
+          file "$smoke_root/toolchain_smoke" "$smoke_root/toolchain_smoke.o"
