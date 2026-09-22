@@ -22,6 +22,8 @@ jobs:
       MACOS_REQUIRE_FULL_BUILD: "1"
       MACOS_REQUIRE_RUST_TOOLCHAIN: "1"
       MACOS_SKIP_ACCEPTANCE: "1"
+      MACOS_INPUT_DOWNLOAD_WORKERS: "16"
+      MACOS_INPUT_ENTRY_WORKERS: "4"
       RUSTUP_HOME: /Volumes/dev/d/chromium-build/.work/macos-arm64/tools/rustup
       CARGO_HOME: /Volumes/dev/d/chromium-build/.work/macos-arm64/cache/cargo
       HOMEBREW_CACHE: /Volumes/dev/d/chromium-build/.work/macos-arm64/cache/homebrew
@@ -44,21 +46,25 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-          import sys
+          python3 scripts/verify_macos_ci.py claim-work-root \
+            --repo-root /Volumes/dev/d/chromium-build \
+            --work-root /Volumes/dev/d/chromium-build/.work/macos-arm64
 
-          sys.path.insert(0, "scripts")
-          import macos_backend
+      - name: Resolve locked input cache key
+        id: input_cache_key
+        working-directory: /Volumes/dev/d/chromium-build
+        shell: bash
+        run: |
+          set -euo pipefail
+          key="$(python3 scripts/verify_macos_ci.py cache-key --lock config/macos.inputs.lock)"
+          echo "key=$key" >> "$GITHUB_OUTPUT"
 
-          repo = Path("/Volumes/dev/d/chromium-build").resolve()
-          layout = macos_backend.WorkLayout(
-              Path("/Volumes/dev/d/chromium-build/.work/macos-arm64"),
-              repo,
-          )
-          layout.ensure()
-          print(layout.root)
-          PY
+      - name: Restore locked Chromium inputs
+        id: restore_inputs
+        uses: actions/cache/restore@v4
+        with:
+          path: /Volumes/dev/d/chromium-build/.work/macos-arm64/inputs
+          key: ${{ steps.input_cache_key.outputs.key }}
 
       - name: Provision ephemeral LLVM and Rust prerequisites
         shell: bash
@@ -97,7 +103,9 @@ jobs:
           fi
 
           llvm_root="$(brew --prefix "$llvm_formula")"
-          if ! python3 -c 'import re, sys; text=sys.stdin.read(); match=re.search(r"version (\d+)\.(\d+)(?:\.(\d+))?", text); sys.exit(0 if match and tuple(int(match.group(i) or 0) for i in range(1, 4)) >= (23, 1, 0) else 1)' < <("$llvm_root/bin/clang" --version); then
+          if ! python3 scripts/verify_macos_ci.py verify-llvm \
+            --clang "$llvm_root/bin/clang" \
+            --minimum 23.1.0; then
             if [ "$llvm_formula" != llvm@23 ] && brew info --formula llvm@23 >/dev/null 2>&1; then
               llvm_formula=llvm@23
               brew install "$llvm_formula"
@@ -119,39 +127,25 @@ jobs:
           set -euo pipefail
           unset CCACHE_DIR SCCACHE_DIR RBE_service GOMA_service RECLIENT_service SISO_service || true
           ./chromium-build --platform macos --arch arm64 --profile macos-release smoke-preflight
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-
-          report = json.loads(
-              Path("/Volumes/dev/d/chromium-build/.work/macos-arm64/metadata/doctor.json")
-              .read_text(encoding="utf-8")
-          )
-          assert report["status"] == "complete", report
-          assert report["preflight_scope"] == "host-only-full-build", report
-          macos_version = tuple(int(part) for part in report["checks"]["macos"]["version"].split("."))
-          sdk_version = tuple(int(part) for part in report["checks"]["xcode"]["sdk_version"].split("."))
-          llvm_version = tuple(int(part) for part in report["checks"]["llvm"]["version"].split("."))
-          assert macos_version >= (26, 0, 0), report
-          assert sdk_version >= (26, 0, 0), report
-          assert llvm_version >= (23, 1, 0), report
-          assert report["checks"]["rust"]["status"] == "complete", report
-          assert report["checks"]["rust"]["toolchain"] == "nightly-2026-09-15", report
-          assert report["checks"]["rust"]["components"] == ["rust-src", "llvm-tools-preview"], report
-          assert report["checks"]["compiler_cache"]["status"] == "disabled", report
-          assert report["checks"]["filesystem"]["minimum_free_bytes"] >= 80 * 1024**3, report
-          for tool in ("llvm-ar", "llvm-nm", "llvm-objcopy", "llvm-strip"):
-              assert tool in report["checks"]["llvm"]["tools"], report
-          assert all(item["status"] == "skipped" for item in report["references"].values()), report
-          PY
+          python3 scripts/verify_macos_ci.py verify-preflight \
+            --work-root /Volumes/dev/d/chromium-build/.work/macos-arm64 \
+            --minimum-free-gb 80
 
       - name: Fetch locked Chromium inputs
+        id: fetch_inputs
         working-directory: /Volumes/dev/d/chromium-build
         shell: bash
         run: |
           set -euo pipefail
           unset CCACHE_DIR SCCACHE_DIR RBE_service GOMA_service RECLIENT_service SISO_service || true
           ./chromium-build --platform macos --arch arm64 --profile macos-release fetch
+
+      - name: Cache locked Chromium inputs
+        if: steps.fetch_inputs.outcome == 'success' && steps.restore_inputs.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /Volumes/dev/d/chromium-build/.work/macos-arm64/inputs
+          key: ${{ steps.input_cache_key.outputs.key }}
 
       - name: Apply locked source preparation
         working-directory: /Volumes/dev/d/chromium-build
@@ -166,17 +160,8 @@ jobs:
         run: |
           set -euo pipefail
           ./chromium-build --platform macos --arch arm64 --profile macos-release configure
-          python3 - <<'PY'
-          from pathlib import Path
-          import json
-
-          root = Path("/Volumes/dev/d/chromium-build/.work/macos-arm64")
-          report = json.loads((root / "metadata" / "configure-macos.json").read_text(encoding="utf-8"))
-          assert report["status"] == "complete", report
-          args = (root / "metadata" / "macos-release.args.gn").read_text(encoding="utf-8")
-          assert 'macos_single_locale = "en-US"' in args, args
-          assert "is_component_build = false" in args, args
-          PY
+          python3 scripts/verify_macos_ci.py verify-configure \
+            --work-root /Volumes/dev/d/chromium-build/.work/macos-arm64
 
       - name: Confirm compiler caching is disabled
         working-directory: /Volumes/dev/d/chromium-build
@@ -184,16 +169,8 @@ jobs:
         run: |
           set -euo pipefail
           ./chromium-build --platform macos --arch arm64 --profile macos-release cache-stats
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-
-          report = json.loads(
-              Path("/Volumes/dev/d/chromium-build/.work/macos-arm64/metadata/compiler-cache-stats.json")
-              .read_text(encoding="utf-8")
-          )
-          assert report["cache"]["status"] == "disabled", report
-          PY
+          python3 scripts/verify_macos_ci.py verify-cache-disabled \
+            --work-root /Volumes/dev/d/chromium-build/.work/macos-arm64
 
       - name: Build Chromium for arm64
         working-directory: /Volumes/dev/d/chromium-build
@@ -217,55 +194,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          ./chromium-build --platform macos --arch arm64 --profile macos-release package
+          python3 scripts/verify_macos_ci.py verify-package \
+            --work-root "$CHROMIUM_WORK_ROOT"
+          version="$(python3 scripts/verify_macos_ci.py chromium-version --lock config/macos.inputs.lock)"
           release_root="$CHROMIUM_WORK_ROOT/release"
-          mkdir -p "$release_root"
-          python3 - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          repo = Path("/Volumes/dev/d/chromium-build").resolve()
-          root = Path(os.environ["CHROMIUM_WORK_ROOT"]).resolve()
-          candidate = json.loads((root / "stage" / "candidate.json").read_text(encoding="utf-8"))
-          if candidate.get("status") != "complete":
-              raise SystemExit(f"candidate is not complete: {candidate}")
-          app = Path(candidate["app"]).resolve()
-          candidates_root = (root / "stage" / "candidates").resolve()
-          if candidates_root not in app.parents or app.name != "Chromium.app":
-              raise SystemExit(f"candidate escapes the owned candidate root: {app}")
-          if not (app / "Contents" / "MacOS" / "Chromium").is_file():
-              raise SystemExit(f"candidate executable is missing: {app}")
-          version = json.loads((repo / "config" / "macos.inputs.lock").read_text(encoding="utf-8"))["chromium"]["version"]
-          release = root / "release"
-          (release / "candidate-app-path").write_text(str(app) + "\n", encoding="utf-8")
-          (release / "version").write_text(version + "\n", encoding="utf-8")
-          (release / "build-manifest.json").write_text(
-              json.dumps(
-                  {
-                      "status": "complete",
-                      "version": version,
-                      "architecture": "arm64",
-                      "app": str(app),
-                      "fingerprint": candidate["fingerprint"],
-                      "run_id": os.environ["GITHUB_RUN_ID"],
-                      "commit": os.environ["GITHUB_SHA"],
-                      "acceptance": "not-run-in-remote-ci",
-                  },
-                  indent=2,
-                  sort_keys=True,
-              )
-              + "\n",
-              encoding="utf-8",
-          )
-          PY
-          app_path="$(cat "$release_root/candidate-app-path")"
-          version="$(cat "$release_root/version")"
           archive="$release_root/Chromium-${version}-macos-arm64.zip"
-          ditto -c -k --sequesterRsrc --keepParent "$app_path" "$archive"
-          shasum -a 256 "$archive" > "$archive.sha256"
           test -s "$archive"
           test -s "$archive.sha256"
-          ls -lh "$archive" "$archive.sha256" "$release_root/build-manifest.json"
+          ls -lh "$archive" "$archive.sha256"
 
       - name: Upload the prerelease asset
         working-directory: /Volumes/dev/d/chromium-build
@@ -275,7 +212,7 @@ jobs:
         run: |
           set -euo pipefail
           release_root="$CHROMIUM_WORK_ROOT/release"
-          version="$(cat "$release_root/version")"
+          version="$(python3 scripts/verify_macos_ci.py chromium-version --lock config/macos.inputs.lock)"
           archive="$release_root/Chromium-${version}-macos-arm64.zip"
           tag="chromium-macos-${version}-run-${GITHUB_RUN_ID}"
           notes="$release_root/release-notes.md"
@@ -296,5 +233,4 @@ jobs:
             --title "Chromium $version macOS arm64 CI build" \
             --notes-file "$notes" \
             "$archive" \
-            "$archive.sha256" \
-            "$release_root/build-manifest.json"
+            "$archive.sha256"

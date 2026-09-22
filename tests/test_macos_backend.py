@@ -2,6 +2,8 @@
 """Focused tests for the native macOS path and its ownership boundary."""
 
 from pathlib import Path
+import hashlib
+import io
 import os
 import shutil
 import tempfile
@@ -171,6 +173,60 @@ class MacOSBackendTests(unittest.TestCase):
         self.assertIn("--depth=1", fetches[0])
         self.assertIn("--no-tags", fetches[0])
 
+    def test_large_locked_download_assembles_parallel_https_ranges(self):
+        data = b"0123456789"
+        entry = {
+            "name": "chromium",
+            "filename": "chromium.tar.xz",
+            "url": "https://example.test/chromium.tar.xz",
+            "size": len(data),
+            "sha512": hashlib.sha512(data).hexdigest(),
+        }
+        requests = []
+
+        class Response:
+            def __init__(self, payload, content_range):
+                self.stream = io.BytesIO(payload)
+                self.status = 206
+                self.headers = {"Content-Range": content_range}
+
+            def geturl(self):
+                return entry["url"]
+
+            def read(self, size=-1):
+                return self.stream.read(size)
+
+            def close(self):
+                self.stream.close()
+
+        def open_url(request, timeout):
+            self.assertEqual(timeout, 120)
+            range_header = request.get_header("Range")
+            self.assertIsNotNone(range_header)
+            requests.append(range_header)
+            start, end = (
+                int(value)
+                for value in range_header.removeprefix("bytes=").split("-", 1)
+            )
+            return Response(data[start : end + 1], f"bytes {start}-{end}/{len(data)}")
+
+        with (
+            mock.patch.object(backend, "RANGE_DOWNLOAD_THRESHOLD_BYTES", 1),
+            mock.patch.object(backend, "RANGE_DOWNLOAD_CHUNK_BYTES", 3),
+            mock.patch.dict(os.environ, {"MACOS_INPUT_DOWNLOAD_WORKERS": "3"}, clear=False),
+            mock.patch.object(backend.urllib.request, "urlopen", side_effect=open_url),
+        ):
+            result = backend.download_locked(entry, self.root / "inputs")
+
+        self.assertEqual(result["download_mode"], "parallel-ranges-3")
+        self.assertEqual(result["workers"], 3)
+        self.assertEqual((self.root / "inputs" / entry["filename"]).read_bytes(), data)
+        self.assertIn("bytes=0-0", requests)
+        self.assertEqual(
+            {value for value in requests if value != "bytes=0-0"},
+            {"bytes=0-2", "bytes=3-5", "bytes=6-8", "bytes=9-9"},
+        )
+
     def test_bundle_fingerprint_changes_with_owned_content(self):
         app = self.root / "Chromium.app"
         (app / "Contents" / "MacOS").mkdir(parents=True)
@@ -178,6 +234,41 @@ class MacOSBackendTests(unittest.TestCase):
         first = backend.bundle_fingerprint(app)
         (app / "Contents" / "MacOS" / "Chromium").write_bytes(b"arm64-test-2")
         self.assertNotEqual(first, backend.bundle_fingerprint(app))
+
+    def test_package_reuses_audited_candidate_and_publishes_only_archive_assets(self):
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        app = layout.candidates / ("a" * 64) / "Chromium.app"
+        executable = app / "Contents" / "MacOS" / "Chromium"
+        executable.parent.mkdir(parents=True)
+        executable.write_bytes(b"arm64-test")
+        fingerprint = backend.bundle_fingerprint(app)
+        candidate = {
+            "schema": 1,
+            "status": "complete",
+            "fingerprint": fingerprint,
+            "app": str(app),
+            "audit": {"status": "complete"},
+        }
+        backend.atomic_json(layout.stage / "candidate.json", candidate)
+
+        def fake_command(command, **kwargs):
+            self.assertEqual(command[0], "/usr/bin/ditto")
+            Path(command[-1]).write_bytes(b"zip-placeholder")
+            return mock.Mock(returncode=0, stdout="", stderr="")
+
+        with (
+            mock.patch.object(backend, "isolated_environment", return_value={}),
+            mock.patch.object(backend, "command_output", side_effect=fake_command),
+        ):
+            report = backend.package_bundle(layout)
+
+        archive = Path(report["archive"])
+        self.assertTrue(archive.is_file())
+        self.assertTrue(archive.with_name(f"{archive.name}.sha256").is_file())
+        self.assertEqual(report["sha256"], backend.sha256(archive))
+        self.assertFalse((layout.release / "build-manifest.json").exists())
+        self.assertFalse((layout.release / "version").exists())
 
     def test_macho_audit_alias_handles_archive_like_bundle_names(self):
         layout = backend.WorkLayout(self.root, self.repo)
@@ -328,10 +419,12 @@ class MacOSBackendTests(unittest.TestCase):
         layout.source.mkdir(parents=True)
         (layout.source / "owned.txt").write_text("owned", encoding="utf-8")
         (layout.inputs / "locked.bin").write_bytes(b"locked")
+        (layout.release / "old.zip").write_bytes(b"old")
         with self.assertRaises(backend.MacOSFailure):
             backend.reset_work(layout, False)
         backend.reset_work(layout, True)
         self.assertFalse(layout.source.exists())
+        self.assertFalse((layout.release / "old.zip").exists())
         self.assertTrue((layout.inputs / "locked.bin").is_file())
 
 

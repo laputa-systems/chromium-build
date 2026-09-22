@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 from contextlib import contextmanager
+from concurrent.futures import ThreadPoolExecutor
 import datetime as dt
 import errno
 import fcntl
@@ -51,6 +52,11 @@ VERSION_RE = re.compile(r"(?<!\d)(\d+)\.(\d+)(?:\.(\d+))?(?:\.(\d+))?(?!\d)")
 RELEASE_RE = re.compile(r"^(\d+\.\d+\.\d+\.\d+)-(\d+)$")
 COMPILER_CACHE_NAMES = ("ccache", "sccache")
 COMPILER_CACHE_DISABLED = {"off", "none", "disabled"}
+DOWNLOAD_CHUNK_BYTES = 1024 * 1024
+RANGE_DOWNLOAD_THRESHOLD_BYTES = 256 * 1024 * 1024
+RANGE_DOWNLOAD_CHUNK_BYTES = 64 * 1024 * 1024
+DEFAULT_INPUT_DOWNLOAD_WORKERS = 16
+MAX_INPUT_DOWNLOAD_WORKERS = 32
 
 
 class MacOSFailure(RuntimeError):
@@ -356,6 +362,7 @@ class WorkLayout:
         self.stage = self.root / "stage"
         self.candidates = self.stage / "candidates"
         self.accepted = self.stage / "accepted"
+        self.release = self.root / "release"
         self.logs = self.root / "logs"
         self.tmp = self.root / "tmp"
         self.home = self.root / "home"
@@ -374,6 +381,7 @@ class WorkLayout:
             self.output,
             self.candidates,
             self.accepted,
+            self.release,
             self.logs,
             self.tmp,
             self.home,
@@ -998,6 +1006,163 @@ def verify_locked_file(path: Path, entry: Mapping[str, Any]) -> None:
         fail(f"{entry['filename']}: SHA-256 mismatch")
 
 
+def configured_positive_int(name: str, default: int, maximum: int) -> int:
+    raw = os.environ.get(name, str(default))
+    try:
+        value = int(raw)
+    except ValueError:
+        fail(f"{name} must be an integer, got {raw!r}")
+    if value < 1 or value > maximum:
+        fail(f"{name} must be between 1 and {maximum}, got {value}")
+    return value
+
+
+def _open_locked_response(url: str, headers: Optional[Mapping[str, str]] = None):
+    request_headers = {"User-Agent": "chromium-build-native-macos"}
+    request_headers.update(headers or {})
+    request = urllib.request.Request(url, headers=request_headers)
+    response = urllib.request.urlopen(request, timeout=120)
+    final_url = urllib.parse.urlparse(response.geturl())
+    if final_url.scheme != "https":
+        response.close()
+        fail(f"locked input redirected to a non-HTTPS URL: {response.geturl()}")
+    return response
+
+
+def _response_status(response: Any) -> int:
+    status = getattr(response, "status", None)
+    if status is None:
+        status = response.getcode()
+    return int(status or 0)
+
+
+def _validate_range_response(
+    response: Any,
+    *,
+    start: int,
+    end: int,
+    expected_size: int,
+) -> None:
+    if _response_status(response) != 206:
+        fail(f"range request returned HTTP {_response_status(response)} instead of 206")
+    content_range = str(response.headers.get("Content-Range", ""))
+    match = re.fullmatch(r"bytes (\d+)-(\d+)/(\d+)", content_range)
+    if not match:
+        fail(f"range response has an invalid Content-Range header: {content_range!r}")
+    actual_start, actual_end, actual_size = (int(value) for value in match.groups())
+    if (actual_start, actual_end, actual_size) != (start, end, expected_size):
+        fail(
+            "range response does not match the locked request: "
+            f"expected bytes {start}-{end}/{expected_size}, got {content_range}"
+        )
+
+
+def _supports_byte_ranges(entry: Mapping[str, Any]) -> bool:
+    try:
+        response = _open_locked_response(
+            str(entry["url"]),
+            {"Range": "bytes=0-0"},
+        )
+    except urllib.error.HTTPError as error:
+        if error.code in {400, 405, 501}:
+            error.close()
+            return False
+        raise
+    try:
+        if _response_status(response) != 206:
+            return False
+        _validate_range_response(
+            response,
+            start=0,
+            end=0,
+            expected_size=int(entry["size"]),
+        )
+        if len(response.read(2)) != 1:
+            fail("range probe returned an unexpected payload length")
+        return True
+    finally:
+        response.close()
+
+
+def _write_at(file_descriptor: int, offset: int, payload: bytes) -> None:
+    view = memoryview(payload)
+    while view:
+        written = os.pwrite(file_descriptor, view, offset)
+        if written <= 0:
+            fail("parallel locked-input download made no write progress")
+        offset += written
+        view = view[written:]
+
+
+def _download_range(
+    entry: Mapping[str, Any],
+    file_descriptor: int,
+    start: int,
+    end: int,
+) -> None:
+    response = _open_locked_response(
+        str(entry["url"]),
+        {"Range": f"bytes={start}-{end}"},
+    )
+    try:
+        _validate_range_response(
+            response,
+            start=start,
+            end=end,
+            expected_size=int(entry["size"]),
+        )
+        offset = start
+        remaining = end - start + 1
+        while remaining:
+            payload = response.read(min(DOWNLOAD_CHUNK_BYTES, remaining))
+            if not payload:
+                fail(
+                    f"range download ended early for {entry['filename']} "
+                    f"at byte {offset}"
+                )
+            if len(payload) > remaining:
+                fail(f"range download returned too many bytes for {entry['filename']}")
+            _write_at(file_descriptor, offset, payload)
+            offset += len(payload)
+            remaining -= len(payload)
+        if response.read(1):
+            fail(f"range download returned too many bytes for {entry['filename']}")
+    finally:
+        response.close()
+
+
+def _download_ranges(entry: Mapping[str, Any], partial: Path, workers: int) -> None:
+    expected_size = int(entry["size"])
+    ranges = [
+        (start, min(start + RANGE_DOWNLOAD_CHUNK_BYTES, expected_size) - 1)
+        for start in range(0, expected_size, RANGE_DOWNLOAD_CHUNK_BYTES)
+    ]
+    file_descriptor = os.open(str(partial), os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        os.ftruncate(file_descriptor, expected_size)
+
+        def fetch_range(span: tuple[int, int]) -> None:
+            _download_range(entry, file_descriptor, span[0], span[1])
+
+        with ThreadPoolExecutor(max_workers=min(workers, len(ranges))) as executor:
+            list(executor.map(fetch_range, ranges))
+    finally:
+        os.close(file_descriptor)
+
+
+def _download_stream(entry: Mapping[str, Any], partial: Path) -> None:
+    response = _open_locked_response(str(entry["url"]))
+    try:
+        with partial.open("wb") as output:
+            while True:
+                chunk = response.read(DOWNLOAD_CHUNK_BYTES)
+                if not chunk:
+                    break
+                output.write(chunk)
+    finally:
+        response.close()
+
+
 def download_locked(entry: Mapping[str, Any], inputs: Path) -> dict[str, Any]:
     inputs.mkdir(parents=True, exist_ok=True)
     destination = inputs / str(entry["filename"])
@@ -1008,17 +1173,19 @@ def download_locked(entry: Mapping[str, Any], inputs: Path) -> dict[str, Any]:
         return {"name": entry.get("name", entry["filename"]), "path": str(destination), "action": "reused"}
     partial = inputs / f".{entry['filename']}.partial-{os.getpid()}"
     partial.unlink(missing_ok=True)
-    request = urllib.request.Request(str(entry["url"]), headers={"User-Agent": "chromium-build-native-macos"})
+    size = int(entry["size"])
+    workers = configured_positive_int(
+        "MACOS_INPUT_DOWNLOAD_WORKERS",
+        DEFAULT_INPUT_DOWNLOAD_WORKERS,
+        MAX_INPUT_DOWNLOAD_WORKERS,
+    )
+    download_mode = "stream"
     try:
-        with urllib.request.urlopen(request, timeout=120) as response, partial.open("wb") as output:
-            final_url = urllib.parse.urlparse(response.geturl())
-            if final_url.scheme != "https":
-                fail(f"locked input redirected to a non-HTTPS URL: {response.geturl()}")
-            while True:
-                chunk = response.read(1024 * 1024)
-                if not chunk:
-                    break
-                output.write(chunk)
+        if size >= RANGE_DOWNLOAD_THRESHOLD_BYTES and workers > 1 and _supports_byte_ranges(entry):
+            _download_ranges(entry, partial, workers)
+            download_mode = f"parallel-ranges-{workers}"
+        else:
+            _download_stream(entry, partial)
         verify_locked_file(partial, entry)
         os.replace(partial, destination)
     except (OSError, urllib.error.URLError) as error:
@@ -1026,7 +1193,27 @@ def download_locked(entry: Mapping[str, Any], inputs: Path) -> dict[str, Any]:
         fail(f"download failed for {entry['url']}: {error}")
     finally:
         partial.unlink(missing_ok=True)
-    return {"name": entry.get("name", entry["filename"]), "path": str(destination), "action": "downloaded"}
+    return {
+        "name": entry.get("name", entry["filename"]),
+        "path": str(destination),
+        "action": "downloaded",
+        "download_mode": download_mode,
+        "workers": workers if download_mode.startswith("parallel-ranges") else 1,
+    }
+
+
+def download_locked_entries(entries: Sequence[Mapping[str, Any]], inputs: Path) -> list[dict[str, Any]]:
+    """Fetch independent locked entries concurrently; large archives split into ranges."""
+
+    if not entries:
+        return []
+    workers = configured_positive_int(
+        "MACOS_INPUT_ENTRY_WORKERS",
+        min(4, len(entries)),
+        MAX_INPUT_DOWNLOAD_WORKERS,
+    )
+    with ThreadPoolExecutor(max_workers=min(workers, len(entries))) as executor:
+        return list(executor.map(lambda entry: download_locked(entry, inputs), entries))
 
 
 def core_series_digest(archive: Path) -> Optional[str]:
@@ -1941,10 +2128,10 @@ def fetch_inputs(layout: WorkLayout) -> dict[str, Any]:
         "true",
         "yes",
     }
-    entries = [
-        download_locked(entry, layout.inputs)
-        for entry in locked_entries(lock, include_test_inputs=not skip_acceptance)
-    ]
+    entries = download_locked_entries(
+        locked_entries(lock, include_test_inputs=not skip_acceptance),
+        layout.inputs,
+    )
     depot_tools = clone_depot_tools(layout, lock, environment)
     rust = ensure_rust_toolchain(layout, environment)
     if skip_acceptance:
@@ -2018,7 +2205,11 @@ def fetch_inputs(layout: WorkLayout) -> dict[str, Any]:
     }
     atomic_json(layout.metadata / "fetch-macos.json", report)
     atomic_write(layout.metadata / "fetch-complete.stamp", "status=complete\nnetwork=fetch\n")
-    print(f"fetch: verified {len(entries)} locked inputs; native source is {layout.source}")
+    modes = ", ".join(
+        f"{item['name']}={item['action']}/{item.get('download_mode', 'existing')}"
+        for item in entries
+    )
+    print(f"fetch: verified {len(entries)} locked inputs ({modes}); native source is {layout.source}")
     return report
 
 
@@ -3220,6 +3411,73 @@ def stage_runtime(layout: WorkLayout) -> dict[str, Any]:
             shutil.rmtree(pending.parent, ignore_errors=True)
 
 
+def package_bundle(layout: WorkLayout) -> dict[str, Any]:
+    """Package the same signed, audited candidate used by local staging."""
+
+    layout.ensure()
+    candidate = read_json(layout.stage / "candidate.json", "staged candidate")
+    if candidate.get("status") != "complete":
+        fail("staged candidate is not complete; run stage-runtime")
+    if candidate.get("audit", {}).get("status") != "complete":
+        fail("staged candidate has no complete bundle audit; run stage-runtime")
+    app = validate_app_path(candidate.get("app", ""), layout, "staged candidate", built=True)
+    candidates_root = layout.candidates.resolve()
+    if candidates_root not in app.parents or app.name != "Chromium.app":
+        fail(f"staged candidate escapes the candidate root: {app}")
+    fingerprint = bundle_fingerprint(app)
+    if candidate.get("fingerprint") != fingerprint:
+        fail(
+            "staged candidate fingerprint changed: "
+            f"expected {candidate.get('fingerprint')}, got {fingerprint}"
+        )
+    lock = load_lock(layout)
+    version = str(lock["chromium"]["version"])
+    release = layout.release
+    archive = release / f"Chromium-{version}-macos-arm64.zip"
+    temporary = release / f".{archive.name}.tmp-{os.getpid()}-{time.time_ns()}"
+    environment = isolated_environment(layout, network="none")
+    ditto = Path("/usr/bin/ditto")
+    if not ditto.is_file():
+        fail("macOS packaging requires /usr/bin/ditto")
+    try:
+        command_output(
+            [
+                str(ditto),
+                "-c",
+                "-k",
+                "--sequesterRsrc",
+                "--keepParent",
+                str(app),
+                str(temporary),
+            ],
+            env=environment,
+            cwd=layout.root,
+        )
+        if not temporary.is_file() or temporary.stat().st_size == 0:
+            fail(f"ditto did not create a non-empty package: {temporary}")
+        digest = sha256(temporary)
+        os.replace(temporary, archive)
+        checksum = archive.with_name(f"{archive.name}.sha256")
+        atomic_write(checksum, f"{digest}  {archive.name}\n")
+    finally:
+        temporary.unlink(missing_ok=True)
+    report = {
+        "schema": 1,
+        "status": "complete",
+        "version": version,
+        "architecture": "arm64",
+        "app": str(app),
+        "fingerprint": fingerprint,
+        "archive": str(archive),
+        "sha256": digest,
+        "size": archive.stat().st_size,
+        "acceptance": "not-run-in-remote-ci" if os.environ.get("MACOS_SKIP_ACCEPTANCE") else "local-stage-only",
+    }
+    atomic_json(layout.metadata / "package-macos.json", report)
+    print(f"package: created {archive} ({report['size']} bytes)")
+    return report
+
+
 def acceptance_harness_manifest(layout: WorkLayout) -> tuple[Path, Path]:
     harness = layout.harness / "shadowdriver"
     source = harness / "src" / "main.rs"
@@ -3396,6 +3654,7 @@ def reset_work(layout: WorkLayout, confirmed: bool) -> dict[str, Any]:
         (layout.source, "Chromium source"),
         (layout.root / "out", "GN/Ninja outputs"),
         (layout.stage, "staged bundles"),
+        (layout.release, "release artifacts"),
         (layout.metadata, "build metadata"),
         (layout.root / ".gclient", "depot_tools configuration"),
         (layout.root / ".gclient_entries", "depot_tools state"),
@@ -3420,6 +3679,7 @@ def status_work(layout: WorkLayout) -> dict[str, Any]:
         ("prepare", layout.metadata / "prepare-macos.json"),
         ("configure", layout.metadata / "configure-macos.json"),
         ("build", layout.metadata / "build-macos.json"),
+        ("package", layout.metadata / "package-macos.json"),
         ("test_staged", layout.metadata / "test-staged-macos.json"),
         ("candidate", layout.stage / "candidate.json"),
         ("accepted", layout.stage / "accepted.json"),
@@ -3483,6 +3743,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 compiler_cache_stats(layout)
             elif command == "stage-runtime":
                 stage_runtime(layout)
+            elif command == "package":
+                package_bundle(layout)
             elif command == "test-staged":
                 test_staged(layout, arguments.app)
             elif command == "reset":

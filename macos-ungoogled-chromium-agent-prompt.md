@@ -53,12 +53,15 @@ Use atomic metadata publication, verified downloads with temporary filenames, an
 
 Preflight the real host: macOS 26 or newer, native arm64 execution, a usable full Xcode installation and SDK including the Metal Toolchain, required Apple C tools, writable appropriate filesystem, free disk space, and sufficient build resources. Require a native LLVM/Clang distribution at least 23.1.0, preferably 23.1.1; prefer the selected Chromium revision's matching LLVM, then an explicit or already-installed Homebrew LLVM for the local builder without installing or unlinking packages. Record the Xcode Apple clang identity separately because Apple clang's version scheme is not the LLVM distribution version. Provision and use exactly Rust `nightly-2026-09-15` in the work root. Detect translated execution. Report missing prerequisites before downloading the large source tree where possible.
 
-The workflow-dispatch-only CI smoke job runs on `macos-26`, performs the same
-host-only preflight, disables compiler caching, and compiles a tiny native arm64
-C++ program. It may provision ephemeral LLVM/Rust prerequisites on that
-disposable runner; it must not add `actions/cache` or any compiler-cache service.
-Dispatch and watch it with the authenticated `gh` CLI after the workflow commit,
-repeating only to diagnose and correct failures until the run succeeds.
+The workflow-dispatch-only CI full-build job runs on `macos-26`, performs the
+same host-only preflight, disables compiler caching, and builds the locked native
+arm64 release. It may provision ephemeral LLVM/Rust prerequisites on that
+disposable runner. It may use `actions/cache` only for the verified, immutable
+locked input archives, keyed by their lock digests; do not add compiler/build
+cache services. The workflow must call the shared repository packaging command
+and upload only the prerelease archive and checksum. Dispatch and watch it with
+the authenticated `gh` CLI after the workflow commit, repeating only to diagnose
+and correct failures until the run succeeds.
 
 The installed OS, Xcode, SDK, and explicitly documented bootstrap executables are read-only host prerequisites. Select Xcode for this process using `DEVELOPER_DIR`; never run a global `xcode-select --switch`. Derive compatible SDK/tool requirements from the selected Chromium revision. Host OS version, SDK version, compiler version, and minimum deployment target are separate concepts. Do not set the deployment target or `LSMinimumSystemVersion` to 27 merely because the build host runs macOS 27. Prefer upstream defaults unless a concrete compatibility requirement justifies an override.
 
@@ -181,8 +184,9 @@ pass the strict macOS/SDK/Apple-toolchain/LLVM/Rust/disk preflight, fetch and
 configure the locked source, complete a native arm64 release build, and sign
 and audit the resulting app before uploading it as a prerelease asset. Remote
 CI intentionally omits the local-only Shadowdriver acceptance dependency;
-`stage-runtime` remains mandatory, and the prerelease metadata must say that
-acceptance was not run remotely. Compiler caching is explicitly disabled.
+`stage-runtime` remains mandatory, and the prerelease release notes must say that
+acceptance was not run remotely. Compiler caching is explicitly disabled; only
+the lock-keyed input archive cache is allowed.
 
 Produce machine-readable build and acceptance metadata, plus a readable summary. Include repository/source revisions, dirty-state indicators, source lock and patch hashes, host OS/Xcode/SDK identities, compiler/tool identities, effective GN arguments, profile identities, commands/log locations, signing details, artifact/bundle hashes, observed browser/CDP identity, extension identities, and individual test outcomes. Keep secrets and unnecessary environment contents out of reports.
 
@@ -199,6 +203,7 @@ export CHROMIUM_WORK_ROOT=/Volumes/dev/d/chromium-build/.work/macos-arm64
 /Volumes/dev/d/chromium-build/chromium-build --platform macos --arch arm64 --profile macos-release build
 /Volumes/dev/d/chromium-build/chromium-build --platform macos --arch arm64 --profile macos-release stage-runtime
 /Volumes/dev/d/chromium-build/chromium-build --platform macos --arch arm64 --profile macos-release test-staged
+/Volumes/dev/d/chromium-build/chromium-build --platform macos --arch arm64 --profile macos-release package
 ```
 
 Also support `test-staged --app /absolute/path/Chromium.app` to verify a relocated or supplied application without installing it. This must run the real Shadowdriver test, not just the packaging audit. Report the candidate/accepted paths explicitly. Document source updates, resumability, disk/cache cleanup, host prerequisites, exclusions, signing limitations, and how to diagnose missing tools or incompatible upstream patches. Keep documentation proportional to the actual interface.

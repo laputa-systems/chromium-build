@@ -24,7 +24,7 @@ usage() {
         '       chromium-build image [--arch arm64|amd64]' \
         '       chromium-build fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-e|gate-f|poc|build|stage-runtime|test-fast|test|test-staged [--arch arm64|amd64]' \
         '       chromium-build build-target <ninja-output-or-label> [--arch arm64|amd64]' \
-        '       chromium-build --platform macos doctor|smoke-preflight|update-lock|fetch|prepare|configure|build|cache-stats|stage-runtime|test-staged [--arch arm64]'
+        '       chromium-build --platform macos doctor|smoke-preflight|update-lock|fetch|prepare|configure|build|cache-stats|stage-runtime|package|test-staged [--arch arm64]'
 }
 
 command_name=
@@ -63,7 +63,7 @@ while [ "$#" -gt 0 ]; do
             LATEST=1
             shift
             ;;
-        image|fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-e|gate-f|poc|build|cache-stats|stage-runtime|test-fast|test|test-staged|doctor|smoke-preflight|update-lock|configure|reset|status)
+        image|fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-e|gate-f|poc|build|cache-stats|stage-runtime|package|test-fast|test|test-staged|doctor|smoke-preflight|update-lock|configure|reset|status)
             [ -z "$command_name" ] || fail 'only one command may be selected'
             command_name=$1
             shift
@@ -219,6 +219,7 @@ case "$command_name" in
     build) run_gate build.py ;;
     build-target) run_gate build-target.py "$BUILD_TARGET" ;;
     stage-runtime) run_gate stage-runtime.py --chrome "/work/out/$PROFILE/chrome" --output "/work/stage/$PROFILE" ;;
+    package) fail 'package is currently implemented only for the native macOS backend' ;;
     test-fast) run_gate test-fast-driver.py ;;
     test) run_gate test-functional-driver.py ;;
     test-staged) run_gate test-functional-driver.py ;;

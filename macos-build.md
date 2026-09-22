@@ -42,6 +42,7 @@ Run the phases in order:
 /Volumes/dev/d/chromium-build/chromium-build --platform macos --arch arm64 --profile macos-release build
 /Volumes/dev/d/chromium-build/chromium-build --platform macos --arch arm64 --profile macos-release stage-runtime
 /Volumes/dev/d/chromium-build/chromium-build --platform macos --arch arm64 --profile macos-release test-staged
+/Volumes/dev/d/chromium-build/chromium-build --platform macos --arch arm64 --profile macos-release package
 ```
 
 `stage-runtime` creates a signed candidate under the work root. `test-staged`
@@ -51,8 +52,13 @@ opens 32 distinct local pages concurrently. Only a passing candidate is
 copied to the accepted bundle directory. The bundle audit uses an owned,
 temporary work-root alias when Xcode's `otool` would interpret a helper name
 such as `Chromium Helper (Alerts)` as an archive member.
+`package` consumes that same signed and audited candidate and writes the zip and
+SHA-256 sidecar under the work-root `release` directory; it does not create a
+second packaging implementation or promote an unaccepted bundle.
 
-The source phase downloads the locked full Chromium archive, creates empty Git
+The source phase downloads the locked full Chromium archive, using bounded
+parallel HTTP ranges for large servers that support them and concurrent
+transfers for independent lock entries. It creates empty Git
 metadata for archive DEPS roots, and uses a shallow, blobless one-commit fetch
 only for the pinned depot_tools checkout. The subsequent `gclient` sync is
 restricted to non-Git GCS/CIPD inputs needed by the archive; it does not fetch
@@ -75,10 +81,11 @@ Shadowdriver references, use the explicit smoke scope:
 The repository also contains a workflow-dispatch-only macOS 26 full-build job at
 `.github/workflows/macos-26-smoke.yml`. It provisions the exact Rust nightly,
 checks the macOS 26+/SDK/Apple-toolchain/LLVM/disk contract, disables compiler
-caching, fetches and builds the locked Chromium source, signs and audits the
-bundle, and uploads it as a GitHub prerelease asset. Remote CI intentionally
-does not clone or run Shadowdriver; local `test-staged` remains the consumer
-acceptance gate.
+caching, restores or saves only the lock-keyed verified input archives, fetches
+and builds the locked Chromium source, signs and audits the bundle, and calls
+the same `package` command used locally before uploading the zip and checksum
+as GitHub prerelease assets. Remote CI intentionally does not clone or run
+Shadowdriver; local `test-staged` remains the consumer acceptance gate.
 
 Xcode 27 SDK TAPI inputs are not currently understood by the bundled lld, so
 the checked-in `macos-release` profile uses the Apple linker and disables
