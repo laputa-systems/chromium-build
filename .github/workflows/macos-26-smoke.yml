@@ -189,10 +189,10 @@ jobs:
           from pathlib import Path
 
           report = json.loads(
-              Path("/Volumes/dev/d/chromium-build/.work/macos-arm64/metadata/cache-stats.json")
+              Path("/Volumes/dev/d/chromium-build/.work/macos-arm64/metadata/compiler-cache-stats.json")
               .read_text(encoding="utf-8")
           )
-          assert report["compiler_cache"]["status"] == "disabled", report
+          assert report["cache"]["status"] == "disabled", report
           PY
 
       - name: Build Chromium for arm64
