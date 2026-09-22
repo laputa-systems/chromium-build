@@ -38,7 +38,10 @@ WORK_PREFIX = Path("/Volumes/dev")
 MIN_MACOS = (26, 0, 0)
 MIN_LLVM = (23, 1, 0)
 PREFERRED_LLVM = (23, 1, 1)
-FULL_BUILD_MIN_FREE_GB = 150
+# macos-26 hosted runners currently expose about 92 GiB free on /Volumes/dev.
+# Keep a 12 GiB headroom margin while allowing the real fetch/configure/build
+# phases to be the capacity proof rather than rejecting every hosted runner.
+FULL_BUILD_MIN_FREE_GB = 80
 RUST_TOOLCHAIN = "nightly-2026-09-15"
 DEFAULT_PROFILE = "macos-release"
 LOCK_RELATIVE = Path("config/macos.inputs.lock")

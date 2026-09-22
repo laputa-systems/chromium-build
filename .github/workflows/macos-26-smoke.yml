@@ -17,7 +17,7 @@ jobs:
     env:
       CHROMIUM_WORK_ROOT: /Volumes/dev/d/chromium-build/.work/macos-arm64
       MACOS_COMPILER_CACHE: off
-      MACOS_MIN_FREE_GB: "150"
+      MACOS_MIN_FREE_GB: "80"
       MACOS_REQUIRE_FULL_BUILD: "1"
       MACOS_REQUIRE_RUST_TOOLCHAIN: "1"
       MACOS_SKIP_ACCEPTANCE: "1"
@@ -138,7 +138,7 @@ jobs:
           assert report["checks"]["rust"]["toolchain"] == "nightly-2026-09-15", report
           assert report["checks"]["rust"]["components"] == ["rust-src", "llvm-tools-preview"], report
           assert report["checks"]["compiler_cache"]["status"] == "disabled", report
-          assert report["checks"]["filesystem"]["minimum_free_bytes"] >= 150 * 1024**3, report
+          assert report["checks"]["filesystem"]["minimum_free_bytes"] >= 80 * 1024**3, report
           for tool in ("llvm-ar", "llvm-nm", "llvm-objcopy", "llvm-strip"):
               assert tool in report["checks"]["llvm"]["tools"], report
           assert all(item["status"] == "skipped" for item in report["references"].values()), report
