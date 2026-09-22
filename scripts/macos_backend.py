@@ -38,6 +38,7 @@ WORK_PREFIX = Path("/Volumes/dev")
 MIN_MACOS = (26, 0, 0)
 MIN_LLVM = (23, 1, 0)
 PREFERRED_LLVM = (23, 1, 1)
+FULL_BUILD_MIN_FREE_GB = 150
 RUST_TOOLCHAIN = "nightly-2026-09-15"
 DEFAULT_PROFILE = "macos-release"
 LOCK_RELATIVE = Path("config/macos.inputs.lock")
@@ -576,9 +577,15 @@ def xcode_identity(environment: Mapping[str, str]) -> dict[str, str]:
         fail("Xcode is unavailable; finish the Xcode installation and ensure xcodebuild is usable")
     sdk = command_output(["xcrun", "--sdk", "macosx", "--show-sdk-version"], env=environment, check=False)
     clang = command_output(["xcrun", "--find", "clang"], env=environment, check=False)
-    if sdk.returncode or clang.returncode:
+    clangxx = command_output(["xcrun", "--find", "clang++"], env=environment, check=False)
+    linker = command_output(["xcrun", "--find", "ld"], env=environment, check=False)
+    if sdk.returncode or clang.returncode or clangxx.returncode or linker.returncode:
         fail("the selected Xcode installation cannot provide the macOS SDK and C compiler")
     clang_path = Path(clang.stdout.strip())
+    clangxx_path = Path(clangxx.stdout.strip())
+    linker_path = Path(linker.stdout.strip())
+    if not clang_path.is_file() or not clangxx_path.is_file() or not linker_path.is_file():
+        fail("the selected Xcode installation returned missing Apple C toolchain paths")
     clang_version = command_output([str(clang_path), "--version"], env=environment, check=False)
     metal = command_output(["xcrun", "--sdk", "macosx", "--find", "metal"], env=environment, check=False)
     if metal.returncode or not metal.stdout.strip() or not Path(metal.stdout.strip()).is_file():
@@ -606,6 +613,8 @@ def xcode_identity(environment: Mapping[str, str]) -> dict[str, str]:
         "xcode": (xcode.stdout or "").strip(),
         "sdk": (sdk.stdout or "").strip(),
         "clang": str(clang_path),
+        "clangxx": str(clangxx_path),
+        "linker": str(linker_path),
         "clang_version": (clang_version.stdout or "").strip(),
         "metal": metal.stdout.strip(),
         "metal_version": (metal_version.stdout or "").strip(),
@@ -652,6 +661,17 @@ def llvm_candidate(root: Path, environment: Mapping[str, str], source: str) -> O
     cxx = root / "bin" / "clang++"
     if not clang.is_file() or not cxx.is_file():
         return None
+    required_tools = {
+        name: root / "bin" / name
+        for name in ("llvm-ar", "llvm-nm", "llvm-objcopy", "llvm-strip")
+    }
+    if any(not path.is_file() for path in required_tools.values()):
+        return None
+    optional_tools = {
+        name: root / "bin" / name
+        for name in ("llvm-ranlib", "llvm-config")
+        if (root / "bin" / name).is_file()
+    }
     version_result = command_output([str(clang), "--version"], env=environment, check=False)
     if version_result.returncode:
         return None
@@ -677,6 +697,7 @@ def llvm_candidate(root: Path, environment: Mapping[str, str], source: str) -> O
         "version_tuple": version,
         "clang_output": version_result.stdout.strip(),
         "llvm_config_version": llvm_version,
+        "tools": {name: str(path) for name, path in {**required_tools, **optional_tools}.items()},
         "target": target_text,
         "preferred": version == PREFERRED_LLVM,
     }
@@ -742,13 +763,24 @@ def reference_state(path: Path, environment: Mapping[str, str]) -> dict[str, Any
 def run_doctor(layout: WorkLayout, *, require_references: bool = True) -> dict[str, Any]:
     layout.ensure()
     environment = isolated_environment(layout)
+    full_build_preflight = os.environ.get("MACOS_REQUIRE_FULL_BUILD", "0").lower() in {
+        "1",
+        "true",
+        "yes",
+    }
     report: dict[str, Any] = {
         "schema": 1,
         "platform": "macos",
         "architecture": host_platform.machine(),
         "work_root": str(layout.root),
         "paths": {"forbidden": ["/tmp", "~"], "root": str(WORK_PREFIX)},
-        "preflight_scope": "full" if require_references else "host-only-smoke",
+        "preflight_scope": (
+            "full"
+            if require_references
+            else "host-only-full-build"
+            if full_build_preflight
+            else "host-only-smoke"
+        ),
         "checks": {},
         "status": "failed",
     }
@@ -770,10 +802,17 @@ def run_doctor(layout: WorkLayout, *, require_references: bool = True) -> dict[s
             "translated": False,
         }
         xcode = xcode_identity(environment)
+        sdk_version = parse_version(xcode["sdk"])
+        if sdk_version < MIN_MACOS:
+            fail(
+                f"macOS SDK {version_string(MIN_MACOS)} or newer is required, "
+                f"got {version_string(sdk_version)}"
+            )
         apple_clang_version = parse_version(xcode["clang_version"])
         environment["XCODE_CLANG"] = xcode["clang"]
         report["checks"]["xcode"] = {
             **xcode,
+            "sdk_version": version_string(sdk_version),
             "apple_clang_version": version_string(apple_clang_version),
             "apple_clang_meets_llvm_floor": apple_clang_version >= MIN_LLVM,
         }
@@ -786,13 +825,23 @@ def run_doctor(layout: WorkLayout, *, require_references: bool = True) -> dict[s
             if key != "version_tuple"
         }
         free = shutil.disk_usage(WORK_PREFIX).free
-        minimum_free = int(os.environ.get("MACOS_MIN_FREE_GB", "150")) * 1024**3
+        configured_minimum_gb = int(
+            os.environ.get("MACOS_MIN_FREE_GB", str(FULL_BUILD_MIN_FREE_GB))
+        )
+        minimum_free = configured_minimum_gb * 1024**3
+        full_build_minimum = FULL_BUILD_MIN_FREE_GB * 1024**3
+        if (require_references or full_build_preflight) and minimum_free < full_build_minimum:
+            fail(
+                "full preflight cannot lower the free-space floor below "
+                f"{FULL_BUILD_MIN_FREE_GB} GiB"
+            )
         if free < minimum_free:
             fail(f"insufficient free space under /Volumes/dev: {free / 1024**3:.1f} GiB; need {minimum_free / 1024**3:.1f} GiB")
         report["checks"]["filesystem"] = {
             "mount": str(WORK_PREFIX),
             "free_bytes": free,
             "minimum_free_bytes": minimum_free,
+            "full_build_minimum_free_bytes": full_build_minimum,
         }
         refs: dict[str, Any] = {}
         for name, path in (
@@ -813,12 +862,61 @@ def run_doctor(layout: WorkLayout, *, require_references: bool = True) -> dict[s
         rustup = command_path("rustup", environment) or "/opt/homebrew/bin/rustup"
         if not Path(rustup).is_file():
             fail("rustup is required to provision the isolated nightly-2026-09-15 toolchain")
-        report["checks"]["rust"] = {
-            "rustup": rustup,
-            "toolchain": RUST_TOOLCHAIN,
-            "status": "bootstrap-required",
-            "install_root": str(layout.tools / "rustup"),
+        require_rust = os.environ.get("MACOS_REQUIRE_RUST_TOOLCHAIN", "0").lower() in {
+            "1",
+            "true",
+            "yes",
         }
+        if require_rust:
+            listed = command_output([rustup, "toolchain", "list"], env=environment, check=False)
+            if listed.returncode or not re.search(rf"(?m)^{re.escape(RUST_TOOLCHAIN)}(?:-|\s|$)", listed.stdout or ""):
+                fail(f"required Rust toolchain {RUST_TOOLCHAIN} is not installed in the isolated rustup home")
+            components = command_output(
+                [rustup, "component", "list", "--toolchain", RUST_TOOLCHAIN, "--installed"],
+                env=environment,
+                check=False,
+            )
+            installed_components = components.stdout or ""
+            required_components = {
+                "rust-src": r"(?m)^rust-src(?:\s|$)",
+                # rustup reports the preview component using its target-specific
+                # published name, for example llvm-tools-aarch64-apple-darwin.
+                "llvm-tools-preview": r"(?m)^llvm-tools(?:-preview)?(?:-|\s|$)",
+            }
+            missing_components = [
+                component
+                for component, pattern in required_components.items()
+                if not re.search(pattern, installed_components)
+            ]
+            if components.returncode or missing_components:
+                fail(
+                    f"Rust {RUST_TOOLCHAIN} is missing required components: "
+                    + ", ".join(missing_components)
+                )
+            rustc = command_output(
+                [rustup, "run", RUST_TOOLCHAIN, "rustc", "--version", "--verbose"],
+                env=environment,
+                check=False,
+            )
+            if rustc.returncode:
+                fail(f"Rust {RUST_TOOLCHAIN} cannot run from the isolated rustup home")
+            rust = {
+                "rustup": rustup,
+                "toolchain": RUST_TOOLCHAIN,
+                "status": "complete",
+                "install_root": str(layout.tools / "rustup"),
+                "components": ["rust-src", "llvm-tools-preview"],
+                "rustc": (rustc.stdout or "").strip(),
+            }
+        else:
+            rust = {
+                "rustup": rustup,
+                "toolchain": RUST_TOOLCHAIN,
+                "status": "bootstrap-required",
+                "install_root": str(layout.tools / "rustup"),
+                "components": ["rust-src", "llvm-tools-preview"],
+            }
+        report["checks"]["rust"] = rust
         report["status"] = "complete"
     except MacOSFailure as error:
         report["failure"] = str(error)
@@ -1306,7 +1404,7 @@ def clone_depot_tools(layout: WorkLayout, lock: Mapping[str, Any], environment: 
 
 
 def ensure_rust_toolchain(layout: WorkLayout, environment: Mapping[str, str]) -> dict[str, Any]:
-    rustup = command_path("rustup", os.environ) or "/opt/homebrew/bin/rustup"
+    rustup = command_path("rustup", environment) or "/opt/homebrew/bin/rustup"
     if not Path(rustup).is_file():
         fail("rustup is unavailable; install rustup without modifying this builder or set PATH to it")
     listed = command_output([rustup, "toolchain", "list"], env=environment, check=False)
@@ -1826,7 +1924,18 @@ def fetch_inputs(layout: WorkLayout) -> dict[str, Any]:
     entries = [download_locked(entry, layout.inputs) for entry in locked_entries(lock)]
     depot_tools = clone_depot_tools(layout, lock, environment)
     rust = ensure_rust_toolchain(layout, environment)
-    harness = fetch_acceptance_dependencies(layout, environment)
+    skip_acceptance = os.environ.get("MACOS_SKIP_ACCEPTANCE", "0").lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+    if skip_acceptance:
+        harness = {
+            "status": "skipped",
+            "reason": "remote full-build workflow packages the audited bundle without Shadowdriver acceptance",
+        }
+    else:
+        harness = fetch_acceptance_dependencies(layout, environment)
 
     source_state = layout.metadata / "source-acquired.json"
     if layout.source.exists() and any(layout.source.iterdir()):

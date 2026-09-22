@@ -72,10 +72,13 @@ Shadowdriver references, use the explicit smoke scope:
 /Volumes/dev/d/chromium-build/chromium-build --platform macos --arch arm64 --profile macos-release smoke-preflight
 ```
 
-The repository also contains a workflow-dispatch-only macOS 26 job at
+The repository also contains a workflow-dispatch-only macOS 26 full-build job at
 `.github/workflows/macos-26-smoke.yml`. It provisions the exact Rust nightly,
-uses LLVM 23.1.0 or newer, disables compiler caching, and compiles a tiny arm64
-C++ program without fetching Chromium source.
+checks the macOS 26+/SDK/Apple-toolchain/LLVM/disk contract, disables compiler
+caching, fetches and builds the locked Chromium source, signs and audits the
+bundle, and uploads it as a GitHub prerelease asset. Remote CI intentionally
+does not clone or run Shadowdriver; local `test-staged` remains the consumer
+acceptance gate.
 
 Xcode 27 SDK TAPI inputs are not currently understood by the bundled lld, so
 the checked-in `macos-release` profile uses the Apple linker and disables

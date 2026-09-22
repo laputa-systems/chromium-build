@@ -175,10 +175,14 @@ Complete and record these gates:
 | Consumer | Actual Shadowdriver API succeeds against the staged executable with recorded identity. |
 | Hygiene | Disposable state remains contained; no unintended host/reference mutation or surviving owned processes. |
 
-The CI smoke workflow is an additional fast gate: it must remain
-`workflow_dispatch`-only, use `runs-on: macos-26`, write project state under
-`/Volumes/dev`, pass macOS/Apple-toolchain/LLVM/Rust preflight, and produce a
-successful tiny arm64 compile with caching explicitly disabled.
+The remote macOS workflow is an additional `workflow_dispatch`-only full-build
+gate: it must use `runs-on: macos-26`, write project state under `/Volumes/dev`,
+pass the strict macOS/SDK/Apple-toolchain/LLVM/Rust/disk preflight, fetch and
+configure the locked source, complete a native arm64 release build, and sign
+and audit the resulting app before uploading it as a prerelease asset. Remote
+CI intentionally omits the local-only Shadowdriver acceptance dependency;
+`stage-runtime` remains mandatory, and the prerelease metadata must say that
+acceptance was not run remotely. Compiler caching is explicitly disabled.
 
 Produce machine-readable build and acceptance metadata, plus a readable summary. Include repository/source revisions, dirty-state indicators, source lock and patch hashes, host OS/Xcode/SDK identities, compiler/tool identities, effective GN arguments, profile identities, commands/log locations, signing details, artifact/bundle hashes, observed browser/CDP identity, extension identities, and individual test outcomes. Keep secrets and unnecessary environment contents out of reports.
 

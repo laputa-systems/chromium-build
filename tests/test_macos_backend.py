@@ -113,6 +113,8 @@ class MacOSBackendTests(unittest.TestCase):
             result(stdout="Xcode 27.0\nBuild version 27A266a\n"),
             result(stdout="27.0\n"),
             result(stdout="/usr/bin/clang\n"),
+            result(stdout="/usr/bin/clang++\n"),
+            result(stdout="/usr/bin/ld\n"),
             result(stdout="Apple clang version 21.0.0\n"),
             result(stdout="/usr/bin/clang\n"),
             result(stderr=missing_metal, returncode=1),
@@ -120,6 +122,31 @@ class MacOSBackendTests(unittest.TestCase):
         with mock.patch.object(backend, "command_output", side_effect=responses):
             with self.assertRaisesRegex(backend.MacOSFailure, "Metal Toolchain is unavailable"):
                 backend.xcode_identity({})
+
+    def test_llvm_candidate_requires_native_binutils(self):
+        llvm = self.root / "llvm"
+        bin_dir = llvm / "bin"
+        bin_dir.mkdir(parents=True)
+        for name in ("clang", "clang++", "llvm-ar", "llvm-nm", "llvm-objcopy", "llvm-strip"):
+            (bin_dir / name).write_text("", encoding="utf-8")
+
+        def result(stdout="", stderr="", returncode=0):
+            return mock.Mock(stdout=stdout, stderr=stderr, returncode=returncode)
+
+        with mock.patch.object(
+            backend,
+            "command_output",
+            side_effect=[
+                result(stdout="clang version 23.1.1\n"),
+                result(stdout="arm64-apple-darwin\n"),
+            ],
+        ):
+            candidate = backend.llvm_candidate(llvm, {}, "test")
+        self.assertIsNotNone(candidate)
+        self.assertEqual(candidate["tools"]["llvm-ar"], str(bin_dir / "llvm-ar"))
+        (bin_dir / "llvm-strip").unlink()
+        with mock.patch.object(backend, "command_output"):
+            self.assertIsNone(backend.llvm_candidate(llvm, {}, "test"))
 
     def test_depot_tools_fetch_is_one_filtered_depth_one_commit(self):
         layout = backend.WorkLayout(self.root, self.repo)
