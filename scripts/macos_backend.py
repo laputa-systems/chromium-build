@@ -42,6 +42,7 @@ PREFERRED_LLVM = (23, 1, 1)
 # Keep a 12 GiB headroom margin while allowing the real fetch/configure/build
 # phases to be the capacity proof rather than rejecting every hosted runner.
 FULL_BUILD_MIN_FREE_GB = 80
+POST_FETCH_MIN_FREE_GB = 40
 RUST_TOOLCHAIN = "nightly-2026-09-15"
 DEFAULT_PROFILE = "macos-release"
 LOCK_RELATIVE = Path("config/macos.inputs.lock")
@@ -763,7 +764,13 @@ def reference_state(path: Path, environment: Mapping[str, str]) -> dict[str, Any
     }
 
 
-def run_doctor(layout: WorkLayout, *, require_references: bool = True) -> dict[str, Any]:
+def run_doctor(
+    layout: WorkLayout,
+    *,
+    require_references: bool = True,
+    minimum_free_gb: Optional[int] = None,
+    enforce_full_build_floor: bool = True,
+) -> dict[str, Any]:
     layout.ensure()
     environment = isolated_environment(layout)
     full_build_preflight = os.environ.get("MACOS_REQUIRE_FULL_BUILD", "0").lower() in {
@@ -828,12 +835,14 @@ def run_doctor(layout: WorkLayout, *, require_references: bool = True) -> dict[s
             if key != "version_tuple"
         }
         free = shutil.disk_usage(WORK_PREFIX).free
-        configured_minimum_gb = int(
-            os.environ.get("MACOS_MIN_FREE_GB", str(FULL_BUILD_MIN_FREE_GB))
+        configured_minimum_gb = (
+            minimum_free_gb
+            if minimum_free_gb is not None
+            else int(os.environ.get("MACOS_MIN_FREE_GB", str(FULL_BUILD_MIN_FREE_GB)))
         )
         minimum_free = configured_minimum_gb * 1024**3
         full_build_minimum = FULL_BUILD_MIN_FREE_GB * 1024**3
-        if (require_references or full_build_preflight) and minimum_free < full_build_minimum:
+        if enforce_full_build_floor and (require_references or full_build_preflight) and minimum_free < full_build_minimum:
             fail(
                 "full preflight cannot lower the free-space floor below "
                 f"{FULL_BUILD_MIN_FREE_GB} GiB"
@@ -1241,15 +1250,18 @@ def load_lock(layout: WorkLayout) -> dict[str, Any]:
     return lock
 
 
-def locked_entries(lock: Mapping[str, Any]) -> list[dict[str, Any]]:
+def locked_entries(lock: Mapping[str, Any], *, include_test_inputs: bool = True) -> list[dict[str, Any]]:
     entries = []
     for name, value in (
         ("chromium", lock["chromium"]["source"]),
         ("ungoogled", lock["ungoogled"]["source"]),
-        ("ublock_origin", lock["test_inputs"]["ublock_origin"]),
     ):
         item = dict(value)
         item["name"] = name
+        entries.append(item)
+    if include_test_inputs:
+        item = dict(lock["test_inputs"]["ublock_origin"])
+        item["name"] = "ublock_origin"
         entries.append(item)
     return entries
 
@@ -1924,14 +1936,17 @@ def fetch_inputs(layout: WorkLayout) -> dict[str, Any]:
     layout.ensure()
     lock = load_lock(layout)
     environment = isolated_environment(layout, network="fetch")
-    entries = [download_locked(entry, layout.inputs) for entry in locked_entries(lock)]
-    depot_tools = clone_depot_tools(layout, lock, environment)
-    rust = ensure_rust_toolchain(layout, environment)
     skip_acceptance = os.environ.get("MACOS_SKIP_ACCEPTANCE", "0").lower() in {
         "1",
         "true",
         "yes",
     }
+    entries = [
+        download_locked(entry, layout.inputs)
+        for entry in locked_entries(lock, include_test_inputs=not skip_acceptance)
+    ]
+    depot_tools = clone_depot_tools(layout, lock, environment)
+    rust = ensure_rust_toolchain(layout, environment)
     if skip_acceptance:
         harness = {
             "status": "skipped",
@@ -2571,7 +2586,15 @@ def configure_source(layout: WorkLayout) -> dict[str, Any]:
         fail("source preparation is not complete; run prepare")
     source = layout.source
     environment = isolated_environment(layout, network="none")
-    run_doctor(layout)
+    post_fetch_minimum = int(
+        os.environ.get("MACOS_POST_FETCH_MIN_FREE_GB", str(POST_FETCH_MIN_FREE_GB))
+    )
+    run_doctor(
+        layout,
+        require_references=False,
+        minimum_free_gb=post_fetch_minimum,
+        enforce_full_build_floor=False,
+    )
     environment, llvm, xcode = toolchain_environment(layout, source, environment)
     profile_path = layout.repo_root / "config" / "profiles" / f"{DEFAULT_PROFILE}.gn"
     if not profile_path.is_file():

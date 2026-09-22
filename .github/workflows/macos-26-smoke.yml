@@ -18,6 +18,7 @@ jobs:
       CHROMIUM_WORK_ROOT: /Volumes/dev/d/chromium-build/.work/macos-arm64
       MACOS_COMPILER_CACHE: off
       MACOS_MIN_FREE_GB: "80"
+      MACOS_POST_FETCH_MIN_FREE_GB: "40"
       MACOS_REQUIRE_FULL_BUILD: "1"
       MACOS_REQUIRE_RUST_TOOLCHAIN: "1"
       MACOS_SKIP_ACCEPTANCE: "1"
