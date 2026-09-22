@@ -35,6 +35,27 @@ jobs:
             "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" \
             /Volumes/dev/d/chromium-build
 
+      - name: Claim the policy work root
+        working-directory: /Volumes/dev/d/chromium-build
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import sys
+
+          sys.path.insert(0, "scripts")
+          import macos_backend
+
+          repo = Path("/Volumes/dev/d/chromium-build").resolve()
+          layout = macos_backend.WorkLayout(
+              Path("/Volumes/dev/d/chromium-build/.work/macos-arm64"),
+              repo,
+          )
+          layout.ensure()
+          print(layout.root)
+          PY
+
       - name: Provision ephemeral LLVM and Rust prerequisites
         shell: bash
         run: |
