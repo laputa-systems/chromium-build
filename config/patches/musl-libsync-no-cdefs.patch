@@ -1,0 +1,12 @@
+--- a/third_party/libsync/src/include/ndk/sync.h
++++ b/third_party/libsync/src/include/ndk/sync.h
+@@ -27,7 +27,9 @@
+ #define ANDROID_SYNC_H
+ 
+ #include <stdint.h>
++#if defined(__GLIBC__)
+ #include <sys/cdefs.h>
++#endif
+ 
+ #include <linux/sync_file.h>
+ 

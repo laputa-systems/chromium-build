@@ -1,5 +1,10 @@
-diff --git a/build/rust/gni_impl/run_bindgen.py b/build/rust/gni_impl/run_bindgen.py
 --- a/build/rust/gni_impl/run_bindgen.py
 +++ b/build/rust/gni_impl/run_bindgen.py
-@@ -115,0 +116,1 @@
-+    genargs.append('-Wno-unknown-warning-option')
+@@ -135,6 +135,7 @@
+         genargs.append(args.header)
+         genargs.append('--')
+         genargs.extend(filter_clang_args(args.clangargs))
++        genargs.append('-Wno-unknown-warning-option')
+         env = os.environ
+         if args.ld_library_path:
+             if sys.platform == 'darwin':

@@ -28,7 +28,7 @@ def main() -> None:
     metadata = Path(os.environ.get("CHROMIUM_METADATA_ROOT", work / "metadata"))
     ninja = os.environ.get("NINJA", "ninja")
     gn = os.environ.get("GN", "gn")
-    readelf = os.environ.get("READELF", "/opt/llvm-musl/bin/llvm-readelf")
+    readelf = os.environ.get("READELF", "/opt/chromium-llvm/bin/llvm-readelf")
     timeout = float(os.environ.get("GATE_E_TIMEOUT", "300"))
     if os.environ.get("NETWORK_MODE", "none") != "none":
         raise ScriptFailure("smoke build requires NETWORK_MODE=none")
@@ -50,7 +50,7 @@ def main() -> None:
         raise ScriptFailure("hermetic smoke target failed to build")
     command_result = run([ninja, "-C", str(out), "-t", "commands", ninja_target], capture_output=True)
     commands.write_text(command_result.stdout, encoding="utf-8")
-    for required in ("-fexceptions", "-pthread", "/opt/llvm-musl/lib/libc++.a", "/opt/llvm-musl/lib/libc++abi.a", "/opt/llvm-musl/lib/libunwind.a"):
+    for required in ("-fexceptions", "-pthread", "libc++", "libc++abi"):
         if required not in command_result.stdout:
             raise ScriptFailure(f"smoke commands omit {required}")
     description = run([gn, "desc", str(out), target_label, "outputs", f"--root={source}"], capture_output=True)
@@ -82,7 +82,7 @@ def main() -> None:
                 "target_built": True,
                 "exceptions_enabled": True,
                 "threads_enabled": True,
-                "external_static_libcxx": True,
+                "chromium_in_tree_libcxx": True,
                 "musl_interpreter": True,
                 "no_forbidden_gnu_runtime": True,
                 "target_ran": True,

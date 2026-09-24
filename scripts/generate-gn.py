@@ -81,7 +81,8 @@ def main() -> None:
             str(probe_file),
         ]
     )
-    args = " ".join(args_file.read_text(encoding="utf-8").splitlines())
+    # GN comments end at a newline; preserve the rendered profile's line breaks.
+    args = args_file.read_text(encoding="utf-8")
     out.mkdir(parents=True, exist_ok=True)
     gn_log = metadata / "gn-gen.log"
     generated = run(

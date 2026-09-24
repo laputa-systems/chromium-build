@@ -1,12 +1,23 @@
-diff --git a/net/socket/udp_socket_posix.cc b/net/socket/udp_socket_posix.cc
 --- a/net/socket/udp_socket_posix.cc
 +++ b/net/socket/udp_socket_posix.cc
-@@ -925,0 +925,4 @@
+@@ -1089,6 +1089,10 @@
+     return;
+   }
+ 
 +#if defined(__linux__) && !defined(__GLIBC__)
 +#pragma GCC diagnostic push
 +#pragma GCC diagnostic ignored "-Wsign-compare"
 +#endif
-@@ -945,0 +949,3 @@
+   for (struct cmsghdr* cmsg = CMSG_FIRSTHDR(msg);
+        cmsg != nullptr &&
+        (!result->tos.has_value() ||
+@@ -1144,6 +1148,9 @@
+     }
+ #endif
+   }
 +#if defined(__linux__) && !defined(__GLIBC__)
 +#pragma GCC diagnostic pop
 +#endif
+ }
+ 
+ base::expected<DatagramsMetadata, Error> UDPSocketPosix::InternalReadMultiple(

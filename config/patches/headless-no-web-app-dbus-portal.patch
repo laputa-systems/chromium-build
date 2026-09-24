@@ -1,0 +1,22 @@
+--- a/chrome/browser/web_applications/BUILD.gn
++++ b/chrome/browser/web_applications/BUILD.gn
+@@ -457,13 +457,17 @@
+   if (is_linux) {
+     # Desktop linux, doesn't count ChromeOS.
+     sources += [
+-      "os_integration/dynamic_launcher_portal.cc",
+-      "os_integration/dynamic_launcher_portal.h",
+       "os_integration/web_app_file_handler_registration_linux.cc",
+       "os_integration/web_app_run_on_os_login_linux.cc",
+       "os_integration/web_app_shortcut_linux.cc",
+       "os_integration/web_app_shortcut_linux.h",
+     ]
++    if (use_dbus) {
++      sources += [
++        "os_integration/dynamic_launcher_portal.cc",
++        "os_integration/dynamic_launcher_portal.h",
++      ]
++    }
+   }
+ 
+   if (is_mac) {

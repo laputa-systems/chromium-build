@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import json
 from pathlib import Path
 import shutil
 import tarfile
@@ -13,9 +14,9 @@ from script_support import ScriptFailure, atomic_write, fail_main, require_file,
 
 
 LOCAL_PATCHES = (
-    "laputa-external-libcxx.patch",
     "gate-e-hermetic-smoke.patch",
     "headless-no-devtools.patch",
+    "devtools-use-bundled-typescript.patch",
     "headless-devtools-protocol-without-frontend.patch",
     "headless-devtools-browser-without-frontend.patch",
     "headless-devtools-runtime-without-frontend.patch",
@@ -53,15 +54,20 @@ LOCAL_PATCHES = (
     "musl-sandbox-cmsg-sign-compare.patch",
     "musl-sys-poll-compat-overlay.patch",
     "musl-v8-sanitizer-header.patch",
+    "headless-link-dawn-drm-and-variations.patch",
+    "headless-no-suspicious-site-bubble.patch",
     "headless-dawn-vulkan-headers.patch",
     "headless-pdf-without-printing.patch",
     "headless-no-printing-test-dep.patch",
     "headless-no-linux-v4l2.patch",
     "headless-no-linux-v4l2-tracker.patch",
     "headless-no-dbus-backend-linkage.patch",
-    "headless-link-dawn-drm-and-variations.patch",
+    "headless-no-web-app-dbus-portal.patch",
+    "headless-global-accelerator-no-dbus-return.patch",
     "musl-fontconfig-no-nls.patch",
     "musl-fontconfig-random.patch",
+    "musl-expat-hash-salt-2-8.patch",
+    "musl-libsync-no-cdefs.patch",
     "musl-bindgen-clang22.patch",
     "alpine-rust-bootstrap.patch",
     "alpine-node-version.patch",
@@ -75,6 +81,7 @@ LOCAL_PATCHES = (
     "musl-native-egl-share-group.patch",
     "musl-native-egl-semaphore-share-group.patch",
     "musl-gpu-sandbox-tsync.patch",
+    "musl-gpu-sched-affinity-errno.patch",
     "musl-gpu-sandbox-broker-tsync.patch",
     "musl-gpu-pwritev2-sandbox.patch",
     "musl-abseil-clang23-lifetime-capture.patch",
@@ -100,7 +107,8 @@ def main() -> None:
     arch = os.environ.get("CHROMIUM_ARCH", "arm64")
     require_network("none", "preparation")
     require_file(metadata / "fetch-complete.stamp", "fetch has not completed")
-    archive = inputs / "chromium-150.0.7871.114-linux.tar.xz"
+    lock = json.loads(require_file(root / "config/inputs.lock").read_text(encoding="utf-8"))
+    archive = inputs / lock["chromium"]["archive_filename"]
     require_file(archive, "Chromium archive is missing")
     if source.exists():
         raise ScriptFailure("prepared source already exists; preserve or move it before preparing")
@@ -111,12 +119,7 @@ def main() -> None:
     config = Path(tempfile.mkdtemp(prefix="prepare-inputs.", dir=work))
     try:
         extract(archive, temp)
-        for name in (
-            "ungoogled-2d89b04e1b68385c9086efab0df1e3679b35246e.tar.gz",
-            "portablelinux-0033e274f91ec6aa57a36a486f41f46d801e381d.tar.gz",
-            "alpine-aports-bc56128509194816d5cd3441d17c20ca2d71cc68.tar.gz",
-            "copium-150.0.tar.gz",
-        ):
+        for name in (entry["filename"] for entry in lock["source_inputs"].values()):
             extract(require_file(inputs / name, f"missing preparation input {name}"), config)
         candidates = [path.parent.parent for path in temp.rglob("chrome/VERSION")]
         if not candidates:

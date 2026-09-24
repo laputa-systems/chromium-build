@@ -163,12 +163,12 @@ def toolchain_checks(args):
     selection = read_json(args.toolchain_selection)
     require(selection.get("status") == "complete", "toolchain selection report is incomplete")
     require(selection.get("network") == "none", "toolchain selection used network")
-    require(selection.get("bundled_toolchain_selected") is False, "a bundled Chromium toolchain is selected")
+    require(selection.get("chromium_prebuilt_selected") is True, "the Chromium prebuilt compiler is not selected")
     require(selection.get("sysroot_selected") is False, "a Chromium sysroot is selected")
     require(selection.get("forbidden_selected") == [], "a forbidden toolchain or download script is selected")
     for key in ("compiler", "cxx", "linker", "ar", "rust_linker"):
         value = selection.get(key, "")
-        require(value.startswith("/opt/llvm-musl/"), f"toolchain selection {key} is outside Laputa")
+        require(value.startswith("/opt/chromium-llvm/"), f"toolchain selection {key} is outside Chromium LLVM")
     require(selection.get("rust_target_triple") in {"aarch64-alpine-linux-musl", "x86_64-alpine-linux-musl"}, "Rust target triple is not an approved Alpine musl target")
 
 

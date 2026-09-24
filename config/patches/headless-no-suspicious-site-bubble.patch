@@ -1,0 +1,43 @@
+--- a/chrome/browser/ui/views/page_info/BUILD.gn
++++ b/chrome/browser/ui/views/page_info/BUILD.gn
+@@ -2,6 +2,7 @@
+ # Use of this source code is governed by a BSD-style license that can be
+ # found in the LICENSE file.
+ 
++import("//components/safe_browsing/buildflags.gni")
+ import("//extensions/buildflags/buildflags.gni")
+ 
+ source_set("page_info") {
+@@ -31,6 +32,10 @@
+     "web_view_side_panel_view.h",
+   ]
+ 
++  if (safe_browsing_mode == 0) {
++    public -= [ "suspicious_site_bubble_view.h" ]
++  }
++
+   public_deps = [
+     "//base",
+     "//chrome/browser/lookalikes",
+@@ -78,6 +83,10 @@
+     "suspicious_site_bubble_view.cc",
+     "web_view_side_panel_view.cc",
+   ]
++
++  if (safe_browsing_mode == 0) {
++    sources -= [ "suspicious_site_bubble_view.cc" ]
++  }
+ 
+   deps = [
+     ":page_info",
+@@ -118,6 +127,10 @@
+     "//ui/views",
+   ]
+ 
++  if (safe_browsing_mode != 0) {
++    deps += [ "//chrome/browser/safe_browsing/suspicious_site_warnings" ]
++  }
++
+   if (enable_extensions) {
+     deps += [ "//chrome/browser/extensions" ]
+   }

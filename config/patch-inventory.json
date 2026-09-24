@@ -3,16 +3,20 @@
   "layers": [
     {
       "project": "portablelinux",
-      "revision": "0033e274f91ec6aa57a36a486f41f46d801e381d",
+      "revision": "effeae1d0728db00ed21cbf603af88e0fc38f97b",
       "patches": [
         "drop-nodejs-version-check.patch",
+        "use-oauth2-client-switches-as-default.patch",
         "fix-compiling-on-arm64.patch",
-        "use-oauth2-client-switches-as-default.patch"
+        "revert-crubit-changes.patch",
+        "revert-public-input-changes.patch",
+        "revert-python-path-adjustement.patch",
+        "revert-tsgo-usage.patch"
       ]
     },
     {
       "project": "alpine",
-      "revision": "bc56128509194816d5cd3441d17c20ca2d71cc68",
+      "revision": "4a3cc589c1e0ad0f7a26b519014e6322e1d5c419",
       "patches": [
         "0001-hotfix-ignore-a-new-warning-in-rust-1.89.patch",
         "compiler.patch",
@@ -24,6 +28,7 @@
         "gdbinit.patch",
         "generic-sensor-include.patch",
         "headless-shell-no-license.patch",
+        "musl-reserved-stack-limit.patch",
         "musl-sandbox.patch",
         "musl-tid-caching.patch",
         "net-test-no-vpython.patch",
@@ -34,12 +39,13 @@
         "no-sandbox-settls.patch",
         "partalloc-no-tagging-arm64.patch",
         "pvalloc.patch",
+        "rust-cbor.patch",
         "temp-failure-retry.patch"
       ]
     },
     {
       "project": "copium",
-      "revision": "150.0",
+      "revision": "153.0",
       "patches": [
         "cr133-ffmpeg-no-noh264parse.patch",
         "cr138-node-version-check.patch",
@@ -55,10 +61,16 @@
         "cr148-v8-no-san-trap.patch",
         "cr149-musl-alloc-shim-dispatch.patch",
         "cr149-rust-toolchain-var.patch",
-        "cr149-unbundle-minizip-undo-unicode.patch",
-        "cr150-empty-ar.patch",
-        "cr150-ffmpeg-no-agtm.patch",
-        "cr150-no-sysroot-modules.patch"
+        "cr151-dawn-armv7-is-real.patch",
+        "cr151-dawn-cgo_enabled.patch",
+        "cr152-dawn-clang-22.patch",
+        "cr152-ffmpeg-no-agtm.patch",
+        "cr152-unbundle-minizip-undo-unicode.patch",
+        "cr152-unbundle-opus-devtools.patch",
+        "cr153-no-python-vendoring.patch",
+        "cr153-typescript-break-definitions.patch",
+        "cr153-unbundle-opus-iamf.patch",
+        "cr153-uncrubit-blink-opentype.patch"
       ]
     }
   ]

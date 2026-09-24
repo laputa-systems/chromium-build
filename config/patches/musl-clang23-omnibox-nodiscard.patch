@@ -1,8 +1,13 @@
-diff --git a/components/omnibox/browser/autocomplete_result.cc b/components/omnibox/browser/autocomplete_result.cc
 --- a/components/omnibox/browser/autocomplete_result.cc
 +++ b/components/omnibox/browser/autocomplete_result.cc
-@@ -856,2 +856,2 @@
--        *matches_.insert(matches_.begin() + i + 1,
--                         matches_[i].CreateActionMatch(j));
+@@ -875,8 +875,8 @@
+     }
+     for (size_t j = 0; j < matches_[i].actions.size(); j++) {
+       if (matches_[i].actions[j]->ActionId() == OmniboxActionId::PEDAL) {
+-        matches_.insert(matches_.begin() + i + 1,
+-                        matches_[i].CreateActionMatch(j));
 +        static_cast<void>(matches_.insert(
 +            matches_.begin() + i + 1, matches_[i].CreateActionMatch(j)));
+         // Remove this action from the primary match and repeat checking at this
+         // same index, which will hence be the next action.
+         matches_[i].actions.erase(matches_[i].actions.begin() + j);

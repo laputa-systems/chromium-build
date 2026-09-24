@@ -3,3 +3,17 @@ diff --git a/chrome/browser/ui/blocked_content/BUILD.gn b/chrome/browser/ui/bloc
 +++ b/chrome/browser/ui/blocked_content/BUILD.gn
 @@ -112,1 +112,0 @@
 -      "//chrome/browser/printing",
+diff --git a/chrome/test/BUILD.gn b/chrome/test/BUILD.gn
+--- a/chrome/test/BUILD.gn
++++ b/chrome/test/BUILD.gn
+@@ -8822,7 +8822,9 @@
+       "//chrome/browser/ui/views/location_bar:interactive_ui_tests",
+       "//chrome/browser/ui/views/location_bar/cookie_controls:interactive_ui_tests",
+       "//chrome/browser/ui/views/tabs/groups:interactive_ui_tests",
+-      "//chrome/browser/ui/webui/print_preview:interactive_ui_tests",
+     ]
++    if (enable_print_preview) {
++      deps += [ "//chrome/browser/ui/webui/print_preview:interactive_ui_tests" ]
++    }
+ 
+     if (!is_chrome_for_testing) {

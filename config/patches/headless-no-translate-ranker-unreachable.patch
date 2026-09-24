@@ -1,12 +1,23 @@
-diff --git a/components/translate/core/browser/translate_ranker_impl.cc b/components/translate/core/browser/translate_ranker_impl.cc
 --- a/components/translate/core/browser/translate_ranker_impl.cc
 +++ b/components/translate/core/browser/translate_ranker_impl.cc
-@@ -230,0 +231,4 @@
+@@ -226,6 +226,10 @@
+ 
+   return kDefaultResponse;
+ 
 +#if defined(__clang__)
 +#pragma clang diagnostic push
 +#pragma clang diagnostic ignored "-Wunreachable-code"
 +#endif
-@@ -269,0 +274,3 @@
+   translate_event->set_ranker_request_timestamp_sec(
+       (base::TimeTicks::Now() - base::TimeTicks()).InSeconds());
+   translate_event->set_ranker_version(GetModelVersion());
+@@ -263,6 +267,9 @@
+   }
+ 
+   return result;
 +#if defined(__clang__)
 +#pragma clang diagnostic pop
 +#endif
+ }
+ 
+ bool TranslateRankerImpl::GetModelDecision(

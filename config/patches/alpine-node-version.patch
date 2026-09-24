@@ -6,6 +6,6 @@ diff --git a/third_party/node/update_node_binaries b/third_party/node/update_nod
  
  BASE_URL="https://nodejs.org/dist"
 -NODE_VERSION="v24.12.0"
-+NODE_VERSION="v24.17.0"
++NODE_VERSION="v24.18.1"
  
  upload=false  # Default value

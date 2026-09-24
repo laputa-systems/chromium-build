@@ -1,0 +1,13 @@
+--- a/sandbox/policy/linux/bpf_gpu_policy_linux.cc
++++ b/sandbox/policy/linux/bpf_gpu_policy_linux.cc
+@@ -104,7 +104,9 @@
+     case __NR_uname:  // https://crbug.com/1075934
+       return Allow();
+     case __NR_sched_setaffinity:
+-      return RestrictSchedTarget(GetPolicyPid(), sysno);
++      // Mesa llvmpipe may try to pin another worker thread. Deny that
++      // request without crashing the sandboxed GPU process.
++      return Error(EPERM);
+     case __NR_prlimit64:
+       return RestrictPrlimit64(GetPolicyPid());
+     case __NR_memfd_create:

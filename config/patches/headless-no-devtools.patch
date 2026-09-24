@@ -38,10 +38,18 @@ diff --git a/chrome/browser/devtools/BUILD.gn b/chrome/browser/devtools/BUILD.gn
 @@ -363,1 +363,1 @@
 -    if (enable_service_discovery) {
 +    if (defined(enable_service_discovery) && enable_service_discovery) {
+@@ -591,6 +591,6 @@
+       "//crypto:test_support",
+     ]
+ 
+-    if (enable_service_discovery) {
++    if (defined(enable_service_discovery) && enable_service_discovery) {
+       sources += [ "device/cast_device_provider_unittest.cc" ]
+     }
 diff --git a/build/rust/std/BUILD.gn b/build/rust/std/BUILD.gn
 --- a/build/rust/std/BUILD.gn
 +++ b/build/rust/std/BUILD.gn
 @@ -296,2 +296,2 @@
          "--rustc-revision",
 -        rustc_revision,
-+        "alpine-rust-1.96.0",
++        "alpine-rust-1.96.1",

@@ -1,0 +1,11 @@
+--- a/ui/base/accelerators/global_accelerator_listener/global_accelerator_listener_ozone.cc
++++ b/ui/base/accelerators/global_accelerator_listener/global_accelerator_listener_ozone.cc
+@@ -68,6 +68,8 @@
+         new GlobalAcceleratorListenerLinux(nullptr, GetSessionName());
+     return linux_instance;
+   }
++  return nullptr;
++#else
+   return nullptr;
+ #endif
+ }

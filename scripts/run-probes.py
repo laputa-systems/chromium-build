@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run Gate B's direct compiler, linker, runtime, and package probes."""
+"""Run Gate B C/linker probes; Gate E tests Chromium's in-tree C++ runtime."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ def main() -> None:
     metadata = Path(os.environ.get("CHROMIUM_METADATA_ROOT", "/work/metadata"))
     out = Path(os.environ.get("PROBE_ROOT", "/work/test-output/gate-b"))
     arch = os.environ.get("CHROMIUM_ARCH", "arm64")
-    llvm = Path(os.environ.get("LLVM_ROOT", "/opt/llvm-musl"))
+    llvm = Path(os.environ.get("LLVM_ROOT", "/opt/chromium-llvm"))
     cc = os.environ.get("CC", str(llvm / "bin/clang"))
     cxx = os.environ.get("CXX", str(llvm / "bin/clang++"))
     ar = os.environ.get("AR", str(llvm / "bin/llvm-ar"))
@@ -60,9 +60,6 @@ def main() -> None:
     def compile_c(name: str, *extra: str) -> None:
         step(f"{name}-compile", [cc, "-std=c11", "-Wall", "-Wextra", "-Werror", "-O0", *extra])
 
-    def compile_cpp(name: str, *extra: str) -> None:
-        step(f"{name}-compile", [cxx, "-std=c++20", "-Wall", "-Wextra", "-Werror", "-O0", "-fexceptions", "-frtti", f"-L{llvm / 'lib'}", *extra])
-
     def check_elf(name: str, file: Path) -> None:
         headers = run([readelf, "-l", str(file)], capture_output=True).stdout
         match = re.search(r"Requesting program interpreter: ([^]]+)\]", headers)
@@ -81,9 +78,6 @@ def main() -> None:
     compile_c("c-runtime", str(source / "c_runtime.c"), "-o", str(out / "c-runtime"), "-pthread")
     step("c-runtime-run", [str(out / "c-runtime")])
     check_elf("c-runtime", out / "c-runtime")
-    compile_cpp("cpp-runtime", str(source / "cpp_runtime.cc"), "-o", str(out / "cpp-runtime"), "-pthread")
-    step("cpp-runtime-run", [str(out / "cpp-runtime")])
-    check_elf("cpp-runtime", out / "cpp-runtime")
     compile_c("archive-member", "-c", str(source / "archive_member.c"), "-o", str(out / "objects/archive_member.o"))
     step("archive-create", [ar, "rcs", str(out / "libarchive-probe.a"), str(out / "objects/archive_member.o")])
     step("archive-index", [ranlib, str(out / "libarchive-probe.a")])
@@ -116,7 +110,7 @@ def main() -> None:
         for path in out.rglob("*")
         if path.is_file() and path.parent.name in ("", "pkg") and path.suffix not in (".log", ".a", ".so")
     )
-    atomic_json(out / "report.json", {"schema": 1, "status": "complete", "architecture": arch, "interpreter": interpreter, "network": "none", "programs": programs, "checks": ["c", "cxx-containers-strings-exceptions-rtti-unwind-tls-threads", "llvm-ar-llvm-ranlib", "lld-shared-object", "musl-interpreter-and-direct-needed", "pkg-config-egl-gles-gbm-libdrm", "pkg-config-nss", "pkg-config-ffmpeg", "surfaceless-egl-renderer"]})
+    atomic_json(out / "report.json", {"schema": 1, "status": "complete", "architecture": arch, "interpreter": interpreter, "network": "none", "programs": programs, "checks": ["c", "llvm-ar-llvm-ranlib", "lld-shared-object", "musl-interpreter-and-direct-needed", "pkg-config-egl-gles-gbm-libdrm", "pkg-config-nss", "pkg-config-ffmpeg", "surfaceless-egl-renderer"]})
     print("Gate B: direct compiler/runtime probes passed")
 
 

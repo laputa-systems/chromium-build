@@ -1,12 +1,3 @@
-diff --git a/extensions/browser/api/networking_private/BUILD.gn b/extensions/browser/api/networking_private/BUILD.gn
---- a/extensions/browser/api/networking_private/BUILD.gn
-+++ b/extensions/browser/api/networking_private/BUILD.gn
-@@ -57,1 +57,4 @@ source_set("networking_private") {
--    sources = [ "networking_private_stubs.cc" ]
-+    sources = [
-+      "networking_private_delegate_factory_no_dbus.cc",
-+      "networking_private_stubs.cc",
-+    ]
 diff --git a/extensions/browser/api/networking_private/networking_private_delegate_factory_no_dbus.cc b/extensions/browser/api/networking_private/networking_private_delegate_factory_no_dbus.cc
 new file mode 100644
 --- /dev/null

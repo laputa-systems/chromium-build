@@ -1,66 +1,30 @@
-# Custom LLVM toolchain notes
+# Chromium LLVM 24 on Alpine musl
 
-This repository uses the pinned Laputa `llvm-prebuilt-musl` release rather than Alpine's compiler packages or Chromium's downloaded toolchain. The current arm64 input is LLVM 23.1.0-rc2 (release `llvm-musl-23.1.0-rc2-6eb5fb9`), installed at `/opt/llvm-musl`, with archive SHA-256 `0c9bd6f0fefa26dbdb7d6ed568f3799b558428b1ce1264656aa328fc6fd9e32d`.
+The Linux amd64 backend pins the compiler archive published for Chromium
+153.0.8010.52 in `config/inputs.lock`: revision
+`llvmorg-24-init-3796-g20e97c4b-2`, installed at `/opt/chromium-llvm`.
+`Dockerfile` verifies its archive size and SHA-256. The archive's Clang and LLD
+report Clang `24.0.0git` and LLD `24.0.0`; Gate A checks the revision, tools, configuration hashes,
+and target triple. Alpine `ninja-build=1.13.2-r1` is the pinned build-only Ninja.
 
-The release's Clang driver reports `23.1.0-rc2`; its LLD binary reports `23.1.0`. Both values are locked separately so Gate A validates the exact tool versions without discarding the release identifier. The release's config files omit the toolchain library search path and C++ ABI/unwind defaults, so the image adds `-L/opt/llvm-musl/lib` to both effective configs and `-lc++abi`/`-lunwind` to `clang++.cfg`; their post-overlay hashes are locked in `config/inputs.lock`.
+Chromium's Linux x64 compiler is a glibc host program. The builder copies a
+pinned Debian runtime to run it on Alpine. `clang.cfg` and `clang++.cfg` target
+`x86_64-unknown-linux-musl`, select compiler-rt and LLD, and map Chromium's
+x86_64 GNU compiler-rt builtins to the musl target path. These changes let the
+compiler emit musl ELF files; the compiler's own glibc libraries must not enter
+the staged browser. Gate B and the ELF audit check the musl interpreter and GNU
+runtime exclusion. The Chromium source tree supplies libc++, libc++abi, and
+libunwind through the normal `use_custom_libcxx` GN path. No Laputa external
+C++ archives are selected.
 
-Record quirks discovered in the custom prebuilt toolchain here. Keep build fixes in the source patch stack only when they are required to integrate Chromium with a deliberate property or omission of this toolchain; do not silently broaden the toolchain or weaken validation to make an isolated compile pass.
+The archive does not currently supply sanitizer interface headers. The normal
+headless profile uses trap-only hardening rather than a sanitizer runtime.
+Alpine's `cr148-v8-no-san-trap.patch` removes V8 callback registration, and
+`musl-v8-sanitizer-header.patch` removes its now-unused sanitizer include.
+A sanitizer profile would require matching headers and runtimes plus runtime
+verification; the present profile does not establish that support.
 
-## Current properties
-
-- `clang` and `clang++` report the musl target triple and live under `/opt/llvm-musl/bin`.
-- The Clang resource directory is `/opt/llvm-musl/lib/clang/23`.
-- The bundle provides the static libc++/libc++abi/unwind archives and compiler-rt builtins needed by the normal Chromium profile.
-- The image uses Alpine's ccache only as a wrapper; the compiler and LLVM binutils remain the Laputa tools.
-- The bundle does not provide compiler-rt sanitizer interface headers such as `sanitizer/common_interface_defs.h` or `sanitizer/asan_interface.h`.
-
-The last point was verified in the builder image. The matching Alpine-installed Clang resource tree also did not provide those sanitizer headers. The custom bundle is therefore suitable for the normal musl build and its trap-only compiler hardening, but it is not currently a complete sanitizer development toolchain.
-
-## V8 sanitizer-header interaction
-
-Chromium's normal debug profile is not an UBSan build: `is_ubsan` remains false. However, Chromium's compiler hardening adds trap-only flags including:
-
-```text
--fsanitize=array-bounds -fsanitize-trap=array-bounds
--fsanitize=return -fsanitize-trap=return
-```
-
-Clang consequently reports its undefined-behavior-sanitizer feature through `__has_feature`, which causes V8's `testing.cc` to see `V8_USE_UNDEFINED_BEHAVIOR_SANITIZER`. That source included `sanitizer/common_interface_defs.h` even though the build did not provide a sanitizer runtime.
-
-Alpine's `cr148-v8-no-san-trap.patch` already removes V8's sanitizer death-callback registration because the partial trap configuration fails to link with sanitizer callbacks. The local `musl-v8-sanitizer-header.patch` removes the now-unused header include left behind by that patch. It does not remove the trap-only hardening flags, disable the sandbox, or turn off sanitizer instrumentation elsewhere in Chromium.
-
-This is an integration fix for the current profile, not evidence that the custom LLVM bundle supports ASan, MSan, UBSan runtime reporting, or sanitizer-instrumented builds. A future sanitizer profile must first add and validate matching compiler-rt headers, runtimes, linker behavior, and musl execution tests.
-
-## libc++ `vector<bool>` clone interaction
-
-The Laputa libc++ headers expose iteration over `std::vector<bool>` through a proxy reference type. Chromium's generic Mojo `CloneTraits<std::vector<T>>` passed that proxy to `mojo::Clone()`, which correctly rejected it as a non-copyable type when generated bindings cloned a Mojo `array<bool>`. The resulting failure was a compile-time static assertion in `mojo/public/cpp/bindings/clone_traits.h` while building `content/browser/webid/document_metadata.cc`.
-
-The local `musl-mojo-vector-bool-clone.patch` converts the proxy to `bool` only for `std::vector<bool>` before entering the generic clone path. The patch preserves normal cloning for all other vector element types and does not change Mojo wire representation or boolean semantics. This is a libc++ integration quirk exposed by the custom toolchain, not a reason to weaken the generated-binding type checks.
-
-## libc++ heterogeneous `raw_ref` lookup
-
-Laputa libc++ selects the const heterogeneous lookup overload for the
-`std::map<base::raw_ref<T>, ...>` used by the permissions implementation. The
-Chromium `std::less<raw_ref<T>>` specialization declared only `T&` overloads,
-even though `raw_ref` itself supports comparisons with const references. That
-made `map.find(const T&)` fail in `permission_request_manager.cc`. The local
-`musl-raw-ref-transparent-const.patch` adds the two const-reference overloads
-to the transparent comparator for non-const `T`. The constraint is necessary
-because `raw_ref<const T>` already turns Chromium's original `T&` overloads
-into const-reference overloads; without it libc++ diagnoses duplicate
-comparator signatures. The key type, ordering, and ownership model are
-unchanged; this only completes the comparator's advertised heterogeneous
-reference lookup surface.
-
-## Preferred future improvements
-
-The cleanest long-term solution is a custom LLVM release that includes the compiler-rt sanitizer headers and the compatible musl sanitizer runtimes. Installing or copying only headers would make compilation pass but would not prove that sanitizer binaries can link or run correctly.
-
-If the toolchain remains intentionally minimal, retain the narrow V8 integration patch and add explicit resource-header checks to environment validation so a future sanitizer-related failure is diagnosed as a toolchain capability gap. Do not add a broad fake sanitizer-header shim: it could make sanitizer builds compile while silently removing their reporting or runtime guarantees.
-
-When updating the LLVM archive, repeat the following checks before changing this note or removing the patch:
-
-1. Confirm the target triple, Clang resource directory, libc++ archives, libc++abi, libunwind, and compiler-rt builtins.
-2. Check whether the resource directory contains the sanitizer interface headers and matching runtime libraries.
-3. Re-run the direct compiler probes and the exact V8 `testing.cc` compile in the headless profile.
-4. Re-evaluate whether Alpine's no-sanitizer-trap patch is still needed and whether the local compatibility patch can be removed.
+When updating Chromium, read `tools/clang/scripts/update.py` in that exact
+Chromium tag, pin its LLVM revision and archive digest, and repeat the direct
+compiler, C++ runtime, GN graph, and browser ELF checks. Upstream LLVM archives
+for other host architectures cannot be inferred from the Linux x64 archive.

@@ -10,15 +10,10 @@ import sys
 from pathlib import Path
 
 
-TOOLCHAIN = "/opt/llvm-musl"
+TOOLCHAIN = "/opt/chromium-llvm"
 CCACHE = "/usr/bin/ccache"
 COMPILERS = {"clang", "clang++"}
 ARCHIVERS = {"ar", "llvm-ar", "ranlib", "llvm-ranlib"}
-LIBCXX_ARCHIVES = (
-    "/opt/llvm-musl/lib/libc++.a",
-    "/opt/llvm-musl/lib/libc++abi.a",
-    "/opt/llvm-musl/lib/libunwind.a",
-)
 FORBIDDEN_TEXT = {
     "--sysroot": "sysroot flag",
     "--gcc-toolchain": "GCC toolchain flag",
@@ -33,8 +28,6 @@ FORBIDDEN_TEXT = {
     "sysroot/": "Chromium sysroot path",
     "/usr/lib/gcc/": "host GCC path",
     "/usr/include/c++/": "host libstdc++ headers",
-    "third_party/libc++": "in-tree libc++ path",
-    "third_party/libc++abi": "in-tree libc++abi path",
 }
 
 
@@ -102,21 +95,21 @@ def audit_command_lines(lines):
             if any(Path(token).name in {"ar", "llvm-ar"} for token in archives):
                 counts["archive_commands"] += 1
                 if any(token != f"{TOOLCHAIN}/bin/llvm-ar" for token in archives):
-                    archive_failures.append(f"line {number}: archive tool is not Laputa llvm-ar")
+                    archive_failures.append(f"line {number}: archive tool is not Chromium llvm-ar")
             if any(Path(token).name in {"ranlib", "llvm-ranlib"} for token in archives):
                 counts["ranlib_commands"] += 1
                 if any(token != f"{TOOLCHAIN}/bin/llvm-ranlib" for token in archives):
-                    archive_failures.append(f"line {number}: ranlib tool is not Laputa llvm-ranlib")
+                    archive_failures.append(f"line {number}: ranlib tool is not Chromium llvm-ranlib")
         if not compilers:
             continue
         compiler = compilers[0]
         compiler_path = compiler.split("=", 1)[-1].strip('"')
         if compiler.startswith("-Clinker="):
             if compiler_path not in (f"{TOOLCHAIN}/bin/clang", f"{TOOLCHAIN}/bin/clang++"):
-                compiler_failures.append(f"line {number}: Rust linker is not absolute Laputa Clang: {compiler}")
+                compiler_failures.append(f"line {number}: Rust linker is not absolute Chromium Clang: {compiler}")
             continue
         if compiler_path not in (f"{TOOLCHAIN}/bin/clang", f"{TOOLCHAIN}/bin/clang++"):
-            compiler_failures.append(f"line {number}: compiler is not absolute Laputa Clang: {compiler}")
+            compiler_failures.append(f"line {number}: compiler is not absolute Chromium Clang: {compiler}")
         if is_compile(tokens):
             if is_assembler(tokens):
                 counts["assembly_commands"] += 1
@@ -128,13 +121,6 @@ def audit_command_lines(lines):
             counts["link_commands"] += 1
             if CCACHE in tokens:
                 linker_failures.append(f"line {number}: link command is wrapped by ccache")
-            missing_archives = [archive for archive in LIBCXX_ARCHIVES if archive not in line]
-            if missing_archives:
-                linker_failures.append(
-                    f"line {number}: link command omits external static libc++ archives: {', '.join(missing_archives)}"
-                )
-            if "-nostdlib++" not in tokens:
-                linker_failures.append(f"line {number}: link command omits -nostdlib++")
             if not any(
                 flag in tokens
                 for flag in (
@@ -311,10 +297,8 @@ def main():
         "response_files": response_report,
         "checks": {
             "ccache_compile_wrapper": not any("ccache" in item for item in failures),
-            "absolute_laputa_compilers": not any("compiler is not" in item for item in failures),
-            "direct_laputa_archives_and_ranlib": not any("archive tool" in item or "ranlib tool" in item for item in failures),
-            "no_in_tree_libcxx": not any("libc++" in item for item in failures),
-            "external_static_libcxx": not any("external static libc++ archives" in item for item in failures),
+            "absolute_chromium_compilers": not any("compiler is not" in item for item in failures),
+            "direct_chromium_archives_and_ranlib": not any("archive tool" in item or "ranlib tool" in item for item in failures),
             "system_ffmpeg_shim": "media/ffmpeg" in command_text or "ffmpeg_stub" in command_text,
             "no_bundled_ffmpeg": not any(
                 "bundled FFmpeg path in a compiler/link command" in item for item in failures

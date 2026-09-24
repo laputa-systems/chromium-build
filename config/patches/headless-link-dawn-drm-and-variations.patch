@@ -1,11 +1,18 @@
-diff --git a/gpu/command_buffer/service/BUILD.gn b/gpu/command_buffer/service/BUILD.gn
 --- a/gpu/command_buffer/service/BUILD.gn
 +++ b/gpu/command_buffer/service/BUILD.gn
-@@ -518,0 +519,1 @@
-+        "//ui/gfx/linux:drm",
-diff --git a/components/variations/net/variations_http_headers.cc b/components/variations/net/variations_http_headers.cc
+@@ -517,6 +517,7 @@
+         "shared_image/dawn_ozone_image_representation.cc",
+         "shared_image/dawn_ozone_image_representation.h",
+       ]
++      deps += [ "//ui/gfx/linux:drm" ]
+     }
+   }
+ 
 --- a/components/variations/net/variations_http_headers.cc
 +++ b/components/variations/net/variations_http_headers.cc
-@@ -213,0 +214,2 @@
-+const char kClientDataHeader[] = "X-Client-Data";
+@@ -33,3 +33,5 @@
+ namespace variations {
 +
++const char kClientDataHeader[] = "X-Client-Data";
+ 
+ namespace {

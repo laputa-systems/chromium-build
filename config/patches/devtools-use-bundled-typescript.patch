@@ -1,0 +1,12 @@
+--- a/third_party/devtools-frontend/src/third_party/typescript/typescript.py
++++ b/third_party/devtools-frontend/src/third_party/typescript/typescript.py
+@@ -10,7 +10,8 @@
+ 
+ 
+ def GetBinaryPath():
+-    return "/usr/bin/tsc"
++    return os_path.normpath(os_path.join(
++        os_path.dirname(__file__), "..", "..", "node_modules", ".bin", "tsc"))
+     if platform.machine() == 'arm64':
+         darwin_path = 'mac-arm64'
+     else:

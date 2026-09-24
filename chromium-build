@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 PLATFORM=linux
-ARCH=arm64
+ARCH=
 PROFILE=
 IMAGE=${CHROMIUM_BUILDER_IMAGE:-}
 WORK_VOLUME=${CHROMIUM_WORK_VOLUME:-}
@@ -21,9 +21,9 @@ fail() {
 usage() {
     printf '%s\n' \
         'usage: chromium-build [--platform linux|macos] [--arch arm64|amd64] [--profile PROFILE] command' \
-        '       chromium-build image [--arch arm64|amd64]' \
-        '       chromium-build fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-e|gate-f|poc|build|stage-runtime|test-fast|test|test-staged [--arch arm64|amd64]' \
-        '       chromium-build build-target <ninja-output-or-label> [--arch arm64|amd64]' \
+        '       chromium-build image [--arch amd64]' \
+        '       chromium-build fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-e|gate-f|poc|build|cache-stats|stage-runtime|test-fast|test|test-staged [--arch amd64] [--jobs N]' \
+        '       chromium-build build-target <ninja-output-or-label> [--arch amd64] [--jobs N]' \
         '       chromium-build --platform macos doctor|smoke-preflight|update-lock|fetch|prepare|configure|build|cache-stats|stage-runtime|package|test-staged [--arch arm64]'
 }
 
@@ -86,6 +86,9 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 [ -n "$command_name" ] || { usage >&2; exit 2; }
+[ -n "$ARCH" ] || {
+    if [ "$PLATFORM" = macos ]; then ARCH=arm64; else ARCH=amd64; fi
+}
 case "$ARCH" in
     aarch64) ARCH=arm64 ;;
     arm64|amd64) ;;
@@ -116,25 +119,19 @@ case "$PLATFORM" in
 esac
 
 case "$ARCH" in
-    arm64)
-        platform=linux/arm64
-        base_image=alpine@sha256:e7a1a92a5bfeee40966aea60f0796b0e7917cc35591542701834f03a68fa3d18
-        llvm_url=https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-23.1.0-rc2-6eb5fb9/clang+llvm-23.1.0-rc2-aarch64-linux-musl.tar.xz
-        llvm_sha256=0c9bd6f0fefa26dbdb7d6ed568f3799b558428b1ce1264656aa328fc6fd9e32d
-        llvm_size=91229132
-        ;;
     amd64)
         platform=linux/amd64
         base_image=alpine@sha256:79ff19e9084a00eece421b2523fb93e22d730e2c0e525905de047e848e56d95f
-        llvm_url=https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-23.1.0-rc2-6eb5fb9/clang+llvm-23.1.0-rc2-x86_64-linux-musl.tar.xz
-        llvm_sha256=36647cca0bf57d206a6ce757d07a9d8489ef6ccf283a2cc7f740d1cba99a088b
-        llvm_size=99139524
+        llvm_url=https://commondatastorage.googleapis.com/chromium-browser-clang/Linux_x64/clang-llvmorg-24-init-3796-g20e97c4b-2.tar.xz
+        llvm_sha256=86d53b33007a35695645e3867589a20f6f8aeedd146331e1a2ec8fd371e05ea2
+        llvm_size=59131228
         ;;
+    arm64) fail 'Chromium 153 publishes no native Linux arm64 LLVM 24 archive; the Linux backend currently supports amd64 only' ;;
 esac
 
-IMAGE=${IMAGE:-ungoogled-chromium-builder:150.0.7871.114-$ARCH}
-WORK_VOLUME=${WORK_VOLUME:-ungoogled-chromium-work-$ARCH}
-CACHE_VOLUME=${CACHE_VOLUME:-ungoogled-chromium-ccache-$ARCH}
+IMAGE=${IMAGE:-ungoogled-chromium-builder:153.0.8010.52-$ARCH}
+WORK_VOLUME=${WORK_VOLUME:-ungoogled-chromium-153-work-$ARCH}
+CACHE_VOLUME=${CACHE_VOLUME:-ungoogled-chromium-153-ccache-$ARCH}
 
 native_arch=$(docker info --format '{{.Architecture}}' 2>/dev/null || true)
 case "$native_arch" in
@@ -150,9 +147,6 @@ if [ "$command_name" = image ]; then
         --build-arg LLVM_URL="$llvm_url" \
         --build-arg LLVM_SHA256="$llvm_sha256" \
         --build-arg LLVM_SIZE="$llvm_size" \
-        --build-arg NINJA_SOURCE_URL=https://github.com/ninja-build/ninja/archive/refs/tags/v1.12.1.tar.gz \
-        --build-arg NINJA_SOURCE_SHA256=821bdff48a3f683bc4bb3b6f0b5fe7b2d647cf65d52aeb63328c91a6c6df285a \
-        --build-arg NINJA_SOURCE_SIZE=240483 \
         -t "$IMAGE" "$ROOT"
     docker image inspect "$IMAGE" --format 'image={{.Id}}'
     exit 0
@@ -187,6 +181,10 @@ run_gate() {
         *.py) script_command=(python3 "${script_command[0]}") ;;
     esac
     local -a test_environment=()
+    local -a build_environment=()
+    if [ -n "$JOBS" ]; then
+        build_environment+=(-e "JOBS=$JOBS")
+    fi
     if [ "$command_name" = test-staged ]; then
         test_environment+=(-e "CHROMIUM_TEST_CHROME=/work/stage/$PROFILE/chrome")
         test_environment+=(-e "MEDIA_RUNTIME_BASELINE=/work/metadata/media-runtime-baseline.json")
@@ -202,6 +200,7 @@ run_gate() {
         -e EGL_PLATFORM=surfaceless \
         -e CCACHE_VOLUME="$CACHE_VOLUME" \
         ${test_environment[@]+"${test_environment[@]}"} \
+        ${build_environment[@]+"${build_environment[@]}"} \
         -v "$WORK_VOLUME:/work" \
         -v "$CACHE_VOLUME:/ccache" \
         "$IMAGE" "${script_command[@]}" "$@"
@@ -218,6 +217,9 @@ case "$command_name" in
     gate-f) run_gate audit-chrome-graph-driver.py ;;
     build) run_gate build.py ;;
     build-target) run_gate build-target.py "$BUILD_TARGET" ;;
+    cache-stats)
+        docker run --rm --network=none -v "$CACHE_VOLUME:/ccache" "$IMAGE" ccache --show-stats
+        ;;
     stage-runtime) run_gate stage-runtime.py --chrome "/work/out/$PROFILE/chrome" --output "/work/stage/$PROFILE" ;;
     package) fail 'package is currently implemented only for the native macOS backend' ;;
     test-fast) run_gate test-fast-driver.py ;;

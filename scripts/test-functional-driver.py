@@ -38,8 +38,9 @@ def main() -> None:
         if not chrome:
             raise ScriptFailure("cannot resolve Chrome")
     baseline = metadata / "media-runtime-baseline.json"
-    if baseline.is_file():
-        os.environ.setdefault("MEDIA_RUNTIME_BASELINE", str(baseline))
+    if staged_chrome:
+        require_file(baseline, "unstaged functional test has not established the media runtime baseline")
+        os.environ["MEDIA_RUNTIME_BASELINE"] = str(baseline)
     ublock = inputs / "uBlock0_1.72.0.chromium.zip"
     require_file(ublock, f"pinned uBlock archive is missing: {ublock}")
     output.mkdir(parents=True, exist_ok=True)
@@ -63,6 +64,8 @@ def main() -> None:
     if os.geteuid() == 0 and shutil.which("su"):
         command = ["su", "chromium", "-s", "/bin/sh", "-c", "exec " + " ".join(subprocess.list2cmdline([item]) for item in command)]
     run(command, timeout=timeout)
+    if not staged_chrome:
+        shutil.copyfile(require_file(output / "media-runtime.json", "media runtime audit is missing"), baseline)
 
 
 if __name__ == "__main__":

@@ -1,28 +1,230 @@
 {
   "schema": 1,
-  "chromium_version": "150.0.7871.114",
-  "patch_application": {"max_fuzz": 2},
+  "chromium_version": "153.0.8010.52",
+  "patch_application": {
+    "max_fuzz": 2
+  },
   "layers": [
     {
       "project": "portablelinux",
-      "revision": "0033e274f91ec6aa57a36a486f41f46d801e381d",
+      "revision": "effeae1d0728db00ed21cbf603af88e0fc38f97b",
       "patches": [
         {
           "name": "drop-nodejs-version-check.patch",
           "state": "not-applicable",
           "replacement": null,
-          "affected_paths": ["third_party/node/node.gni", "third_party/protobuf/proto_library.gni"],
-          "reason": "The ungoogled source layer already contains this change."
+          "affected_paths": [
+            "third_party/node/node.gni",
+            "third_party/protobuf/proto_library.gni"
+          ],
+          "reason": "The selected ungoogled core series already provides the Node version change."
+        },
+        {
+          "name": "use-oauth2-client-switches-as-default.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": []
         },
         {
           "name": "fix-compiling-on-arm64.patch",
           "state": "not-applicable",
           "replacement": null,
-          "affected_paths": ["build/toolchain/linux/BUILD.gn", "tools/rust/"],
-          "reason": "The Laputa profile uses its external musl LLVM/Rust toolchain and does not invoke this Chromium host-Rust bootstrap path."
+          "affected_paths": [
+            "build/toolchain/linux/BUILD.gn",
+            "tools/clang/scripts/build.py",
+            "tools/rust/build_bindgen.py",
+            "tools/rust/build_rust.py",
+            "tools/rust/cargo-config.toml.template",
+            "tools/rust/config.toml.template"
+          ],
+          "reason": "The current native Linux target is x86-64."
         },
         {
-          "name": "use-oauth2-client-switches-as-default.patch",
+          "name": "revert-crubit-changes.patch",
+          "state": "not-applicable",
+          "replacement": null,
+          "affected_paths": [
+            "components/cbor/BUILD.gn"
+          ],
+          "reason": "Alpine rust-cbor.patch already handles this source change; the portable revert would reverse it."
+        },
+        {
+          "name": "revert-public-input-changes.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": [],
+          "reason": "Retain the portablelinux public input compatibility change."
+        },
+        {
+          "name": "revert-python-path-adjustement.patch",
+          "state": "not-applicable",
+          "replacement": null,
+          "affected_paths": [
+            ".gn"
+          ],
+          "reason": "Copium cr153-no-python-vendoring.patch already restores the system Python path."
+        },
+        {
+          "name": "revert-tsgo-usage.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": [],
+          "reason": "Retain the portablelinux TypeScript generator compatibility change."
+        }
+      ]
+    },
+    {
+      "project": "alpine",
+      "revision": "4a3cc589c1e0ad0f7a26b519014e6322e1d5c419",
+      "patches": [
+        {
+          "name": "0001-hotfix-ignore-a-new-warning-in-rust-1.89.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": []
+        },
+        {
+          "name": "compiler.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": []
+        },
+        {
+          "name": "disable-dns_config_service.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": []
+        },
+        {
+          "name": "disable-failing-tests.patch",
+          "state": "not-applicable",
+          "replacement": null,
+          "affected_paths": [
+            "base/strings/safe_sprintf_unittest.cc"
+          ]
+        },
+        {
+          "name": "fc-cache-version.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": []
+        },
+        {
+          "name": "fix-ffmpeg-codec-list.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": []
+        },
+        {
+          "name": "fstatat-32bit.patch",
+          "state": "not-applicable",
+          "replacement": null,
+          "affected_paths": [
+            "third_party/lss/linux_syscall_support.h"
+          ]
+        },
+        {
+          "name": "gdbinit.patch",
+          "state": "not-applicable",
+          "replacement": null,
+          "affected_paths": [
+            "tools/gdb/gdbinit"
+          ]
+        },
+        {
+          "name": "generic-sensor-include.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": []
+        },
+        {
+          "name": "headless-shell-no-license.patch",
+          "state": "not-applicable",
+          "replacement": null,
+          "affected_paths": [
+            "headless/BUILD.gn"
+          ]
+        },
+        {
+          "name": "musl-reserved-stack-limit.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": [],
+          "reason": "Alpine musl thread stack limit compatibility."
+        },
+        {
+          "name": "musl-sandbox.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": []
+        },
+        {
+          "name": "musl-tid-caching.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": []
+        },
+        {
+          "name": "net-test-no-vpython.patch",
+          "state": "not-applicable",
+          "replacement": null,
+          "affected_paths": [
+            "net/test/python_utils.cc"
+          ]
+        },
+        {
+          "name": "net-test-pyws3-py3.12.patch",
+          "state": "not-applicable",
+          "replacement": null,
+          "affected_paths": [
+            "third_party/pywebsocket3/src/pywebsocket3/websocket_server.py"
+          ]
+        },
+        {
+          "name": "no-execinfo.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": []
+        },
+        {
+          "name": "no-mallinfo.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": []
+        },
+        {
+          "name": "no-res-ninit-nclose.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": []
+        },
+        {
+          "name": "no-sandbox-settls.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": []
+        },
+        {
+          "name": "partalloc-no-tagging-arm64.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": []
+        },
+        {
+          "name": "pvalloc.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": []
+        },
+        {
+          "name": "rust-cbor.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": [],
+          "reason": "Alpine Rust CBOR compatibility; replaces the portablelinux Crubit revert."
+        },
+        {
+          "name": "temp-failure-retry.patch",
           "state": "apply",
           "replacement": null,
           "affected_paths": []
@@ -30,54 +232,176 @@
       ]
     },
     {
-      "project": "alpine",
-      "revision": "bc56128509194816d5cd3441d17c20ca2d71cc68",
-      "patches": [
-        {"name":"0001-hotfix-ignore-a-new-warning-in-rust-1.89.patch","state":"apply","replacement":null,"affected_paths":[]},
-        {"name":"compiler.patch","state":"apply","replacement":null,"affected_paths":[]},
-        {"name":"disable-dns_config_service.patch","state":"apply","replacement":null,"affected_paths":[]},
-        {"name":"disable-failing-tests.patch","state":"not-applicable","replacement":null,"affected_paths":["testing/","*_test.cc"]},
-        {"name":"fc-cache-version.patch","state":"apply","replacement":null,"affected_paths":[]},
-        {"name":"fix-ffmpeg-codec-list.patch","state":"apply","replacement":null,"affected_paths":[]},
-        {"name":"fstatat-32bit.patch","state":"not-applicable","replacement":null,"affected_paths":["base/files/file_util_posix.cc"]},
-        {"name":"gdbinit.patch","state":"not-applicable","replacement":null,"affected_paths":["tools/gdb/",".gdbinit"]},
-        {"name":"generic-sensor-include.patch","state":"apply","replacement":null,"affected_paths":[]},
-        {"name":"headless-shell-no-license.patch","state":"not-applicable","replacement":null,"affected_paths":["headless/","headless_shell"]},
-        {"name":"musl-sandbox.patch","state":"apply","replacement":null,"affected_paths":[]},
-        {"name":"musl-tid-caching.patch","state":"apply","replacement":null,"affected_paths":[]},
-        {"name":"net-test-no-vpython.patch","state":"not-applicable","replacement":null,"affected_paths":["net/","test/"]},
-        {"name":"net-test-pyws3-py3.12.patch","state":"not-applicable","replacement":null,"affected_paths":["net/","test/"]},
-        {"name":"no-execinfo.patch","state":"apply","replacement":null,"affected_paths":[]},
-        {"name":"no-mallinfo.patch","state":"apply","replacement":null,"affected_paths":[]},
-        {"name":"no-res-ninit-nclose.patch","state":"apply","replacement":null,"affected_paths":[]},
-        {"name":"no-sandbox-settls.patch","state":"apply","replacement":null,"affected_paths":[]},
-        {"name":"partalloc-no-tagging-arm64.patch","state":"apply","replacement":null,"affected_paths":[]},
-        {"name":"pvalloc.patch","state":"apply","replacement":null,"affected_paths":[]},
-        {"name":"temp-failure-retry.patch","state":"apply","replacement":null,"affected_paths":[]}
-      ]
-    },
-    {
       "project": "copium",
-      "revision": "150.0",
+      "revision": "153.0",
       "patches": [
-        {"name":"cr133-ffmpeg-no-noh264parse.patch","state":"apply","replacement":null,"affected_paths":[]},
-        {"name":"cr138-node-version-check.patch","state":"superseded","replacement":"portablelinux:node-version-check","affected_paths":["third_party/node/"]},
-        {"name":"cr140-musl-prctl.patch","state":"apply","replacement":null,"affected_paths":[]},
-        {"name":"cr143-libsync-__BEGIN_DECLS.patch","state":"apply","replacement":null,"affected_paths":[]},
-        {"name":"cr145-iwyu-dev_t.patch","state":"apply","replacement":null,"affected_paths":[]},
-        {"name":"cr145-musl-unfortify-SkDescriptor.patch","state":"apply","replacement":null,"affected_paths":[]},
-        {"name":"cr146-swiftshader-unfortify-memset-memcpy.patch","state":"not-applicable","replacement":null,"affected_paths":["gpu/command_buffer/service/swiftshader/","third_party/swiftshader/"]},
-        {"name":"cr146-unfortify-blink-display_item_list.patch","state":"apply","replacement":null,"affected_paths":[]},
-        {"name":"cr147-is-musl-libcxx.patch","state":"apply","replacement":null,"affected_paths":[]},
-        {"name":"cr147-simdutf-8.0-base-char.patch","state":"apply","replacement":null,"affected_paths":[]},
-        {"name":"cr148-rust-1.95-bytemuck.patch","state":"apply","replacement":null,"affected_paths":[]},
-        {"name":"cr148-v8-no-san-trap.patch","state":"apply","replacement":null,"affected_paths":[]},
-        {"name":"cr149-musl-alloc-shim-dispatch.patch","state":"apply","replacement":null,"affected_paths":[]},
-        {"name":"cr149-rust-toolchain-var.patch","state":"apply","replacement":null,"affected_paths":[]},
-        {"name":"cr149-unbundle-minizip-undo-unicode.patch","state":"apply","replacement":null,"affected_paths":[]},
-        {"name":"cr150-empty-ar.patch","state":"apply","replacement":null,"affected_paths":[]},
-        {"name":"cr150-ffmpeg-no-agtm.patch","state":"apply","replacement":null,"affected_paths":[]},
-        {"name":"cr150-no-sysroot-modules.patch","state":"apply","replacement":null,"affected_paths":[]}
+        {
+          "name": "cr133-ffmpeg-no-noh264parse.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": []
+        },
+        {
+          "name": "cr138-node-version-check.patch",
+          "state": "superseded",
+          "replacement": "portablelinux:node-version-check",
+          "affected_paths": []
+        },
+        {
+          "name": "cr140-musl-prctl.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": []
+        },
+        {
+          "name": "cr143-libsync-__BEGIN_DECLS.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": []
+        },
+        {
+          "name": "cr145-iwyu-dev_t.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": []
+        },
+        {
+          "name": "cr145-musl-unfortify-SkDescriptor.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": []
+        },
+        {
+          "name": "cr146-swiftshader-unfortify-memset-memcpy.patch",
+          "state": "not-applicable",
+          "replacement": null,
+          "affected_paths": [
+            "third_party/swiftshader/src/Device/Memset.hpp"
+          ]
+        },
+        {
+          "name": "cr146-unfortify-blink-display_item_list.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": []
+        },
+        {
+          "name": "cr147-is-musl-libcxx.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": []
+        },
+        {
+          "name": "cr147-simdutf-8.0-base-char.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": []
+        },
+        {
+          "name": "cr148-rust-1.95-bytemuck.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": []
+        },
+        {
+          "name": "cr148-v8-no-san-trap.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": []
+        },
+        {
+          "name": "cr149-musl-alloc-shim-dispatch.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": []
+        },
+        {
+          "name": "cr149-rust-toolchain-var.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": []
+        },
+        {
+          "name": "cr151-dawn-armv7-is-real.patch",
+          "state": "not-applicable",
+          "replacement": null,
+          "affected_paths": [
+            "third_party/dawn/tools/python/cipd_deps.py"
+          ],
+          "reason": "ARMv7-only Dawn source compatibility is outside native x86-64."
+        },
+        {
+          "name": "cr151-dawn-cgo_enabled.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": [],
+          "reason": "Dawn Go generation needs cgo explicitly disabled on Alpine."
+        },
+        {
+          "name": "cr152-dawn-clang-22.patch",
+          "state": "not-applicable",
+          "replacement": null,
+          "affected_paths": [
+            "third_party/dawn/src/utils/BUILD.gn"
+          ],
+          "reason": "This build uses Chromium Clang 24, not Alpine Clang 22."
+        },
+        {
+          "name": "cr152-ffmpeg-no-agtm.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": [],
+          "reason": "System FFmpeg does not expose Chromium\u2019s bundled AV1 AGTM configuration."
+        },
+        {
+          "name": "cr152-unbundle-minizip-undo-unicode.patch",
+          "state": "not-applicable",
+          "replacement": null,
+          "affected_paths": [
+            "third_party/zlib/google/zip_reader.cc"
+          ],
+          "reason": "This profile only unbundles FFmpeg."
+        },
+        {
+          "name": "cr152-unbundle-opus-devtools.patch",
+          "state": "not-applicable",
+          "replacement": null,
+          "affected_paths": [
+            "content/services/devtools_media_encoding_service/BUILD.gn"
+          ],
+          "reason": "This profile only unbundles FFmpeg."
+        },
+        {
+          "name": "cr153-no-python-vendoring.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": [],
+          "reason": "Use the pinned image Python rather than a pruned Chromium Python distribution."
+        },
+        {
+          "name": "cr153-typescript-break-definitions.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": [],
+          "reason": "Retain Chromium 153 TypeScript declaration compatibility."
+        },
+        {
+          "name": "cr153-unbundle-opus-iamf.patch",
+          "state": "not-applicable",
+          "replacement": null,
+          "affected_paths": [
+            "build/linux/unbundle/opus.gn",
+            "build/shim_headers.gni"
+          ],
+          "reason": "This profile only unbundles FFmpeg."
+        },
+        {
+          "name": "cr153-uncrubit-blink-opentype.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": [],
+          "reason": "Restore the source path needed by the Chromium 153 font graph."
+        }
       ]
     }
   ]

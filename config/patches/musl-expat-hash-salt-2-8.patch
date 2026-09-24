@@ -1,0 +1,19 @@
+--- a/third_party/skia/src/xml/SkXMLParser.cpp
++++ b/third_party/skia/src/xml/SkXMLParser.cpp
+@@ -175,7 +175,16 @@
+     // random salt once per process oursevles ensures the salt is non-deterministic
+     // and unguessable, while preventing calls to rand_s inside sandboxed processes
+     // on Windows.
++#if XML_MAJOR_VERSION > 2 || (XML_MAJOR_VERSION == 2 && XML_MINOR_VERSION >= 8)
++    SkRandom random(get_hash_salt());
++    uint8_t entropy[16];
++    for (uint8_t& byte : entropy) {
++        byte = static_cast<uint8_t>(random.nextU());
++    }
++    XML_SetHashSalt16Bytes(ctx.fXMLParser, entropy);
++#else
+     XML_SetHashSalt(ctx.fXMLParser, get_hash_salt());
++#endif
+ 
+     XML_SetUserData(ctx.fXMLParser, &ctx);
+     XML_SetElementHandler(ctx.fXMLParser, start_element_handler, end_element_handler);

@@ -87,6 +87,9 @@ def fetch_one(item, inputs_root):
             action = "downloaded"
         finally:
             temporary_path.unlink(missing_ok=True)
+    # The browser acceptance phase drops root privileges before reading the
+    # verified extension archive from this same input directory.
+    destination.chmod(0o644)
     return {
         "name": item["name"],
         "filename": item["filename"],

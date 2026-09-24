@@ -1,10 +1,9 @@
-diff --git a/gpu/command_buffer/service/BUILD.gn b/gpu/command_buffer/service/BUILD.gn
 --- a/gpu/command_buffer/service/BUILD.gn
 +++ b/gpu/command_buffer/service/BUILD.gn
-@@ -514,6 +514,10 @@
-         "shared_image/dawn_ozone_image_representation.cc",
+@@ -518,6 +518,11 @@
          "shared_image/dawn_ozone_image_representation.h",
        ]
+       deps += [ "//ui/gfx/linux:drm" ]
 +      deps += [
 +        "//third_party/dawn/src/dawn/native",
 +        "//third_party/libsync",
@@ -12,8 +11,7 @@ diff --git a/gpu/command_buffer/service/BUILD.gn b/gpu/command_buffer/service/BU
 +      ]
      }
    }
-
-diff --git a/gpu/command_buffer/service/shared_image/ozone_image_backing_factory.cc b/gpu/command_buffer/service/shared_image/ozone_image_backing_factory.cc
+ 
 --- a/gpu/command_buffer/service/shared_image/ozone_image_backing_factory.cc
 +++ b/gpu/command_buffer/service/shared_image/ozone_image_backing_factory.cc
 @@ -95,9 +95,13 @@

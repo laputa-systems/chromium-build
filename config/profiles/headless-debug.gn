@@ -11,7 +11,7 @@ use_sysroot = false
 rust_sysroot_absolute = "/usr"
 rust_bindgen_root = "/usr"
 use_lld = true
-clang_base_path = "/opt/llvm-musl"
+clang_base_path = "/opt/chromium-llvm"
 clang_version = "@CLANG_MAJOR@"
 clang_use_chrome_plugins = false
 custom_toolchain = "//build/toolchain/linux/unbundle:default"
@@ -29,8 +29,11 @@ chrome_pgo_phase = 0
 is_cfi = false
 use_thin_lto = false
 use_custom_libcxx = true
-use_laputa_libcxx = true
+use_custom_libunwind = true
 use_safe_libstdcxx = false
+# The crash app retains Crashpad's net target even without a handler. Use its
+# Chromium BoringSSL transport instead of Linux's libcurl default.
+crashpad_http_transport_impl = "socket"
 
 use_ozone = true
 ozone_platform = "headless"
@@ -46,7 +49,8 @@ rtc_link_pipewire = false
 use_vaapi = false
 enable_vulkan = false
 enable_swiftshader = false
-enable_printing = false
+enable_printing = true
+use_cups = false
 
 ffmpeg_branding = "Chrome"
 proprietary_codecs = true

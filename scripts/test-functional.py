@@ -663,6 +663,9 @@ def main():
         raise SystemExit("functional test refuses root; run Chromium as the build/test user")
     if args.require_llvmpipe:
         os.environ["REQUIRE_LLVMPIPE"] = "1"
+        # Keep GPU acceptance independent of the host's exposed render device.
+        os.environ["LIBGL_ALWAYS_SOFTWARE"] = "1"
+        os.environ["GALLIUM_DRIVER"] = "llvmpipe"
     elif os.environ.get("REQUIRE_LLVMPIPE") is None:
         os.environ["REQUIRE_LLVMPIPE"] = "0"
     os.environ["REQUIRE_MEDIA"] = "1" if args.require_media else "0"

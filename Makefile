@@ -1,13 +1,14 @@
-ARCH ?= arm64
 PLATFORM ?= linux
 ifeq ($(PLATFORM),macos)
+ARCH ?= arm64
 PROFILE ?= macos-release
 else
+ARCH ?= amd64
 PROFILE ?= headless-debug
 endif
-IMAGE ?= ungoogled-chromium-builder:150.0.7871.114-$(ARCH)
-WORK_VOLUME ?= ungoogled-chromium-work-$(ARCH)
-CACHE_VOLUME ?= ungoogled-chromium-ccache-$(ARCH)
+IMAGE ?= ungoogled-chromium-builder:153.0.8010.52-$(ARCH)
+WORK_VOLUME ?= ungoogled-chromium-153-work-$(ARCH)
+CACHE_VOLUME ?= ungoogled-chromium-153-ccache-$(ARCH)
 
 CHROMIUM_BUILD = CHROMIUM_BUILDER_IMAGE=$(IMAGE) \
     CHROMIUM_WORK_VOLUME=$(WORK_VOLUME) \

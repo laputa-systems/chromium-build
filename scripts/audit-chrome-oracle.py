@@ -9,9 +9,9 @@ import sys
 from pathlib import Path
 
 
-COMPILER = re.compile(r"(?:^|[\s\"])/opt/llvm-musl/bin/clang(?:\+\+)?(?=[\s\"]|$)")
-ARCHIVE = re.compile(r"(?:^|[\s\"])/opt/llvm-musl/bin/llvm-ar(?=[\s\"]|$)")
-RANLIB = re.compile(r"(?:^|[\s\"])/opt/llvm-musl/bin/llvm-ranlib(?=[\s\"]|$)")
+COMPILER = re.compile(r"(?:^|[\s\"])/opt/chromium-llvm/bin/clang(?:\+\+)?(?=[\s\"]|$)")
+ARCHIVE = re.compile(r"(?:^|[\s\"])/opt/chromium-llvm/bin/llvm-ar(?=[\s\"]|$)")
+RANLIB = re.compile(r"(?:^|[\s\"])/opt/chromium-llvm/bin/llvm-ranlib(?=[\s\"]|$)")
 
 
 def classify(text):
@@ -31,7 +31,7 @@ def classify(text):
             counts["ranlib_commands"] += 1
         if not COMPILER.search(line):
             continue
-        if re.search(r"-Clinker=[\"]?/opt/llvm-musl/bin/clang(?:\+\+)?", line):
+        if re.search(r"-Clinker=[\"]?/opt/chromium-llvm/bin/clang(?:\+\+)?", line):
             continue
         compile_command = bool(re.search(r"(?:^|\s)-(?:c|S|E)(?:\s|$)", line))
         if not compile_command:

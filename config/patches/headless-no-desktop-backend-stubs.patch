@@ -1,44 +1,6 @@
-diff --git a/chrome/browser/devtools/BUILD.gn b/chrome/browser/devtools/BUILD.gn
---- a/chrome/browser/devtools/BUILD.gn
-+++ b/chrome/browser/devtools/BUILD.gn
-@@ -207,6 +207,8 @@ static_library("devtools") {
-     if (defined(toolkit_views) && toolkit_views) {
-       sources += [
-         "views/devtools_floaty.cc",
-         "views/devtools_floaty.h",
-       ]
-+    } else {
-+      sources += [ "views/devtools_floaty_stub.cc" ]
-     }
-diff --git a/chrome/browser/devtools/views/devtools_floaty_stub.cc b/chrome/browser/devtools/views/devtools_floaty_stub.cc
-new file mode 100644
---- /dev/null
-+++ b/chrome/browser/devtools/views/devtools_floaty_stub.cc
-@@ -0,0 +1,15 @@
-+// Copyright 2026 The Chromium Authors
-+// Use of this source code is governed by a BSD-style license that can be
-+// found in the LICENSE file.
-+
-+#include "chrome/browser/devtools/views/devtools_floaty.h"
-+
-+#include "ui/gfx/geometry/point.h"
-+
-+namespace DevToolsFloaty {
-+
-+void Show(Profile*, int, int, gfx::Point, int) {}
-+
-+void Restore(int) {}
-+
-+}  // namespace DevToolsFloaty
-diff --git a/chrome/browser/notifications/BUILD.gn b/chrome/browser/notifications/BUILD.gn
 --- a/chrome/browser/notifications/BUILD.gn
 +++ b/chrome/browser/notifications/BUILD.gn
-@@ -328,10 +328,12 @@ source_set("notifications") {
-   if (is_linux) {
-     if (use_dbus) {
-       sources += [ "notification_platform_bridge_linux.cc" ]
- 
-       deps += [
+@@ -335,6 +335,8 @@
          "//chrome/app/theme:chrome_unscaled_resources_grit",
          "//chrome/browser/themes",
        ]
@@ -46,11 +8,10 @@ diff --git a/chrome/browser/notifications/BUILD.gn b/chrome/browser/notification
 +      sources += [ "notification_platform_bridge_no_dbus.cc" ]
      }
    }
-diff --git a/chrome/browser/notifications/notification_platform_bridge_no_dbus.cc b/chrome/browser/notifications/notification_platform_bridge_no_dbus.cc
-new file mode 100644
---- /dev/null
+ 
+--- a/chrome/browser/notifications/notification_platform_bridge_no_dbus.cc
 +++ b/chrome/browser/notifications/notification_platform_bridge_no_dbus.cc
-@@ -0,0 +1,18 @@
+@@ -0,0 +1,16 @@
 +// Copyright 2026 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -67,18 +28,27 @@ new file mode 100644
 +    NotificationHandler::Type) {
 +  return false;
 +}
-diff --git a/chrome/browser/metrics/chrome_metrics_service_client.cc b/chrome/browser/metrics/chrome_metrics_service_client.cc
 --- a/chrome/browser/metrics/chrome_metrics_service_client.cc
 +++ b/chrome/browser/metrics/chrome_metrics_service_client.cc
-@@ -851,1 +851,1 @@ void ChromeMetricsServiceClient::RegisterMetricsProviders() {
+@@ -880,7 +880,7 @@
+       metrics::MetricsLogUploader::MetricServiceType::UMA));
+ 
+ 
 -#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
 +#if BUILDFLAG(IS_CHROMEOS)
-diff --git a/extensions/browser/api/networking_private/BUILD.gn b/extensions/browser/api/networking_private/BUILD.gn
+   metrics_service_->RegisterMetricsProvider(
+       std::make_unique<metrics::BluetoothMetricsProvider>());
+ #endif
 --- a/extensions/browser/api/networking_private/BUILD.gn
 +++ b/extensions/browser/api/networking_private/BUILD.gn
-@@ -57,1 +57,5 @@ source_set("networking_private") {
+@@ -76,6 +76,9 @@
+     ]
+   } else {
+     not_needed([ "default_sources" ])
 -    sources = [ "networking_private_stubs.cc" ]
 +    sources = [
 +      "networking_private_delegate_factory_no_dbus.cc",
 +      "networking_private_stubs.cc",
 +    ]
+   }
+ }

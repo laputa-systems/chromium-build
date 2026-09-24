@@ -127,7 +127,7 @@ def apply_inventory(source, roots, inventory, disposition, patch_dir):
     return records
 
 
-def prune(source, pruning_file):
+def prune(source, pruning_file, version):
     requested = [
         line.strip()
         for line in pruning_file.read_text(encoding="utf-8").splitlines()
@@ -149,7 +149,7 @@ def prune(source, pruning_file):
         "schema": 1,
         "status": "complete",
         "network": "none",
-        "chromium_version": "150.0.7871.114",
+        "chromium_version": version,
         "requested": requested,
         "removed": removed,
         "already_absent": already_absent,
@@ -158,7 +158,7 @@ def prune(source, pruning_file):
     }
 
 
-def substitute_domains(source, files, regex_file):
+def substitute_domains(source, files, regex_file, version):
     patterns = []
     for line in regex_file.read_text(encoding="utf-8").splitlines():
         line = line.strip()
@@ -189,7 +189,7 @@ def substitute_domains(source, files, regex_file):
         "schema": 1,
         "status": "complete",
         "network": "none",
-        "chromium_version": "150.0.7871.114",
+        "chromium_version": version,
         "processed": processed,
         "changed": changed,
         "unprocessed": [],
@@ -218,6 +218,7 @@ def add_builder_links(source):
     links = {
         "third_party/node/linux/node-linux-x64/bin/node": "/usr/bin/node",
         "third_party/gperf/cipd/bin/gperf": "/usr/bin/gperf",
+        "third_party/dawn/tools/golang/linux-amd64/bin/go": "/usr/bin/go",
     }
     records = []
     for relative, target in links.items():
@@ -319,9 +320,9 @@ def main():
         if item["project"] == "portablelinux" and item["state"] == "apply"
     ]
     local_patch_reasons = {
-        "laputa-external-libcxx.patch": "Chromium's use_custom_libcxx path builds the in-tree runtime; this patch redirects it to the validated Laputa static runtime.",
         "gate-e-hermetic-smoke.patch": "Adds the repository-owned Gate E smoke target without making it a dependency of Chrome.",
         "headless-no-devtools.patch": "The initial headless product does not build or ship the DevTools frontend; raw CDP remains available.",
+        "devtools-use-bundled-typescript.patch": "The portable Linux tsgo revert selects a system tsc that is absent from this pinned builder; use the already bundled DevTools TypeScript entry point without adding a builder package.",
         "headless-devtools-protocol-without-frontend.patch": "Raw CDP browser handlers still need the generated protocol domains even when the DevTools frontend is disabled; generate the protocol implementation independently of frontend resources.",
         "headless-devtools-browser-without-frontend.patch": "Chrome UI and raw CDP retain browser-side DevTools symbols even when frontend resources are disabled; keep the browser implementation target while separating it from frontend generation.",
         "headless-devtools-runtime-without-frontend.patch": "The browser-side DevTools implementation and WebUI plumbing are required for raw CDP even when frontend assets are disabled; keep those targets while avoiding frontend resource generation.",
@@ -339,7 +340,7 @@ def main():
         "headless-no-printing-pdf-helpers.patch": "Print-to-PDF is disabled while PDFium remains enabled; exclude Skia tagged-PDF helper code and return no SkDocument so the lower-level shared printing target has no Skia-PDF link dependency.",
         "headless-no-printing-flag.patch": "The printing feature header is unavailable when ENABLE_PRINTING is disabled; omit the about:flags entry for a printing-only feature while retaining PDFium.",
         "headless-no-one-google-bar-unreachable.patch": "The ungoogled-chromium One Google Bar switch returns before its disabled network path; scope Clang's unreachable-code suppression to that intentional dead path.",
-        "musl-extension-toolbar-shadow.patch": "The custom Clang build enables -Wshadow as an error; rename an inner ExtensionsToolbarDesktop anchor variable that collides with the surrounding local.",
+        "musl-extension-toolbar-shadow.patch": "The pinned Chromium Clang build enables -Wshadow as an error; rename an inner ExtensionsToolbarDesktop anchor variable that collides with the surrounding local.",
         "musl-profile-lookup-const.patch": "The custom libc++ raw_ptr comparator accepts Profile* but not const Profile* for transparent set lookup; compare the identity address without changing the set or profile.",
         "headless-no-safe-browsing-command.patch": "Advanced Protection is disabled in this Google-free headless product; make its browser command explicitly non-executable so the disabled command remains warning-clean.",
         "musl-sched-param-initializer.patch": "musl adds reserved fields to sched_param; designated initialization keeps Chromium's realtime priorities while zero-initializing libc-specific fields without a missing-field warning.",
@@ -352,25 +353,30 @@ def main():
         "musl-cookie-string-view-iterator.patch": "Chromium's cookie parser mixes std::string and std::string_view iterator types; libc++ keeps these iterator types distinct on musl.",
         "musl-udp-cmsg-sign-compare.patch": "musl's CMSG_NXTHDR macro compares size_t with ptrdiff_t; suppress that libc-header warning locally for Chromium's UDP ancillary-data loop.",
         "musl-mojo-cmsg-sign-compare.patch": "musl's CMSG_NXTHDR macro compares size_t with ptrdiff_t; suppress that libc-header warning locally for Mojo's POSIX socket ancillary-data loop.",
-        "musl-mojo-vector-bool-clone.patch": "Laputa libc++ exposes std::vector<bool> iteration through a proxy reference; convert that proxy to bool before Mojo's generic clone path invokes CloneTraits.",
-        "musl-raw-ref-transparent-const.patch": "Chromium's raw_ref transparent comparator omits const-reference overloads; Laputa libc++ uses the const heterogeneous std::map lookup path for PermissionRequest.",
-        "musl-private-key-find-iterator.patch": "Laputa libc++ rejects incrementing the temporary const iterator returned by std::find over Chromium's constexpr key-source array; keep the iterator in a named variable before advancing it.",
+        "musl-mojo-vector-bool-clone.patch": "Chromium libc++ exposes std::vector<bool> iteration through a proxy reference; convert that proxy to bool before Mojo's generic clone path invokes CloneTraits.",
+        "musl-raw-ref-transparent-const.patch": "Chromium's raw_ref transparent comparator omits const-reference overloads; Chromium libc++ uses the const heterogeneous std::map lookup path for PermissionRequest.",
+        "musl-private-key-find-iterator.patch": "Chromium libc++ rejects incrementing the temporary const iterator returned by std::find over Chromium's constexpr key-source array; keep the iterator in a named variable before advancing it.",
         "musl-webrtc-physical-socket.patch": "musl's CMSG_NXTHDR macro compares size_t with ptrdiff_t; suppress that libc-header warning locally for WebRTC's Unix socket implementation.",
         "musl-sandbox-cmsg-sign-compare.patch": "musl's CMSG_NXTHDR macro compares size_t with ptrdiff_t; suppress that libc-header warning locally for the sandbox broker's Unix credential socket loop.",
         "musl-sys-poll-compat-overlay.patch": "Alpine's sys/poll.h is a warning-emitting redirect to poll.h; provide that compatibility header through Chromium's musl toolchain include overlay so every target gets the portable behavior.",
-        "musl-v8-sanitizer-header.patch": "Trap-only sanitizer flags define V8's feature macros, but this musl toolchain omits compiler-rt headers and Alpine's no-sanitizer-trap patch removes the callbacks that used them.",
+        "musl-v8-sanitizer-header.patch": "Trap-only sanitizer flags define V8's feature macros, but the Chromium musl toolchain omits compiler-rt headers and Alpine's no-sanitizer-trap patch removes the callbacks that used them.",
         "headless-dawn-vulkan-headers.patch": "Dawn's Linux WebGPU Ozone representation uses Vulkan interop headers even when Chromium's Vulkan runtime is disabled; declare the bundled headers/native target and pass a null queue in the no-Vulkan Ozone factory path.",
         "headless-pdf-without-printing.patch": "PDFium still consumes shared printing primitives, but this headless product does not expose print-to-PDF; allow the lower-level dependency to build with printing features disabled.",
         "headless-no-printing-test-dep.patch": "The blocked-content interactive test is outside the headless product and unconditionally depends on Chrome's printing implementation; omit that test-only dependency when printing is disabled.",
         "headless-no-linux-v4l2.patch": "The headless product has no webcam support; omit Linux V4L2 sources while retaining the shared capture interfaces and optional PipeWire path.",
         "headless-no-linux-v4l2-tracker.patch": "The generic capture tracker factory still selected the removed Linux V4L2 GPU tracker; return no GPU-memory tracker so webcam/V4L2 support is disabled consistently.",
         "headless-no-dbus-backend-linkage.patch": "This headless Linux profile has no DBus backend; guard BlueZ and Bluetooth metrics and provide a no-op platform shell implementation so the browser remains link-complete without desktop integration.",
+        "headless-no-web-app-dbus-portal.patch": "Chromium 153 adds a web app launcher portal source that includes DBus headers even when the headless profile disables DBus; compile that unused desktop integration only when use_dbus is enabled.",
+        "headless-global-accelerator-no-dbus-return.patch": "Without DBus or ChromeOS, Ozone's platform listener is the only global accelerator provider; explicitly return null when it is unavailable.",
         "headless-link-dawn-drm-and-variations.patch": "The enabled Dawn Ozone representation uses Linux DRM helpers, and the variations net target declares its header name without defining it; add the direct DRM dependency and the stable header constant.",
+        "headless-no-suspicious-site-bubble.patch": "The page-info suspicious-site bubble has no production callers when Safe Browsing is disabled; omit it from that profile, while keeping its controller dependency when the feature is enabled.",
         "musl-fontconfig-no-nls.patch": "The bundled fontconfig archive enables NLS in its generated configuration, which requires the absent gettext development header; Chromium does not need fontconfig's translation catalogs.",
         "musl-fontconfig-random.patch": "The bundled fontconfig configuration claims glibc's random_r API is available; use its portable random() fallback on musl.",
+        "musl-expat-hash-salt-2-8.patch": "Alpine Expat 2.8 deprecates the 32-bit hash salt API; feed its 16-byte API from Skia's existing process salt generator while retaining the older API for older Expat.",
+        "musl-libsync-no-cdefs.patch": "libsync's Android header already defines the C linkage macros it needs, so skip Alpine's warning-only sys/cdefs.h compatibility header on musl.",
         "musl-bindgen-clang22.patch": "Alpine's pinned libclang predates two Chromium warning names; bindgen must ignore unknown warning-option diagnostics.",
-        "alpine-rust-bootstrap.patch": "The pinned Alpine Rust package is stable while Chromium 150 emits nightly-only -Z flags; enable its documented bootstrap compatibility mode only in Chromium's Rust wrapper.",
-        "alpine-node-version.patch": "The pinned Alpine Node package is v24.17.0 while this Chromium checkout records v24.12.0; keep the build-time version check enabled against the hermetic package actually installed in the image.",
+        "alpine-rust-bootstrap.patch": "The pinned Alpine Rust package is stable while Chromium's wrapper emits nightly-only -Z flags; enable its documented bootstrap compatibility mode only in that wrapper.",
+        "alpine-node-version.patch": "The pinned Alpine Node package is v24.18.1 while this Chromium checkout records v24.12.0; keep the build-time version check enabled against the hermetic package actually installed in the image.",
         "musl-crashpad-cdefs.patch": "Crashpad's ptrace compatibility header only needs glibc's sys/cdefs.h for its glibc-specific constants; avoid Alpine's deprecation warning on musl while retaining that include on glibc.",
         "musl-crashpad-cmsg.patch": "musl's CMSG_NXTHDR macro compares size_t with ptrdiff_t; suppress that libc-header warning locally for Crashpad's Unix credential socket loop.",
         "headless-no-crashpad-handler.patch": "The headless product does not collect crash reports; omit the Crashpad handler data dependency from Chrome, the crash app, and headless executables to keep the output graph and artifact minimal.",
@@ -381,6 +387,7 @@ def main():
         "musl-native-egl-share-group.patch": "Native Mesa EGL does not implement ANGLE's display texture share-group extension; only enable Chromium's global texture share-group state when that capability exists.",
         "musl-native-egl-semaphore-share-group.patch": "Native Mesa EGL does not implement ANGLE's display semaphore share-group extension; only enable Chromium's global semaphore share-group state when that capability exists.",
         "musl-gpu-sandbox-tsync.patch": "Chromium initializes native Mesa GPU helper threads before installing seccomp; enable the existing GPU TSYNC option so those threads enter the GPU sandbox together.",
+        "musl-gpu-sched-affinity-errno.patch": "Mesa llvmpipe may set another worker thread's affinity; the GPU sandbox's self-thread-only trap otherwise kills the GPU process, so deny affinity changes with EPERM while keeping seccomp active.",
         "musl-gpu-sandbox-broker-tsync.patch": "The native Mesa GPU process has helper threads before Chromium forks its syscall broker; pass the existing GPU TSYNC option through broker startup instead of tripping the generic single-thread assertion.",
         "musl-gpu-pwritev2-sandbox.patch": "Alpine musl's GPU path uses pwritev2 (syscall 287); allow that specific harmless file-write syscall in Chromium's existing GPU seccomp policy so the GPU remains sandboxed.",
         "musl-abseil-clang23-lifetime-capture.patch": "Clang 23 deprecates Abseil's lifetime_capture_by(this) spelling; use the replacement lifetime_capture_by_this attribute while preserving the lifetime-capture diagnostic.",
@@ -408,11 +415,12 @@ def main():
             }
         )
     pruning_root = next(args.ungoogled_root.glob("ungoogled-chromium-*"))
-    pruning_report = prune(args.source, pruning_root / "pruning.list")
+    pruning_report = prune(args.source, pruning_root / "pruning.list", version)
     domain_report = substitute_domains(
         args.source,
         pruning_root / "domain_substitution.list",
         pruning_root / "domain_regex.list",
+        version,
     )
     rust_target = add_rust_target(args.source, args.rust_target_triple)
     builder_links = add_builder_links(args.source)
@@ -450,14 +458,14 @@ def main():
     toolchain = {
         "status": "complete",
         "network": "none",
-        "bundled_toolchain_selected": False,
+        "chromium_prebuilt_selected": True,
         "sysroot_selected": False,
         "forbidden_selected": [],
-        "compiler": "/opt/llvm-musl/bin/clang",
-        "cxx": "/opt/llvm-musl/bin/clang++",
-        "linker": "/opt/llvm-musl/bin/ld.lld",
-        "ar": "/opt/llvm-musl/bin/llvm-ar",
-        "rust_linker": "/opt/llvm-musl/bin/clang",
+        "compiler": "/opt/chromium-llvm/bin/clang",
+        "cxx": "/opt/chromium-llvm/bin/clang++",
+        "linker": "/opt/chromium-llvm/bin/ld.lld",
+        "ar": "/opt/chromium-llvm/bin/llvm-ar",
+        "rust_linker": "/opt/chromium-llvm/bin/clang",
         "rust_target_triple": args.rust_target_triple,
     }
     write_atomic(args.metadata / "source-inputs.json", source_report)

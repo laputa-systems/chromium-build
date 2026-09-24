@@ -1,5 +1,10 @@
-diff --git a/build/rust/gni_impl/rustc_wrapper.py b/build/rust/gni_impl/rustc_wrapper.py
 --- a/build/rust/gni_impl/rustc_wrapper.py
 +++ b/build/rust/gni_impl/rustc_wrapper.py
-@@ -393,0 +394,1 @@
-+  env.setdefault('RUSTC_BOOTSTRAP', '1')
+@@ -419,6 +419,7 @@
+     rustc_args.append(f'@{out_rsp}')
+ 
+     rustenv = dict([item.split("=", 1) for item in rustenv])  # list to dict
++    rustenv.setdefault('RUSTC_BOOTSTRAP', '1')
+     _SaveRustEnvAndFlags(args.dump_rustc_env_and_flags, rustenv, rustc_args)
+     PrepareRustEnvForExecution(rustenv)
+ 

@@ -1,41 +1,41 @@
 {
   "schema": 1,
   "chromium": {
-    "version": "150.0.7871.114",
-    "devtools_revision": "ec97cf3bbeea2cb623fbf97c4e3f22f5acb4d568",
-    "archive_filename": "chromium-150.0.7871.114-linux.tar.xz",
-    "archive_url": "https://github.com/chromium-linux-tarballs/chromium-tarballs/releases/download/150.0.7871.114/chromium-150.0.7871.114-linux.tar.xz",
-    "archive_size": 1670274328,
-    "archive_sha512": "c6ab88182810bbf9423f01c1c4d02abfb3dcec8c182095ddfae5a49bb3817aef21a43eb743dcc95a6418ffaa54f3a8a4686795fb2e7be67f4c3d0ab489f0ee66"
+    "version": "153.0.8010.52",
+    "devtools_revision": "511172b786248e29d7493bf954faa57f834dc5b3",
+    "archive_filename": "chromium-153.0.8010.52-linux.tar.xz",
+    "archive_url": "https://github.com/chromium-linux-tarballs/chromium-tarballs/releases/download/153.0.8010.52/chromium-153.0.8010.52-linux.tar.xz",
+    "archive_size": 1878470976,
+    "archive_sha512": "144667ff65b4018b9afd911bd9acfa83f8e396b984d03b5b0f5588c46f36989e5d523522b1cfb471d2cef0f29a60b7ea3e7ec21f3cae100ca65835be1c023d17"
   },
   "source_inputs": {
     "ungoogled": {
-      "revision": "2d89b04e1b68385c9086efab0df1e3679b35246e",
-      "filename": "ungoogled-2d89b04e1b68385c9086efab0df1e3679b35246e.tar.gz",
-      "url": "https://github.com/ungoogled-software/ungoogled-chromium/archive/2d89b04e1b68385c9086efab0df1e3679b35246e.tar.gz",
-      "size": 669641,
-      "sha512": "645d45ec4e48cb3052e89eed21ca4845d6d84e55be818c6e33d6ae3cbbe55a65501f34d0e02ba10b80022ef6801169c878ab28b8d35e600d4894bf8abf55ca49"
+      "revision": "a638756eb14c8b6ce64b4b2a067afea5d4207bf4",
+      "filename": "ungoogled-a638756eb14c8b6ce64b4b2a067afea5d4207bf4.tar.gz",
+      "url": "https://github.com/ungoogled-software/ungoogled-chromium/archive/a638756eb14c8b6ce64b4b2a067afea5d4207bf4.tar.gz",
+      "size": 671665,
+      "sha512": "0b0bbeb1d213cc6ae1764ea628ae32fb2762419b4a554f0a4f6ba40d56df103e67ea0972cbbb5f4c0954fd6c22913badc081dcb6ebc87a3152b65f617a854efb"
     },
     "portablelinux": {
-      "revision": "0033e274f91ec6aa57a36a486f41f46d801e381d",
-      "filename": "portablelinux-0033e274f91ec6aa57a36a486f41f46d801e381d.tar.gz",
-      "url": "https://github.com/ungoogled-software/ungoogled-chromium-portablelinux/archive/0033e274f91ec6aa57a36a486f41f46d801e381d.tar.gz",
-      "size": 13680,
-      "sha512": "76db5fc229b484ba6d04ccfa163a97051e3e71a8d166b1071123277743efd164390251003ef29bc82bd342926ef40e7befc258faa8cd5fd50054a63330b69d1e"
+      "revision": "effeae1d0728db00ed21cbf603af88e0fc38f97b",
+      "filename": "portablelinux-effeae1d0728db00ed21cbf603af88e0fc38f97b.tar.gz",
+      "url": "https://github.com/ungoogled-software/ungoogled-chromium-portablelinux/archive/effeae1d0728db00ed21cbf603af88e0fc38f97b.tar.gz",
+      "size": 16799,
+      "sha512": "ac297490b0eaa8a21451508888fb5ea168591e20c7110cf533026a8ab56eca3a29f3dbb177b63e224c3e7e5a1a3f76e9502c366dab24126cde6152efb6a3cc8a"
     },
     "alpine": {
-      "revision": "bc56128509194816d5cd3441d17c20ca2d71cc68",
-      "filename": "alpine-aports-bc56128509194816d5cd3441d17c20ca2d71cc68.tar.gz",
-      "url": "https://gitlab.alpinelinux.org/alpine/aports/-/archive/bc56128509194816d5cd3441d17c20ca2d71cc68/aports-bc56128509194816d5cd3441d17c20ca2d71cc68.tar.gz",
-      "size": 13982065,
-      "sha512": "aee791c8ea8d8a8083a8d0d99e85df1ac5bf0b532e9dccdfe0d48f4e53c05c2aa77a950b4d1c064d63edbe056e96efc8a46a6e2e4c2e3de84ff319c42b77cd4e"
+      "revision": "4a3cc589c1e0ad0f7a26b519014e6322e1d5c419",
+      "filename": "aports-4a3cc589c1e0ad0f7a26b519014e6322e1d5c419.tar.gz",
+      "url": "https://gitlab.alpinelinux.org/alpine/aports/-/archive/4a3cc589c1e0ad0f7a26b519014e6322e1d5c419/aports-4a3cc589c1e0ad0f7a26b519014e6322e1d5c419.tar.gz",
+      "size": 14268061,
+      "sha512": "0207cd32606a1bd343e3b3ea8925735d1e18fa5668da2dc9a936f8b033318245234b328b7c8ef68166a90a9e7cf781873f6360cba5d5778126e5451be0dd2029"
     },
     "copium": {
-      "revision": "150.0",
-      "filename": "copium-150.0.tar.gz",
-      "url": "https://codeberg.org/selfisekai/copium/archive/150.0.tar.gz",
-      "size": 14203,
-      "sha512": "7b8316b95c103a1a992d48839ff4c460fde655707fc6e150cf0ec916d64df19ee002a3396d177134bba5fd6e3fefcd930a0f3d49bd23ad51bd459502ef1a5533"
+      "revision": "153.0",
+      "filename": "copium-153.0.tar.gz",
+      "url": "https://codeberg.org/selfisekai/copium/archive/153.0.tar.gz",
+      "size": 30571,
+      "sha512": "6f8286defd231a589f4f042019a90595050c08821f8c1cfec843345ef724b4fc7233162f9a6da0857b838fccb8d36961eb28189ff0589abbe19e021dea64aff4"
     }
   },
   "test_inputs": {
@@ -49,15 +49,13 @@
   },
   "source_identity": {
     "schema": 1,
-    "chromium_version": "150.0.7871.114",
-    "devtools_revision": "ec97cf3bbeea2cb623fbf97c4e3f22f5acb4d568"
+    "chromium_version": "153.0.8010.52",
+    "devtools_revision": "511172b786248e29d7493bf954faa57f834dc5b3"
   },
   "build_tools": {
     "ninja": {
-      "version": "1.12.1",
-      "source_url": "https://github.com/ninja-build/ninja/archive/refs/tags/v1.12.1.tar.gz",
-      "source_size": 240483,
-      "source_sha256": "821bdff48a3f683bc4bb3b6f0b5fe7b2d647cf65d52aeb63328c91a6c6df285a"
+      "package": "ninja-build=1.13.2-r1",
+      "path": "/usr/local/bin/ninja"
     }
   },
   "base": {
@@ -68,29 +66,26 @@
     }
   },
   "toolchain": {
-    "version": "23.1.0-rc2",
-    "lld_version": "23.1.0",
-    "root": "/opt/llvm-musl",
-    "clang_cfg_sha256": "8b29c8fab4c026894addf1cee2cda0792072ef0edd9694f840dd3b65db6963b1",
-    "clangxx_cfg_sha256": "61396367eeb93c9695591c055f25d4925cd147e6dcb7d4cf7b9c0408e31aa7a8",
+    "distribution": "chromium-clang",
+    "version": "24.0.0git",
+    "revision": "llvmorg-24-init-3796-g20e97c4b-2",
+    "lld_version": "24.0.0",
+    "root": "/opt/chromium-llvm",
+    "clang_cfg_sha256": "234bdd941720eee7c052191816d7fa1ec0dd44e6f97f8119ab3f577fbf3eddc2",
+    "clangxx_cfg_sha256": "234bdd941720eee7c052191816d7fa1ec0dd44e6f97f8119ab3f577fbf3eddc2",
+    "host_runtime": {
+      "image": "debian@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251",
+      "purpose": "build-only glibc loader and libraries for Chromium's Linux_x64 compiler"
+    },
     "architectures": {
-      "arm64": {
-        "linux_arch": "aarch64",
-        "chromium_cpu": "arm64",
-        "target_triple": "aarch64-unknown-linux-musl",
-        "archive_filename": "clang+llvm-23.1.0-rc2-aarch64-linux-musl.tar.xz",
-        "archive_size": 91229132,
-        "archive_url": "https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-23.1.0-rc2-6eb5fb9/clang+llvm-23.1.0-rc2-aarch64-linux-musl.tar.xz",
-        "archive_sha256": "0c9bd6f0fefa26dbdb7d6ed568f3799b558428b1ce1264656aa328fc6fd9e32d"
-      },
       "amd64": {
         "linux_arch": "x86_64",
         "chromium_cpu": "x64",
         "target_triple": "x86_64-unknown-linux-musl",
-        "archive_filename": "clang+llvm-23.1.0-rc2-x86_64-linux-musl.tar.xz",
-        "archive_size": 99139524,
-        "archive_url": "https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-23.1.0-rc2-6eb5fb9/clang+llvm-23.1.0-rc2-x86_64-linux-musl.tar.xz",
-        "archive_sha256": "36647cca0bf57d206a6ce757d07a9d8489ef6ccf283a2cc7f740d1cba99a088b"
+        "archive_filename": "clang-llvmorg-24-init-3796-g20e97c4b-2.tar.xz",
+        "archive_size": 59131228,
+        "archive_url": "https://commondatastorage.googleapis.com/chromium-browser-clang/Linux_x64/clang-llvmorg-24-init-3796-g20e97c4b-2.tar.xz",
+        "archive_sha256": "86d53b33007a35695645e3867589a20f6f8aeedd146331e1a2ec8fd371e05ea2"
       }
     }
   },
