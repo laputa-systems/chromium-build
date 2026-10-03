@@ -127,6 +127,8 @@ def main() -> None:
             target_cpu,
             "--clang-major",
             clang_major,
+            "--profile",
+            profile_name,
             "--output",
             str(metadata / "gn-args-report.json"),
         ]

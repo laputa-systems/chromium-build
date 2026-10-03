@@ -9,6 +9,8 @@ IMAGE=${CHROMIUM_BUILDER_IMAGE:-}
 WORK_VOLUME=${CHROMIUM_WORK_VOLUME:-}
 CACHE_VOLUME=${CHROMIUM_CACHE_VOLUME:-}
 APP_PATH=
+INSTALL_PREFIX=${CHROMIUM_INSTALL_PREFIX:-}
+INSTALL_BIN_DIR=${CHROMIUM_INSTALL_BIN_DIR:-}
 JOBS=
 YES=0
 LATEST=0
@@ -22,7 +24,8 @@ usage() {
     printf '%s\n' \
         'usage: chromium-build [--platform linux|macos] [--arch arm64|amd64] [--profile PROFILE] command' \
         '       chromium-build image [--arch amd64]' \
-        '       chromium-build fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-e|gate-f|poc|build|cache-stats|stage-runtime|test-fast|test|test-staged [--arch amd64] [--jobs N]' \
+        '       chromium-build ensure-source|fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-e|gate-f|poc|build|cache-stats|stage-runtime|test-fast|test|test-staged|package [--arch amd64] [--profile headless-debug|headless-release] [--jobs N]' \
+        '       chromium-build install [--profile headless-debug|headless-release] [--prefix DIR] [--bin-dir DIR]' \
         '       chromium-build build-target <ninja-output-or-label> [--arch amd64] [--jobs N]' \
         '       chromium-build --platform macos doctor|smoke-preflight|update-lock|fetch|prepare|configure|build|cache-stats|stage-runtime|package|test-staged [--arch arm64]'
 }
@@ -50,6 +53,16 @@ while [ "$#" -gt 0 ]; do
             APP_PATH=$2
             shift 2
             ;;
+        --prefix)
+            [ "$#" -ge 2 ] || fail '--prefix needs a value'
+            INSTALL_PREFIX=$2
+            shift 2
+            ;;
+        --bin-dir)
+            [ "$#" -ge 2 ] || fail '--bin-dir needs a value'
+            INSTALL_BIN_DIR=$2
+            shift 2
+            ;;
         --jobs)
             [ "$#" -ge 2 ] || fail '--jobs needs a value'
             JOBS=$2
@@ -63,7 +76,7 @@ while [ "$#" -gt 0 ]; do
             LATEST=1
             shift
             ;;
-        image|fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-e|gate-f|poc|build|cache-stats|stage-runtime|package|test-fast|test|test-staged|doctor|smoke-preflight|update-lock|configure|reset|status)
+        image|ensure-source|install|fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-e|gate-f|poc|build|cache-stats|stage-runtime|package|test-fast|test|test-staged|doctor|smoke-preflight|update-lock|configure|reset|status)
             [ -z "$command_name" ] || fail 'only one command may be selected'
             command_name=$1
             shift
@@ -111,7 +124,10 @@ case "$PLATFORM" in
         ;;
     linux)
         PROFILE=${PROFILE:-headless-debug}
-        [ "$PROFILE" = headless-debug ] || fail "Gate A/B/C/D/F only support headless-debug"
+        case "$PROFILE" in
+            headless-debug|headless-release) ;;
+            *) fail "Linux supports the headless-debug and headless-release profiles only" ;;
+        esac
         ;;
     *)
         fail "unsupported platform $PLATFORM"
@@ -185,6 +201,7 @@ run_gate() {
     if [ -n "$JOBS" ]; then
         build_environment+=(-e "JOBS=$JOBS")
     fi
+    build_environment+=(-e "GN_OUT=/work/out/$PROFILE")
     if [ "$command_name" = test-staged ]; then
         test_environment+=(-e "CHROMIUM_TEST_CHROME=/work/stage/$PROFILE/chrome")
         test_environment+=(-e "MEDIA_RUNTIME_BASELINE=/work/metadata/media-runtime-baseline.json")
@@ -206,6 +223,93 @@ run_gate() {
         "$IMAGE" "${script_command[@]}" "$@"
 }
 
+volume_has() {
+    docker run --rm --network=none -v "$WORK_VOLUME:/work:ro" "$IMAGE" test -e "/work/$1"
+}
+
+# Fetch and prepare are one-shot: prepare refuses to overwrite a prepared
+# source tree, so a resumable release run skips whatever already completed.
+ensure_source() {
+    if volume_has metadata/fetch-complete.stamp; then
+        echo 'ensure-source: fetch already complete'
+    else
+        run_fetch
+    fi
+    if volume_has metadata/source-complete.stamp; then
+        echo 'ensure-source: source already prepared'
+    else
+        run_gate prepare-source-driver.py
+    fi
+}
+
+# Launch the way CDP clients such as Shadowdriver do, with a scrubbed
+# environment, and require the DevTools endpoint to create a page target.
+smoke_cdp() {
+    local launcher=$1 profile_dir pid port i status=1
+    profile_dir=$(mktemp -d)
+    env -i HOME="$HOME" PATH=/usr/bin:/bin "$launcher" --headless=new --disable-gpu --no-first-run \
+        --remote-debugging-port=0 --user-data-dir="$profile_dir" about:blank 2>"$profile_dir.log" &
+    pid=$!
+    for i in $(seq 60); do
+        [ -s "$profile_dir/DevToolsActivePort" ] && break
+        kill -0 "$pid" 2>/dev/null || break
+        sleep 1
+    done
+    port=$(head -n 1 "$profile_dir/DevToolsActivePort" 2>/dev/null || true)
+    if [ -n "$port" ] \
+        && curl -fsS "http://127.0.0.1:$port/json/version" | grep -q '"Browser": *"[A-Za-z]*Chrome/' \
+        && curl -fsS -X PUT "http://127.0.0.1:$port/json/new?about:blank" | grep -q '"type": *"page"'; then
+        status=0
+    fi
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+    [ "$status" = 0 ] || tail -20 "$profile_dir.log" >&2
+    rm -rf -- "$profile_dir" "$profile_dir.log"
+    return "$status"
+}
+
+# Copy the packaged bundle out of the work volume, verify it byte-for-byte
+# against its manifest, prove it launches on this host, then swap it in.
+install_package() {
+    [ -n "${HOME:-}" ] || fail 'install needs HOME or --prefix and --bin-dir'
+    local prefix=${INSTALL_PREFIX:-$HOME/.local/opt/ungoogled-chromium-$PROFILE}
+    local bin_dir=${INSTALL_BIN_DIR:-$HOME/.local/bin}
+    case "$prefix" in /*) ;; *) fail "--prefix must be absolute: $prefix" ;; esac
+    volume_has "package/$PROFILE/package-manifest.json" || fail "no $PROFILE package; run chromium-build package first"
+    mkdir -p "$(dirname -- "$prefix")" "$bin_dir"
+    local staging
+    staging=$(mktemp -d "$(dirname -- "$prefix")/.chromium-install.XXXXXX")
+    trap 'rm -rf -- "$staging"' EXIT
+    docker run --rm --network=none \
+        -v "$WORK_VOLUME:/work:ro" \
+        -v "$staging:/install" \
+        "$IMAGE" python3 -c '
+import hashlib, json, os, shutil, sys
+source, target, owner = sys.argv[1], "/install", (int(sys.argv[2]), int(sys.argv[3]))
+manifest = json.load(open(os.path.join(source, "package-manifest.json")))
+if manifest.get("status") != "complete":
+    sys.exit("package manifest is incomplete")
+shutil.copytree(source, target, dirs_exist_ok=True)
+for entry in manifest["files"]:
+    with open(os.path.join(target, entry["path"]), "rb") as stream:
+        if hashlib.file_digest(stream, "sha256").hexdigest() != entry["sha256"]:
+            sys.exit(f"installed file differs from the package: {entry["path"]}")
+for directory, names, files in os.walk(target):
+    for name in [directory, *(os.path.join(directory, file) for file in files)]:
+        os.chown(name, *owner)
+' "/work/package/$PROFILE" "$(id -u)" "$(id -g)"
+    smoke_cdp "$staging/chromium" || fail 'packaged Chromium did not start and open a page on this host'
+    if [ -e "$prefix" ]; then
+        mv -- "$prefix" "$staging.previous"
+    fi
+    mv -- "$staging" "$prefix"
+    trap - EXIT
+    rm -rf -- "$staging.previous"
+    ln -sfn -- "$prefix/chromium" "$bin_dir/chromium"
+    echo "install: $("$bin_dir/chromium" --version) at $prefix"
+    echo "install: $bin_dir/chromium -> $prefix/chromium"
+}
+
 case "$command_name" in
     fetch) run_fetch ;;
     prepare) run_gate prepare-source-driver.py ;;
@@ -221,7 +325,9 @@ case "$command_name" in
         docker run --rm --network=none -v "$CACHE_VOLUME:/ccache" "$IMAGE" ccache --show-stats
         ;;
     stage-runtime) run_gate stage-runtime.py --chrome "/work/out/$PROFILE/chrome" --output "/work/stage/$PROFILE" ;;
-    package) fail 'package is currently implemented only for the native macOS backend' ;;
+    package) run_gate package-runtime.py --stage "/work/stage/$PROFILE" --output "/work/package/$PROFILE" ;;
+    ensure-source) ensure_source ;;
+    install) install_package ;;
     test-fast) run_gate test-fast-driver.py ;;
     test) run_gate test-functional-driver.py ;;
     test-staged) run_gate test-functional-driver.py ;;

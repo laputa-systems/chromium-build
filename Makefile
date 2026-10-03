@@ -9,15 +9,18 @@ endif
 IMAGE ?= ungoogled-chromium-builder:153.0.8010.52-$(ARCH)
 WORK_VOLUME ?= ungoogled-chromium-153-work-$(ARCH)
 CACHE_VOLUME ?= ungoogled-chromium-153-ccache-$(ARCH)
+# Ninja parallelism for build steps; empty keeps build.py's default of min(CPUs, 8).
+JOBS ?=
 
 CHROMIUM_BUILD = CHROMIUM_BUILDER_IMAGE=$(IMAGE) \
     CHROMIUM_WORK_VOLUME=$(WORK_VOLUME) \
     CHROMIUM_CACHE_VOLUME=$(CACHE_VOLUME) \
-    ./chromium-build --platform $(PLATFORM) --arch $(ARCH) --profile $(PROFILE)
+    ./chromium-build --platform $(PLATFORM) --arch $(ARCH) --profile $(PROFILE) $(if $(JOBS),--jobs $(JOBS))
 DOCKER ?= docker
 
 .NOTPARALLEL:
 .PHONY: image fetch prepare gate-a gate-b gate-c gate-d gate-e gate-f gates
+.PHONY: release-linux package install
 .PHONY: bootstrap full-build resume-build build-target stage-runtime test-fast test-functional test-staged cache-stats resume-check graph-breakdown check-py
 .PHONY: macos-doctor macos-smoke-preflight macos-update-lock macos-fetch macos-prepare macos-configure macos-cache-stats macos-build macos-stage-runtime macos-test-staged
 
@@ -77,6 +80,29 @@ test-functional:
 
 test-staged:
 	$(CHROMIUM_BUILD) test-staged
+
+package:
+	$(CHROMIUM_BUILD) package
+
+install:
+	$(CHROMIUM_BUILD) install
+
+# Build, accept, package, and install the self-contained headless release
+# bundle. Resumable: completed fetch/prepare are skipped and Ninja only
+# rebuilds what changed. `image` always runs so the image carries the
+# current scripts; with a warm build cache that is a no-op.
+release-linux: PLATFORM = linux
+release-linux: PROFILE = headless-release
+release-linux:
+	$(CHROMIUM_BUILD) image
+	$(CHROMIUM_BUILD) ensure-source
+	$(CHROMIUM_BUILD) poc
+	$(CHROMIUM_BUILD) build
+	$(CHROMIUM_BUILD) test
+	$(CHROMIUM_BUILD) stage-runtime
+	$(CHROMIUM_BUILD) test-staged
+	$(CHROMIUM_BUILD) package
+	$(CHROMIUM_BUILD) install
 
 cache-stats:
 	$(DOCKER) run --rm --network=none -v $(CACHE_VOLUME):/ccache $(IMAGE) \

@@ -23,8 +23,12 @@ not build instructions.
 
 ## Linux musl backend
 
-Omitting `--platform` selects Linux. The implemented profile is
-`headless-debug`; the pinned Chromium and toolchain identities are in
+Omitting `--platform` selects Linux. The implemented profiles are
+`headless-debug` and `headless-release`, which differ only in `is_debug` (and
+`dcheck_always_on = false` for release); `verify-gn-args.py` enforces that. The
+profiles share one work volume's source and gate reports but build into
+`/work/out/<profile>`, and `build` refuses to run unless Gate D last passed for
+the same profile. The pinned Chromium and toolchain identities are in
 `config/inputs.lock` and the architecture-specific package locks. Chromium 153's
 GN graph requires printing targets to exist, so this profile enables printing
 while disabling CUPS (`use_cups=false`). `Dockerfile`
@@ -88,9 +92,27 @@ Typical Linux sequence:
 ./chromium-build --arch amd64 --profile headless-debug test-staged
 ```
 
-`package` is unimplemented for Linux. Exported runtime closure, clean-host
-relocation, cold-build acceptance, and the Wayland/ALSA profile also lack
-current evidence. Do not call a staged runtime a portable release package.
+Linux `package` turns a staged runtime into a self-contained bundle at
+`/work/package/<profile>`: `chrome` and its resources, the transitive
+`DT_NEEDED` closure plus NSS's dlopened modules in `lib/`, the pinned Noto
+fonts with a relative fontconfig configuration, and a `chromium` launcher that
+sets `LD_LIBRARY_PATH` and `FONTCONFIG_FILE`. The host must provide only the
+musl loader/libc; glibc can never enter the closure. The FFmpeg closure's musl
+`libstdc++`/`libgcc_s` are bundled under the audited exception above, while
+`stage-runtime` still keeps them out of `chrome`'s direct requirements.
+`install` copies a package out of the volume, verifies it against
+`package-manifest.json`, requires a CDP launch in a scrubbed environment on the
+host, then swaps it into `~/.local/opt/ungoogled-chromium-<profile>` and links
+`~/.local/bin/chromium` (`--prefix`/`--bin-dir` override). Shadowdriver finds
+`chromium` on `PATH` without further configuration.
+
+`make release-linux [JOBS=N]` runs the whole resumable release path for
+`headless-release`: image, `ensure-source` (fetch/prepare only if not already
+stamped), Gates A–F, build, functional test, stage, staged test, package, and
+install. A bundled `headless-debug` package and grab's browser contracts passed
+on an Alpine 3.23 host (musl 1.2.5) with no NSS, FFmpeg, fontconfig, or fonts
+installed. Clean-host relocation beyond that, cold-build acceptance, and the
+Wayland/ALSA profile still lack evidence.
 
 ## Native macOS arm64 backend
 

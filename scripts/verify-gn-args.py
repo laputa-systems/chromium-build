@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check the effective headless-debug GN values and canonical listing."""
+"""Check the effective headless profile GN values and canonical listing."""
 
 import argparse
 import ast
@@ -38,6 +38,11 @@ def parse_value(value):
         return value
 
 
+# The two Linux profiles differ only in the debug switch; everything else in
+# `expected` is the shared headless musl contract.
+DEBUG_BY_PROFILE = {"headless-debug": True, "headless-release": False}
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--args", type=Path, required=True)
@@ -46,6 +51,7 @@ def main():
     parser.add_argument("--probe", type=Path, required=True)
     parser.add_argument("--target-cpu", required=True)
     parser.add_argument("--clang-major", required=True)
+    parser.add_argument("--profile", choices=sorted(DEBUG_BY_PROFILE), required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
@@ -67,7 +73,7 @@ def main():
         "host_toolchain": "//build/toolchain/linux/unbundle:default",
         "cc_wrapper": "/usr/bin/ccache",
         "is_component_build": False,
-        "is_debug": True,
+        "is_debug": DEBUG_BY_PROFILE[args.profile],
         "is_official_build": False,
         "safe_browsing_mode": 0,
         "symbol_level": 0,
@@ -100,6 +106,8 @@ def main():
         "enable_widevine": False,
         "optimize_webui": False,
     }
+    if not DEBUG_BY_PROFILE[args.profile]:
+        expected["dcheck_always_on"] = False
     for name, value in expected.items():
         if values.get(name) != value:
             raise SystemExit(f"GN arg {name}: expected {value!r}, got {values.get(name)!r}")
@@ -148,6 +156,7 @@ def main():
         "schema": 1,
         "status": "complete",
         "target_cpu": args.target_cpu,
+        "profile": args.profile,
         "values": values,
         "optional_arguments": probe["arguments"],
     }

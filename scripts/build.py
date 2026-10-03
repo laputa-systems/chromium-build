@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 import time
@@ -31,6 +32,11 @@ def main() -> None:
         raise ScriptFailure("build requires NETWORK_MODE=none")
     require_file(metadata / "gate-d-report.json", "Gate D has not passed")
     require_file(metadata / "gate-f-report.json", "Gate F has not passed")
+    # Gate reports are shared by the profiles in one work volume; refuse to
+    # build one profile on the strength of another profile's Gate D.
+    gated = json.loads((metadata / "gate-d-report.json").read_text(encoding="utf-8")).get("profile")
+    if gated != profile:
+        raise ScriptFailure(f"Gate D last passed for {gated}, not {profile}; rerun the gates for this profile")
     require_directory(out, f"missing GN output {out}")
     command_path(ninja)
 
