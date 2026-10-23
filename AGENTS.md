@@ -1,175 +1,38 @@
-# Repository working contract
+# chromium-build
 
-This repository builds ungoogled Chromium through two separate backends. Use
-`./chromium-build` as the host entry point. `Makefile` provides shortcuts, and
-`scripts/macos_backend.py` owns the native macOS phases. The lock files, profile
-files, patch inventory, command implementation, and phase reports are the source
-of truth for the current build; historical artifact paths and image digests are
-not build instructions.
+Builds ungoogled Chromium through a containerized Linux musl backend and a
+native macOS arm64 backend. `./chromium-build`, the input locks, profiles,
+patch inventories, and phase reports define current behavior.
 
 ## Working rules
 
-- Before editing, trace the intended behavior through the command, its callers,
-  locks, patches, tests, and nearby comments. Use one domain name per concept and
-  keep contract changes explicit in code, tests, and documentation.
-- For a bug fix, add the smallest isolated failing regression test first, then
-  fix the cause. Start verification with the narrowest useful compiler, schema,
-  test, or runtime check. Keep existing comments that explain constraints.
-- Do not add a dependency without consulting the user. Do not run formatters,
-  linters, or pre-commit hooks. Never push unless explicitly asked.
-- Preserve resumable build state and logs when diagnosing failures. Keep version
-  updates and build-contract changes reviewable; do not weaken sandboxing,
-  signature checks, source checksums, or browser acceptance to make a build pass.
+- Read the relevant command, callers, lock inputs, patches, and focused tests
+  before changing a build contract.
+- Keep Linux and macOS inputs and phases separate. Do not weaken source,
+  signature, sandbox, runtime, or browser acceptance checks.
+- Do not run formatters, linters, hooks, or CI. Verify locally with a focused
+  check. Preserve resumable state when diagnosing failures.
+- Do not install or update host tools as part of a normal build. Keep macOS
+  generated state under this repository's `.work/` directory.
+- Do not push or commit unless requested.
 
-## Linux musl backend
+## Guides
 
-Omitting `--platform` selects Linux. The implemented profiles are
-`headless-debug` and `headless-release`, which differ only in `is_debug` (and
-`dcheck_always_on = false` for release); `verify-gn-args.py` enforces that. The
-profiles share one work volume's source and gate reports but build into
-`/work/out/<profile>`, and `build` refuses to run unless Gate D last passed for
-the same profile. The pinned Chromium and toolchain identities are in
-`config/inputs.lock` and the architecture-specific package locks. Chromium 153's
-GN graph requires printing targets to exist, so this profile enables printing
-while disabling CUPS (`use_cups=false`). `Dockerfile`
-builds a native Alpine image. Source and Ninja output live in Docker named
-volumes, not host bind mounts. Only `fetch` may use networking; preparation,
-generation, compilation, testing, and staging run without it. Do not silently
-replace pinned archives with Git clones, depot_tools, or Chromium toolchain
-downloads on this backend.
+- Linux musl builds, profiles, gates, packaging, and installation:
+  [Linux](docs/linux.md).
+- Native macOS builds, cache selection, staged acceptance, and packaging:
+  [macOS](docs/macos.md).
+- macOS compiler cache selector: `MACOS_COMPILER_CACHE=off|ccache|sccache|auto`;
+  `none` and `disabled` also turn compiler caching off.
+- Gate F's independent graph audit and generated evidence:
+  [Gate F oracle](docs/gate-f-oracle.md).
 
-The Linux amd64 image uses Chromium 153's pinned LLVM 24 archive at
-`/opt/chromium-llvm`. Chromium's compiler is a glibc host executable, so the
-image copies a pinned Debian glibc runtime solely to run build tools. Its Clang
-configuration targets `x86_64-unknown-linux-musl`; browser outputs must use the
-musl interpreter and must not gain glibc, libstdc++, or libgcc direct ELF
-requirements. Chromium's in-tree libc++/libc++abi/libunwind provide the C++
-runtime. The pinned Alpine `ninja-build` package, ccache, and Rust toolchain are
-build-only tools. The copied stock-Alpine FFmpeg runtime dependency closure is
-the narrowly audited shipped exception, including its transitive GNU runtime
-libraries. Do not broaden that exception by editing an allowlist alone. See
-`LLVM-TOOLCHAIN.md` for the compiler boundary and validation.
+The Makefile contains command shortcuts. `config/inputs.lock`,
+`config/macos.inputs.lock`, the architecture package locks, and the profile
+files are authoritative for pinned inputs.
 
-The amd64 compiler cache lives in the persistent Docker volume
-`ungoogled-chromium-153-ccache-amd64`, is limited to 10 GB, and is namespaced
-by architecture, LLVM archive digest, and compiler-command policy. Ccache must
-use GN's selected `clang` or `clang++` rather than a forced compiler override.
-Gate A compiles C and C++ musl objects twice and requires direct cache hits;
-Gate F confirms that C/C++ compile
-commands use `/usr/bin/ccache` while link commands bypass it. Use
-`./chromium-build --arch amd64 cache-stats` to inspect the cache. A first full
-build mostly records misses because each source is compiled for the first time.
-`stage-runtime` audits the built Chrome ELF interpreter and direct shared
-library requirements before copying it; its manifest records both.
+## Commands
 
-The earlier arm64/Chromium 150 headless milestone passed its full `chrome`
-build, Gates A–F, `test-fast`, functional `test`, `stage-runtime`, and
-`test-staged`; these are historical results and do not establish Chromium 153
-amd64 acceptance. The current Linux 153 lock supports native amd64 only:
-Chromium publishes no native Linux arm64 LLVM 24 archive at this revision.
-Check current work-volume reports before claiming any new phase passed.
-
-On the native amd64 host, the Chromium 153 headless build passed a clean
-source preparation and Gates A–F in the `ungoogled-chromium-153-final-proof-amd64`
-volume. The built and staged Chrome passed `test-fast`, the full functional
-scenario, and the staged functional scenario in the main work volume. An
-isolated Shadowdriver harness opened 32 distinct pages with the pinned uBlock
-extension policy against the staged Chrome. These results establish this
-host's headless acceptance; they do not establish relocation or a portable
-package.
-
-Typical Linux sequence:
-
-```sh
-./chromium-build --arch amd64 --profile headless-debug image
-./chromium-build --arch amd64 --profile headless-debug fetch
-./chromium-build --arch amd64 --profile headless-debug prepare
-./chromium-build --arch amd64 --profile headless-debug poc
-./chromium-build --arch amd64 --profile headless-debug build
-./chromium-build --arch amd64 --profile headless-debug test-fast
-./chromium-build --arch amd64 --profile headless-debug test
-./chromium-build --arch amd64 --profile headless-debug stage-runtime
-./chromium-build --arch amd64 --profile headless-debug test-staged
-```
-
-Linux `package` turns a staged runtime into a self-contained bundle at
-`/work/package/<profile>`: `chrome` and its resources, the transitive
-`DT_NEEDED` closure plus NSS's dlopened modules in `lib/`, the pinned Noto
-fonts with a relative fontconfig configuration, and a `chromium` launcher that
-sets `LD_LIBRARY_PATH` and `FONTCONFIG_FILE`. The host must provide only the
-musl loader/libc; glibc can never enter the closure. The FFmpeg closure's musl
-`libstdc++`/`libgcc_s` are bundled under the audited exception above, while
-`stage-runtime` still keeps them out of `chrome`'s direct requirements.
-`install` copies a package out of the volume, verifies it against
-`package-manifest.json`, requires a CDP launch in a scrubbed environment on the
-host, then swaps it into `~/.local/opt/ungoogled-chromium-<profile>` and links
-`~/.local/bin/chromium` (`--prefix`/`--bin-dir` override). Shadowdriver finds
-`chromium` on `PATH` without further configuration.
-
-`make release-linux [JOBS=N]` runs the whole resumable release path for
-`headless-release`: image, `ensure-source` (fetch/prepare only if not already
-stamped), Gates A–F, build, functional test, stage, staged test, package, and
-install. A bundled `headless-debug` package and grab's browser contracts passed
-on an Alpine 3.23 host (musl 1.2.5) with no NSS, FFmpeg, fontconfig, or fonts
-installed. Clean-host relocation beyond that, cold-build acceptance, and the
-Wayland/ALSA profile still lack evidence.
-
-## Native macOS arm64 backend
-
-Select `--platform macos --arch arm64 --profile macos-release`. The backend
-builds the locked ungoogled release in `config/macos.inputs.lock` as a desktop
-`Chromium.app`. It uses native Apple Silicon and macOS 26 or newer, a usable Xcode
-SDK and Metal Toolchain, compatible LLVM 23.1.0 or newer, and the locked Rust
-nightly. The work root must be an absolute child of the repository's `.work/`
-directory; keep all project-controlled downloads, tools, caches, source, output,
-logs, test profiles, and artifacts there. The acceptance harness uses the
-sibling `shadowdriver` checkout, which remains a read-only reference. Do not
-alter Xcode, Homebrew installations, keychains, `/Applications`, or the read-only
-Helium and Shadowdriver reference checkouts as part of an ordinary local build.
-
-Mac source preparation applies the version-matched ungoogled core series. Do not
-mix in the Linux musl/headless patch stack or Helium branding/product changes.
-The release profile keeps the normal desktop UI, extension support, DevTools,
-native sandbox, and only the packaged `en-US` locale. The checked-in profile
-uses Apple's linker and disables ThinLTO because the selected bundled lld does
-not parse the Xcode 27 SDK TAPI inputs; revisit this only with a demonstrated
-compatible toolchain. Compiler caching is optional and local through
-`MACOS_COMPILER_CACHE=off|ccache|sccache|kache|auto`; `auto` uses an already
-installed ccache, sccache, or Kache wrapper, in that order. Cache stores,
-configuration, runtime files, and logs stay under the work root.
-`none` and `disabled` also turn compiler caching off.
-
-Run local phases in order. `update-lock --latest` is an explicit maintainer
-operation when selecting a new release; ordinary runs use the committed lock.
-
-```sh
-export CHROMIUM_WORK_ROOT="$PWD/.work/macos-arm64"
-./chromium-build --platform macos --arch arm64 --profile macos-release doctor
-./chromium-build --platform macos --arch arm64 --profile macos-release fetch
-./chromium-build --platform macos --arch arm64 --profile macos-release prepare
-./chromium-build --platform macos --arch arm64 --profile macos-release configure
-./chromium-build --platform macos --arch arm64 --profile macos-release build
-./chromium-build --platform macos --arch arm64 --profile macos-release stage-runtime
-./chromium-build --platform macos --arch arm64 --profile macos-release test-staged
-./chromium-build --platform macos --arch arm64 --profile macos-release package
-```
-
-`stage-runtime` signs and audits a candidate app. `test-staged` runs the actual
-Shadowdriver acceptance harness against the staged executable. It checks
-BrowserNative identity and CDP capture, 32- and 64-page waves, MV2 and MV3
-extensions, uBlock blocking, screenshot and PDF capture, and headed and
-headless Metal rendering. It promotes the candidate only after the harness
-passes. `test-staged --app /absolute/path/Chromium.app` tests a supplied or
-relocated app. `package` writes the candidate zip and checksum under the work
-root's `release` directory.
-Use `status` and the JSON phase reports under the work root to establish what
-actually passed on a given host. `reset --yes` removes owned generated state;
-use it only when that loss is intended.
-
-`.github/workflows/macos-26-smoke.yml` is a manually dispatched full-build and
-prerelease-packaging path. It signs and audits the app, but skips local
-Shadowdriver acceptance and packages the candidate without an accepted marker.
-A CI artifact alone does not establish consumer acceptance. The local harness
-also exercises the supplied-app relocation path. Check the current workroot's
-phase reports before claiming that a build or acceptance phase passed. Do not
-infer those results from unit tests or the workflow definition.
+- Build and run browser acceptance with `./chromium-build`; use the platform
+  guides for required flags and phase order.
+- Run the Python static checks with `make check-py`.
