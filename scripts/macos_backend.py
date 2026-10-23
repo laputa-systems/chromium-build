@@ -35,13 +35,9 @@ import urllib.request
 import zipfile
 
 
-WORK_PREFIX = Path("/Volumes/dev")
 MIN_MACOS = (26, 0, 0)
 MIN_LLVM = (23, 1, 0)
 PREFERRED_LLVM = (23, 1, 1)
-# macos-26 hosted runners currently expose about 92 GiB free on /Volumes/dev.
-# Keep a 12 GiB headroom margin while allowing the real fetch/configure/build
-# phases to be the capacity proof rather than rejecting every hosted runner.
 FULL_BUILD_MIN_FREE_GB = 80
 POST_FETCH_MIN_FREE_GB = 40
 RUST_TOOLCHAIN = "nightly-2026-09-15"
@@ -50,8 +46,9 @@ LOCK_RELATIVE = Path("config/macos.inputs.lock")
 OWNERSHIP_SCHEMA = 1
 VERSION_RE = re.compile(r"(?<!\d)(\d+)\.(\d+)(?:\.(\d+))?(?:\.(\d+))?(?!\d)")
 RELEASE_RE = re.compile(r"^(\d+\.\d+\.\d+\.\d+)-(\d+)$")
-COMPILER_CACHE_NAMES = ("ccache", "sccache")
-COMPILER_CACHE_DISABLED = {"off", "none", "disabled"}
+COMPILER_CACHE_NAMES = ("ccache", "sccache", "kache")
+COMPILER_CACHE_DISABLED = ("off", "none", "disabled")
+COMPILER_CACHE_CHOICES = ("auto", *COMPILER_CACHE_DISABLED, *COMPILER_CACHE_NAMES)
 DOWNLOAD_CHUNK_BYTES = 1024 * 1024
 RANGE_DOWNLOAD_THRESHOLD_BYTES = 256 * 1024 * 1024
 RANGE_DOWNLOAD_CHUNK_BYTES = 64 * 1024 * 1024
@@ -94,7 +91,7 @@ def canonical_path(raw: str | Path, label: str, *, must_exist: bool = False) -> 
     if "\x00" in value:
         fail(f"{label} contains a NUL byte")
     if "~" in value:
-        fail(f"{label} must not use ~; spell it as an absolute path under /Volumes/dev")
+        fail(f"{label} must not use ~; spell it as an absolute path")
     if " " in value or "\t" in value or "\n" in value:
         fail(f"{label} contains whitespace, which Chromium does not support here: {value}")
     path = Path(value)
@@ -106,13 +103,19 @@ def canonical_path(raw: str | Path, label: str, *, must_exist: bool = False) -> 
 
 
 def validate_work_root(raw: str | Path, repo_root: Path) -> Path:
+    requested_root = Path(raw)
+    work_area = repo_root / ".work"
+    if work_area.is_symlink():
+        fail(f"repository .work directory must not be a symlink: {work_area}")
+    if requested_root.is_symlink():
+        fail(f"work root must not be a symlink: {requested_root}")
     root = canonical_path(raw, "CHROMIUM_WORK_ROOT")
-    if not is_within(root, WORK_PREFIX):
-        fail(f"CHROMIUM_WORK_ROOT must be under /Volumes/dev: {root}")
-    if root in (WORK_PREFIX, Path("/"), repo_root, repo_root.parent):
+    if not is_within(root, work_area) or root == work_area:
+        fail(f"CHROMIUM_WORK_ROOT must be a child of the repository .work directory ({work_area}): {root}")
+    if root == Path("/"):
         fail(f"refusing dangerous work root: {root}")
     if root == Path("/tmp") or is_within(root, Path("/tmp")):
-        fail(f"/tmp is forbidden; choose a work root under /Volumes/dev: {root}")
+        fail(f"/tmp is forbidden; choose a work root under the repository .work directory: {root}")
     if root.exists() and root.is_symlink():
         fail(f"work root must not be a symlink: {root}")
     return root
@@ -179,7 +182,8 @@ def compiler_cache_report(environment: Mapping[str, str]) -> dict[str, Any]:
                 "path": environment.get("CHROMIUM_COMPILER_CACHE_WRAPPER", ""),
                 "version": environment.get("CHROMIUM_COMPILER_CACHE_VERSION", ""),
                 "directory": environment.get("CCACHE_DIR")
-                or environment.get("SCCACHE_DIR", ""),
+                or environment.get("SCCACHE_DIR")
+                or environment.get("KACHE_CACHE_DIR", ""),
             }
         )
     else:
@@ -210,11 +214,8 @@ def select_compiler_cache(
             "reason": f"disabled by MACOS_COMPILER_CACHE={choice}",
             "root": str(layout.cache / "compiler"),
         }
-    if choice not in {"auto", *COMPILER_CACHE_NAMES}:
-        fail(
-            "MACOS_COMPILER_CACHE must be auto, off, ccache, or sccache; "
-            f"got {choice!r}"
-        )
+    if choice not in COMPILER_CACHE_CHOICES:
+        fail(f"MACOS_COMPILER_CACHE must be one of {', '.join(COMPILER_CACHE_CHOICES)}; got {choice!r}")
 
     names = (choice,) if choice in COMPILER_CACHE_NAMES else COMPILER_CACHE_NAMES
     inspected: list[str] = []
@@ -227,6 +228,8 @@ def select_compiler_cache(
             Path("/usr/local/opt") / name / "bin" / name,
             Path("/usr/bin") / name,
         ]
+        if name == "kache":
+            candidate_paths.append(Path.home() / ".cargo" / "bin" / name)
         resolved_from_path = command_path(name, environment)
         if resolved_from_path:
             candidate_paths.append(Path(resolved_from_path))
@@ -240,21 +243,29 @@ def select_compiler_cache(
                 continue
             if " " in str(path) or "\t" in str(path) or "\n" in str(path):
                 fail(f"compiler cache executable contains whitespace: {path}")
-            if not (
-                is_within(path, WORK_PREFIX)
+            in_supported_location = (
+                is_within(path, layout.root)
                 or is_within(path, Path("/opt/homebrew"))
                 or is_within(path, Path("/usr/local"))
                 or is_within(path, Path("/usr/bin"))
-            ):
+                or (name == "kache" and is_within(path, Path.home() / ".cargo" / "bin"))
+            )
+            if not in_supported_location:
                 continue
             inspected.append(str(path))
             version = command_output([str(path), "--version"], env=environment, check=False)
             if version.returncode:
                 continue
-            cache_directory = layout.cache / "compiler" / name
+            cache_parent = layout.cache / "compiler"
+            if not is_within(cache_parent.resolve(), layout.root.resolve()):
+                fail(f"compiler cache directory escapes the work root: {cache_parent}")
+            cache_directory = cache_parent / name
             cache_temp = cache_directory / "tmp"
             cache_directory.mkdir(parents=True, exist_ok=True)
-            cache_temp.mkdir(parents=True, exist_ok=True)
+            if not is_within(cache_directory.resolve(), layout.root.resolve()):
+                fail(f"compiler cache directory escapes the work root: {cache_directory}")
+            if name == "ccache":
+                cache_temp.mkdir(parents=True, exist_ok=True)
             return {
                 "status": "enabled",
                 "requested": choice,
@@ -424,6 +435,16 @@ class WorkLayout:
 
 @contextmanager
 def work_lock(layout: WorkLayout) -> Iterator[None]:
+    initialization_lock_dir = layout.repo_root / ".work" / ".locks"
+    initialization_lock_dir.mkdir(parents=True, exist_ok=True)
+    initialization_lock = initialization_lock_dir / "initialization.lock"
+    with initialization_lock.open("a+", encoding="utf-8") as stream:
+        try:
+            fcntl.flock(stream.fileno(), fcntl.LOCK_EX)
+        except OSError as error:
+            fail(f"cannot acquire work-root initialization lock {initialization_lock}: {error}")
+        layout.ensure()
+
     layout.lock_dir.mkdir(parents=True, exist_ok=True)
     lock_path = layout.lock_dir / "build.lock"
     with lock_path.open("a+", encoding="utf-8") as stream:
@@ -454,7 +475,7 @@ def isolated_environment(
     )
     for key in tuple(environment):
         if key.startswith(
-            ("RBE_", "GOMA_", "RECLIENT_", "SISO_", "SCCACHE_", "CCACHE_", "DISTCC_")
+            ("RBE_", "GOMA_", "RECLIENT_", "SISO_", "SCCACHE_", "CCACHE_", "DISTCC_", "KACHE_")
         ) or key.startswith("CHROMIUM_COMPILER_CACHE_"):
             environment.pop(key, None)
     for key in (
@@ -517,6 +538,11 @@ def isolated_environment(
     selected_path = [str(layout.tools / "bin"), str(layout.tools / "depot_tools")]
     if llvm_root:
         selected_path.append(str(llvm_root / "bin"))
+    rustc_wrapper = command_path("kache", os.environ)
+    if rustc_wrapper:
+        wrapper_dir = str(Path(rustc_wrapper).resolve().parent)
+        if wrapper_dir not in selected_path:
+            selected_path.append(wrapper_dir)
     for host_tool in ("rustup", "cargo"):
         resolved_host_tool = command_path(host_tool, os.environ)
         if resolved_host_tool:
@@ -566,8 +592,31 @@ def isolated_environment(
                     "CCACHE_COMPILERCHECK": "content",
                 }
             )
-        else:
+        elif selected_cache["kind"] == "sccache":
             environment["SCCACHE_DIR"] = selected_cache["directory"]
+        else:
+            runtime_directory = layout.cache / "compiler" / "kache-runtime"
+            runtime_directory.mkdir(parents=True, exist_ok=True)
+            if not is_within(runtime_directory.resolve(), layout.root.resolve()):
+                fail(f"Kache runtime directory escapes the work root: {runtime_directory}")
+            config_path = layout.cache / "compiler" / "kache.toml"
+            if config_path.is_symlink() or (config_path.exists() and not config_path.is_file()):
+                fail(f"Kache configuration path is not a regular file: {config_path}")
+            config = (
+                "[cache]\n"
+                f"local_store = {json.dumps(selected_cache['directory'])}\n"
+                f"runtime_dir = {json.dumps(str(runtime_directory))}\n"
+                "daemon_idle_timeout_secs = 600\n"
+            )
+            atomic_write(config_path, config)
+            environment["KACHE_CACHE_DIR"] = selected_cache["directory"]
+            environment["KACHE_RUNTIME_DIR"] = str(runtime_directory)
+            environment["KACHE_CONFIG"] = str(config_path)
+            environment["KACHE_HOST_CONFIG"] = ""
+            environment["KACHE_DAEMON_IDLE_TIMEOUT"] = "600"
+            environment["KACHE_LOG_FILE"] = str(
+                layout.home / "Library" / "Logs" / "kache" / "kache.log"
+            )
     else:
         environment["CHROMIUM_COMPILER_CACHE_REASON"] = selected_cache["reason"]
     return environment
@@ -772,6 +821,13 @@ def reference_state(path: Path, environment: Mapping[str, str]) -> dict[str, Any
     }
 
 
+def required_reference_paths(layout: WorkLayout) -> tuple[tuple[str, Path], ...]:
+    return (
+        ("helium", layout.repo_root.parent / "helium"),
+        ("shadowdriver", layout.repo_root.parent / "shadowdriver"),
+    )
+
+
 def run_doctor(
     layout: WorkLayout,
     *,
@@ -791,7 +847,7 @@ def run_doctor(
         "platform": "macos",
         "architecture": host_platform.machine(),
         "work_root": str(layout.root),
-        "paths": {"forbidden": ["/tmp", "~"], "root": str(WORK_PREFIX)},
+        "paths": {"forbidden": ["/tmp", "~"], "root": str(layout.repo_root / ".work")},
         "preflight_scope": (
             "full"
             if require_references
@@ -842,7 +898,7 @@ def run_doctor(
             for key, value in llvm.items()
             if key != "version_tuple"
         }
-        free = shutil.disk_usage(WORK_PREFIX).free
+        free = shutil.disk_usage(layout.root).free
         configured_minimum_gb = (
             minimum_free_gb
             if minimum_free_gb is not None
@@ -856,18 +912,15 @@ def run_doctor(
                 f"{FULL_BUILD_MIN_FREE_GB} GiB"
             )
         if free < minimum_free:
-            fail(f"insufficient free space under /Volumes/dev: {free / 1024**3:.1f} GiB; need {minimum_free / 1024**3:.1f} GiB")
+            fail(f"insufficient free space under {layout.root}: {free / 1024**3:.1f} GiB; need {minimum_free / 1024**3:.1f} GiB")
         report["checks"]["filesystem"] = {
-            "mount": str(WORK_PREFIX),
+            "mount": str(layout.root),
             "free_bytes": free,
             "minimum_free_bytes": minimum_free,
             "full_build_minimum_free_bytes": full_build_minimum,
         }
         refs: dict[str, Any] = {}
-        for name, path in (
-            ("helium", Path("/Volumes/dev/d/helium")),
-            ("shadowdriver", Path("/Volumes/dev/d/shadowdriver")),
-        ):
+        for name, path in required_reference_paths(layout):
             if path.is_dir():
                 refs[name] = reference_state(path, environment)
             elif require_references:
@@ -2571,6 +2624,34 @@ def _apply_english_only_locale_compatibility(source: Path) -> dict[str, Any]:
     }
 
 
+def _apply_managed_profile_controller_link_fix(source: Path) -> dict[str, Any]:
+    path = source / "chrome" / "browser" / "enterprise" / "BUILD.gn"
+    if not path.is_file():
+        fail(f"macOS compatibility target is missing: {path}")
+    original = path.read_text(encoding="utf-8")
+    entry = '      "signin/managed_profile_creation_controller.cc",\n'
+    if original.count(entry) == 1:
+        return {
+            "status": "reused",
+            "name": "managed-profile-creation-controller-link",
+            "path": str(path),
+        }
+    if original.count(entry):
+        fail(f"duplicate managed profile controller source entry in {path}")
+    anchor = '      "signin/managed_profile_creator.cc",\n'
+    if original.count(anchor) != 1:
+        fail(f"unexpected enterprise implementation source list in {path}")
+    updated = original.replace(anchor, entry + anchor, 1)
+    path.write_text(updated, encoding="utf-8")
+    return {
+        "status": "applied",
+        "name": "managed-profile-creation-controller-link",
+        "path": str(path),
+        "sha256_before": hashlib.sha256(original.encode()).hexdigest(),
+        "sha256_after": hashlib.sha256(updated.encode()).hexdigest(),
+    }
+
+
 def apply_macos_profile_compatibility(source: Path) -> dict[str, Any]:
     """Apply source fixes required by the lightweight macOS profile."""
 
@@ -2611,6 +2692,7 @@ def apply_macos_profile_compatibility(source: Path) -> dict[str, Any]:
         "safe_browsing": safe_browsing,
         "screen_ai": _apply_disabled_screen_ai_compatibility(source),
         "english_only_locale": _apply_english_only_locale_compatibility(source),
+        "managed_profile_controller": _apply_managed_profile_controller_link_fix(source),
     }
 
 
@@ -3025,18 +3107,22 @@ def compiler_cache_stats(layout: WorkLayout) -> dict[str, Any]:
         "output": "",
         "ninja_incremental": {
             "status": "unavailable",
-            "reason": "the configured output directory is not present",
+            "reason": "the GN output directory has not been configured",
         },
     }
     if cache.get("status") == "enabled":
-        result = command_output([str(cache["path"]), "--show-stats"], env=environment, check=False)
+        if cache.get("kind") == "kache":
+            stats_command = [str(cache["path"]), "stats", "--since", "24h"]
+        else:
+            stats_command = [str(cache["path"]), "--show-stats"]
+        result = command_output(stats_command, env=environment, check=False)
         report["status"] = "complete" if result.returncode == 0 else "failed"
         report["output"] = (result.stdout or result.stderr or "").strip()
         if result.returncode:
             report["returncode"] = result.returncode
     else:
         report["output"] = "compiler cache disabled; Ninja incremental outputs are the active local cache"
-    if layout.source.is_dir() and layout.output.is_dir():
+    if layout.source.is_dir() and (layout.output / "build.ninja").is_file():
         try:
             ninja = find_executable(
                 [
@@ -3081,8 +3167,8 @@ def validate_app_path(raw: str | Path, layout: WorkLayout, label: str, *, built:
         fail(f"{label} must be an existing .app directory: {app}")
     if built:
         layout.assert_owned(app, label)
-    elif not is_within(app, WORK_PREFIX):
-        fail(f"{label} must be under /Volumes/dev: {app}")
+    elif not is_within(app, layout.repo_root / ".work"):
+        fail(f"{label} must be under the repository .work directory: {app}")
     return app
 
 
@@ -3483,13 +3569,19 @@ def acceptance_harness_manifest(layout: WorkLayout) -> tuple[Path, Path]:
     source = harness / "src" / "main.rs"
     manifest = harness / "Cargo.toml"
     source.parent.mkdir(parents=True, exist_ok=True)
+    support = harness / "src" / "support" / "http.rs"
+    support.parent.mkdir(parents=True, exist_ok=True)
+    support_source = layout.repo_root.parent / "shadowdriver" / "tests" / "support" / "http.rs"
+    if not support_source.is_file():
+        fail(f"Shadowdriver HTTP test support is missing: {support_source}")
+    shutil.copy2(support_source, support)
     template = layout.repo_root / "scripts" / "shadowdriver_acceptance.rs"
     if not template.is_file():
         fail(f"Shadowdriver acceptance source is missing: {template}")
     shutil.copy2(template, source)
     atomic_write(
         manifest,
-        """[package]
+        f"""[package]
 name = "chromium-build-shadowdriver-acceptance"
 version = "0.1.0"
 edition = "2024"
@@ -3497,7 +3589,8 @@ edition = "2024"
 [dependencies]
 async-io = "2"
 futures-lite = "2"
-shadowdriver = { path = "/Volumes/dev/d/shadowdriver" }
+miniserde = "0.1"
+shadowdriver = {{ path = "{layout.repo_root.parent / 'shadowdriver'}" }}
 """,
     )
     return manifest, source
@@ -3548,6 +3641,10 @@ def run_shadowdriver_harness(layout: WorkLayout, lock: Mapping[str, Any], app: P
             "CHROMIUM_TEST_EXTENSION": str(extension),
         }
     )
+    local_network_home = os.environ.get("HOME")
+    if not local_network_home:
+        fail("the invoking macOS user HOME is required for local Chromium acceptance")
+    harness_environment["HOME"] = local_network_home
     command = [str(cargo), "run", "--offline", "--manifest-path", str(manifest), "--locked"]
     stream_command(
         command,
@@ -3715,8 +3812,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     arguments = parse_arguments(argv)
     try:
         repo_root = canonical_path(arguments.repo_root, "repository root", must_exist=True)
-        if not is_within(repo_root, WORK_PREFIX) or repo_root == WORK_PREFIX:
-            fail(f"repository root must be under /Volumes/dev: {repo_root}")
+        if repo_root == Path("/"):
+            fail(f"refusing filesystem root as repository: {repo_root}")
         arch = normalize_arch(arguments.arch)
         if arch != "arm64" or arguments.profile != DEFAULT_PROFILE:
             fail("the native macOS backend supports arm64 and macos-release only")

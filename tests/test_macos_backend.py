@@ -20,19 +20,68 @@ import macos_backend as backend
 
 class MacOSBackendTests(unittest.TestCase):
     def setUp(self):
-        self.repo = Path("/Volumes/dev/d/chromium-build")
-        self.root = Path(tempfile.mkdtemp(prefix="macos-backend-test-", dir="/Volumes/dev"))
+        self.repo = Path(__file__).resolve().parents[1]
+        test_work_area = self.repo / ".work" / "tmp"
+        test_work_area.mkdir(parents=True, exist_ok=True)
+        self.root = Path(tempfile.mkdtemp(prefix="macos-backend-test-", dir=test_work_area))
 
     def tearDown(self):
         shutil.rmtree(self.root, ignore_errors=True)
 
     def test_work_root_rejects_forbidden_and_ambiguous_paths(self):
-        for value in ("/tmp/chromium", "~/chromium", "/Volumes/dev/with space"):
+        for value in ("/tmp/chromium", "~/chromium", "/Volumes/dev/with space", str(self.repo / ".work")):
             with self.subTest(value=value), self.assertRaises(backend.MacOSFailure):
                 backend.validate_work_root(value, self.repo)
 
-        with self.assertRaises(backend.MacOSFailure):
-            backend.validate_work_root("/Volumes/dev", self.repo)
+        default_root = self.repo / ".work" / "macos-arm64"
+        self.assertEqual(backend.validate_work_root(default_root, self.repo), default_root)
+        self.assertEqual(backend.validate_work_root(self.root, self.repo), self.root)
+
+    def test_work_root_rejects_a_repository_work_area_symlink_escape(self):
+        repository = self.root / "checkout"
+        repository.mkdir()
+        escaped_work = self.root / "escaped-work"
+        escaped_work.mkdir()
+        (repository / ".work").symlink_to(escaped_work, target_is_directory=True)
+
+        with self.assertRaisesRegex(backend.MacOSFailure, "repository .work directory must not be a symlink"):
+            backend.validate_work_root(repository / ".work" / "macos-arm64", repository)
+
+    def test_work_root_rejects_a_symlinked_root(self):
+        target = self.root / "real-work-root"
+        target.mkdir()
+        alias = self.root / "linked-work-root"
+        alias.symlink_to(target, target_is_directory=True)
+
+        with self.assertRaisesRegex(backend.MacOSFailure, "work root must not be a symlink"):
+            backend.validate_work_root(alias, self.repo)
+
+    def test_acceptance_manifest_uses_the_sibling_shadowdriver_checkout(self):
+        layout = backend.WorkLayout(self.root, self.repo)
+        manifest, _ = backend.acceptance_harness_manifest(layout)
+        self.assertIn(f'shadowdriver = {{ path = "{self.repo.parent / "shadowdriver"}" }}', manifest.read_text())
+
+    def test_required_references_use_sibling_checkouts_and_fail_when_missing(self):
+        repository = self.root / "checkout"
+        layout = backend.WorkLayout(repository / ".work" / "macos-arm64", repository)
+        references = dict(backend.required_reference_paths(layout))
+        self.assertEqual(references["helium"], self.root / "helium")
+        self.assertEqual(references["shadowdriver"], self.root / "shadowdriver")
+        with self.assertRaisesRegex(backend.MacOSFailure, "required read-only reference is missing"):
+            backend.reference_state(references["helium"], {})
+
+    def test_work_lock_initializes_a_fresh_root_before_creating_its_lock_file(self):
+        fresh_root = self.root / "fresh"
+        layout = backend.WorkLayout(fresh_root, self.repo)
+        with backend.work_lock(layout):
+            self.assertTrue(layout.marker.is_file())
+            self.assertTrue((layout.lock_dir / "build.lock").is_file())
+
+    def test_supplied_app_path_stays_within_repository_work_area(self):
+        layout = backend.WorkLayout(self.root, self.repo)
+        app = self.root / "relocated" / "Chromium.app"
+        app.mkdir(parents=True)
+        self.assertEqual(backend.validate_app_path(app, layout, "Chromium app"), app)
 
     def test_layout_claims_only_an_empty_root_and_is_repeatable(self):
         layout = backend.WorkLayout(self.root, self.repo)
@@ -45,6 +94,18 @@ class MacOSBackendTests(unittest.TestCase):
         self.assertEqual(environment["DEVELOPER_DIR"], "/Applications/Xcode.app/Contents/Developer")
         self.assertEqual(environment["NETWORK_MODE"], "none")
         self.assertNotIn("RBE_service", environment)
+
+    def test_isolated_environment_exposes_an_installed_kache_wrapper(self):
+        layout = backend.WorkLayout(self.root / "fresh-work", self.repo)
+        wrappers = {
+            "kache": "/Users/tester/.cargo/bin/kache",
+            "rustup": "/opt/homebrew/bin/rustup",
+            "cargo": "/opt/homebrew/bin/cargo",
+        }
+        with mock.patch.object(backend, "command_path", side_effect=lambda name, env: wrappers.get(name)):
+            environment = backend.isolated_environment(layout)
+
+        self.assertIn("/Users/tester/.cargo/bin", environment["PATH"].split(os.pathsep))
 
         foreign = self.root / "foreign"
         foreign.mkdir()
@@ -80,6 +141,101 @@ class MacOSBackendTests(unittest.TestCase):
         self.assertEqual(report["status"], "disabled")
         self.assertNotIn("CCACHE_DIR", environment)
         self.assertNotIn("SCCACHE_DIR", environment)
+
+    def test_kache_compiler_cache_uses_workroot_store_and_runtime(self):
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        wrapper = layout.tools / "bin" / "kache"
+        wrapper.parent.mkdir(parents=True)
+        wrapper.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        wrapper.chmod(0o755)
+        version = mock.Mock(returncode=0, stdout="kache 1.0.0\n", stderr="")
+        with mock.patch.object(backend, "command_output", return_value=version):
+            environment = backend.isolated_environment(layout, compiler_cache="kache")
+
+        self.assertEqual(environment["CHROMIUM_COMPILER_CACHE_KIND"], "kache")
+        self.assertEqual(environment["KACHE_CACHE_DIR"], str(layout.cache / "compiler" / "kache"))
+        self.assertEqual(environment["KACHE_RUNTIME_DIR"], str(layout.cache / "compiler" / "kache-runtime"))
+        config_path = Path(environment["KACHE_CONFIG"])
+        self.assertTrue(backend.is_within(config_path, layout.root))
+        self.assertIn(f'local_store = "{environment["KACHE_CACHE_DIR"]}"', config_path.read_text())
+        self.assertIn('daemon_idle_timeout_secs = 600', config_path.read_text())
+        self.assertEqual(environment["KACHE_HOST_CONFIG"], "")
+        self.assertEqual(environment["KACHE_DAEMON_IDLE_TIMEOUT"], "600")
+        self.assertEqual(
+            environment["KACHE_LOG_FILE"],
+            str(layout.home / "Library" / "Logs" / "kache" / "kache.log"),
+        )
+
+    def test_kache_cache_rejects_a_workroot_cache_symlink_escape(self):
+        root = self.root / "build-root"
+        layout = backend.WorkLayout(root, self.repo)
+        layout.ensure()
+        escaped = self.root / "escaped-cache"
+        escaped.mkdir()
+        (layout.cache / "compiler").symlink_to(escaped, target_is_directory=True)
+        wrapper = layout.tools / "bin" / "kache"
+        wrapper.parent.mkdir(parents=True, exist_ok=True)
+        wrapper.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        wrapper.chmod(0o755)
+        version = mock.Mock(returncode=0, stdout="kache 1.0.0\n", stderr="")
+
+        with mock.patch.object(backend, "command_output", return_value=version):
+            with self.assertRaisesRegex(backend.MacOSFailure, "compiler cache directory escapes"):
+                backend.isolated_environment(layout, compiler_cache="kache")
+
+        self.assertFalse((escaped / "kache").exists())
+
+    def test_documented_compiler_cache_choices_match_the_backend(self):
+        documented = f"`MACOS_COMPILER_CACHE=off|{'|'.join(backend.COMPILER_CACHE_NAMES)}|auto`"
+        instructions = (self.repo / "AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn(documented, instructions)
+        aliases = "`" + "` and `".join(backend.COMPILER_CACHE_DISABLED[1:]) + "`"
+        self.assertIn(f"{aliases} also turn compiler caching off.", instructions)
+
+    def test_kache_cache_stats_uses_the_local_store_report(self):
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        wrapper = layout.tools / "bin" / "kache"
+        wrapper.parent.mkdir(parents=True, exist_ok=True)
+        wrapper.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        wrapper.chmod(0o755)
+        ninja = layout.source / "third_party" / "ninja" / "ninja"
+        ninja.parent.mkdir(parents=True)
+        ninja.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        ninja.chmod(0o755)
+        layout.source.mkdir(parents=True, exist_ok=True)
+        backend.atomic_json(
+            layout.metadata / "configure-macos.json",
+            {"compiler_cache": {"status": "enabled", "kind": "kache"}},
+        )
+        version = mock.Mock(returncode=0, stdout="kache 1.0.0\n", stderr="")
+        stats = mock.Mock(returncode=0, stdout="local stats\n", stderr="")
+        ninja_error = mock.Mock(returncode=1, stdout="ninja: no build.ninja\n", stderr="")
+
+        def command_result(command, **kwargs):
+            if command[-1] == "--version":
+                return version
+            if "stats" in command:
+                return stats
+            return ninja_error
+
+        with mock.patch.object(backend, "command_output", side_effect=command_result) as run:
+            report = backend.compiler_cache_stats(layout)
+
+        self.assertEqual(report["status"], "complete")
+        self.assertEqual(report["cache"]["directory"], str(layout.cache / "compiler" / "kache"))
+        self.assertEqual(report["output"], "local stats")
+        self.assertEqual(report["ninja_incremental"]["status"], "unavailable")
+        self.assertEqual(len(run.call_args_list), 2)
+        self.assertEqual(
+            run.call_args_list[1].args[0],
+            [str(wrapper), "stats", "--since", "24h"],
+        )
+        self.assertEqual(
+            run.call_args_list[1].kwargs["env"]["KACHE_CACHE_DIR"],
+            str(layout.cache / "compiler" / "kache"),
+        )
 
     def test_architecture_normalization_is_native_only(self):
         self.assertEqual(backend.normalize_arch("aarch64"), "arm64")
@@ -363,6 +519,20 @@ class MacOSBackendTests(unittest.TestCase):
         )
         browser = source / "chrome" / "browser"
         browser.mkdir(parents=True)
+        enterprise = browser / "enterprise"
+        enterprise.mkdir()
+        enterprise_build = enterprise / "BUILD.gn"
+        enterprise_build.write_text(
+            'source_set("impl") {\n'
+            '  if (is_linux || is_win || is_mac) {\n'
+            '    sources += [\n'
+            '      "signin/enterprise_signin_service_factory.cc",\n'
+            '      "signin/managed_profile_creator.cc",\n'
+            '    ]\n'
+            '  }\n'
+            '}\n',
+            encoding="utf-8",
+        )
         client = browser / "chrome_content_browser_client.cc"
         client.write_text(
             '#include "chrome/browser/screen_ai/screen_ai_install_state.h"\n'
@@ -391,8 +561,13 @@ class MacOSBackendTests(unittest.TestCase):
         self.assertEqual(applied["safe_browsing"]["status"], "applied")
         self.assertEqual(applied["screen_ai"]["status"], "applied")
         self.assertEqual(applied["english_only_locale"]["status"], "applied")
+        self.assertEqual(applied["managed_profile_controller"]["status"], "applied")
         self.assertNotIn("safe_browsing:archive_analyzer_results", build_file.read_text(encoding="utf-8"))
         self.assertNotIn("safe_browsing:disk_image_type_sniffer_mac", build_file.read_text(encoding="utf-8"))
+        self.assertIn(
+            '"signin/managed_profile_creation_controller.cc"',
+            enterprise_build.read_text(encoding="utf-8"),
+        )
         patched_locales = locale_file.read_text(encoding="utf-8")
         self.assertIn('macos_single_locale = ""', patched_locales)
         self.assertIn('if (macos_single_locale != "")', patched_locales)
@@ -411,6 +586,7 @@ class MacOSBackendTests(unittest.TestCase):
         self.assertEqual(reused["safe_browsing"]["status"], "reused")
         self.assertEqual(reused["screen_ai"]["status"], "reused")
         self.assertEqual(reused["english_only_locale"]["status"], "reused")
+        self.assertEqual(reused["managed_profile_controller"]["status"], "reused")
         self.assertEqual(reused["english_only_locale"]["grd_outputs"]["status"], "reused")
 
     def test_reset_requires_confirmation_and_preserves_inputs(self):

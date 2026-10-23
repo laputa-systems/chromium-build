@@ -1,19 +1,19 @@
 {
   "architecture": "arm64",
   "chromium": {
-    "commit": "78e5e45d4bb41035e17ea4da2cc257f496416ac9",
-    "devtools_revision": "511172b786248e29d7493bf954faa57f834dc5b3",
-    "main_branch_position": 1681091,
+    "commit": "1d17a2e2ee147bb7d6ae2ab6abdb3a2510c17775",
+    "devtools_revision": "bf69d041b0ad1f74730204a73bff29f3ef1d4ead",
+    "main_branch_position": 1706539,
     "source": {
-      "filename": "chromium-153.0.8010.52.tar.xz",
-      "sha512": "257eef0ec51874ab51ae1d577f1c6efe2b756718aeac404c36686661ef9b7ae22d37eab1efde2338f960b415101b0de4e0182e86a8edfc4ab06a8ee812e8b707",
-      "size": 4121270828,
-      "url": "https://commondatastorage.googleapis.com/chromium-browser-official/chromium-153.0.8010.52.tar.xz"
+      "filename": "chromium-156.0.8078.47.tar.xz",
+      "sha512": "b6f02b7718ea746ee9b96615974dc9411d52216decbcc7a0219b5f900890593f305419eb1fbd12f3661a1d7ad2fa9156cf5ea767d4d1e17c5d8fb7795362ec1f",
+      "size": 4422608896,
+      "url": "https://commondatastorage.googleapis.com/chromium-browser-official/chromium-156.0.8078.47.tar.xz"
     },
-    "version": "153.0.8010.52"
+    "version": "156.0.8078.47"
   },
   "depot_tools": {
-    "commit": "55a39e603bee1ad299545508bc96e2a5d29d3cc4",
+    "commit": "b1c2e86792a7f2b6576c181b7327ddd53b1a42a8",
     "repository": "https://chromium.googlesource.com/chromium/tools/depot_tools.git"
   },
   "llvm": {
@@ -23,11 +23,11 @@
   },
   "macos_reference": {
     "adaptation": "reference only; version-mismatched packaging changes are not imported",
-    "commit": "038db2b41f7aeb00bbceb2f5a56912b26eb5b284",
+    "commit": "148658e08c4e0180ce9e87d889bc6d447dd13289",
     "compatible_with_chromium": false,
     "patches_applied": [],
     "repository": "https://github.com/ungoogled-software/ungoogled-chromium-macos.git",
-    "version": "152.0.7977.82"
+    "version": "unknown"
   },
   "patch_policy": {
     "core_ungoogled": "apply complete series in declared order",
@@ -41,7 +41,7 @@
     "macos_reference": "do not apply version-mismatched packaging patches"
   },
   "platform": "macos",
-  "resolved_at": "2026-09-21T19:12:38.537939+00:00",
+  "resolved_at": "2026-10-23T03:14:33.641771+00:00",
   "rust": {
     "components": [
       "rust-src",
@@ -62,15 +62,15 @@
     }
   },
   "ungoogled": {
-    "commit": "a638756eb14c8b6ce64b4b2a067afea5d4207bf4",
-    "patch_series_sha256": "4ff99a455ee8e0b6f66c167ebb0b79ec063daa1038ce5bc659a485965d7abae7",
-    "release": "153.0.8010.52-1",
+    "commit": "0673f8701c94e5688c33ef8ce5e36602d311d246",
+    "patch_series_sha256": "6f65a6fd9c7c0c66a12d9bf5dda4c5bfc9d36bb76fd09c24756ea92d7f2a2577",
+    "release": "156.0.8078.47-1",
     "revision": 1,
     "source": {
-      "filename": "ungoogled-a638756eb14c8b6ce64b4b2a067afea5d4207bf4.tar.gz",
-      "sha512": "0b0bbeb1d213cc6ae1764ea628ae32fb2762419b4a554f0a4f6ba40d56df103e67ea0972cbbb5f4c0954fd6c22913badc081dcb6ebc87a3152b65f617a854efb",
-      "size": 671665,
-      "url": "https://github.com/ungoogled-software/ungoogled-chromium/archive/a638756eb14c8b6ce64b4b2a067afea5d4207bf4.tar.gz"
+      "filename": "ungoogled-0673f8701c94e5688c33ef8ce5e36602d311d246.tar.gz",
+      "sha512": "b9b9df8f12c62749d1cf01fa50b27516eca2551eb01541fb3d8c72042d79814fd83d1b0134890e83c5f20263e3d8a436cf7ed9d48df6e54bdb12c3507aabec53",
+      "size": 679725,
+      "url": "https://github.com/ungoogled-software/ungoogled-chromium/archive/0673f8701c94e5688c33ef8ce5e36602d311d246.tar.gz"
     }
   }
 }

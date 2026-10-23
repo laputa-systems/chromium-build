@@ -120,11 +120,12 @@ Select `--platform macos --arch arm64 --profile macos-release`. The backend
 builds the locked ungoogled release in `config/macos.inputs.lock` as a desktop
 `Chromium.app`. It uses native Apple Silicon and macOS 26 or newer, a usable Xcode
 SDK and Metal Toolchain, compatible LLVM 23.1.0 or newer, and the locked Rust
-nightly. The work root must be an absolute path under `/Volumes/dev`; keep all
-project-controlled downloads, tools, caches, source, output, logs, test profiles,
-and artifacts there. Do not alter Xcode, Homebrew installations, keychains,
-`/Applications`, or the read-only Helium and Shadowdriver reference checkouts as
-part of an ordinary local build.
+nightly. The work root must be an absolute child of the repository's `.work/`
+directory; keep all project-controlled downloads, tools, caches, source, output,
+logs, test profiles, and artifacts there. The acceptance harness uses the
+sibling `shadowdriver` checkout, which remains a read-only reference. Do not
+alter Xcode, Homebrew installations, keychains, `/Applications`, or the read-only
+Helium and Shadowdriver reference checkouts as part of an ordinary local build.
 
 Mac source preparation applies the version-matched ungoogled core series. Do not
 mix in the Linux musl/headless patch stack or Helium branding/product changes.
@@ -133,14 +134,16 @@ native sandbox, and only the packaged `en-US` locale. The checked-in profile
 uses Apple's linker and disables ThinLTO because the selected bundled lld does
 not parse the Xcode 27 SDK TAPI inputs; revisit this only with a demonstrated
 compatible toolchain. Compiler caching is optional and local through
-`MACOS_COMPILER_CACHE=off|ccache|sccache|auto`; `auto` uses an already installed
-wrapper if available.
+`MACOS_COMPILER_CACHE=off|ccache|sccache|kache|auto`; `auto` uses an already
+installed ccache, sccache, or Kache wrapper, in that order. Cache stores,
+configuration, runtime files, and logs stay under the work root.
+`none` and `disabled` also turn compiler caching off.
 
 Run local phases in order. `update-lock --latest` is an explicit maintainer
 operation when selecting a new release; ordinary runs use the committed lock.
 
 ```sh
-export CHROMIUM_WORK_ROOT=/Volumes/dev/d/chromium-build/.work/macos-arm64
+export CHROMIUM_WORK_ROOT="$PWD/.work/macos-arm64"
 ./chromium-build --platform macos --arch arm64 --profile macos-release doctor
 ./chromium-build --platform macos --arch arm64 --profile macos-release fetch
 ./chromium-build --platform macos --arch arm64 --profile macos-release prepare
@@ -152,24 +155,21 @@ export CHROMIUM_WORK_ROOT=/Volumes/dev/d/chromium-build/.work/macos-arm64
 ```
 
 `stage-runtime` signs and audits a candidate app. `test-staged` runs the actual
-Shadowdriver acceptance harness against the staged executable, loads the pinned
-uBlock extension, and evaluates 32 distinct data pages before promoting the
-candidate. `test-staged --app
-/absolute/path/Chromium.app` tests a supplied or relocated app. `package` writes
-the candidate zip and checksum under the work root's `release` directory.
+Shadowdriver acceptance harness against the staged executable. It checks
+BrowserNative identity and CDP capture, 32- and 64-page waves, MV2 and MV3
+extensions, uBlock blocking, screenshot and PDF capture, and headed and
+headless Metal rendering. It promotes the candidate only after the harness
+passes. `test-staged --app /absolute/path/Chromium.app` tests a supplied or
+relocated app. `package` writes the candidate zip and checksum under the work
+root's `release` directory.
 Use `status` and the JSON phase reports under the work root to establish what
 actually passed on a given host. `reset --yes` removes owned generated state;
 use it only when that loss is intended.
 
 `.github/workflows/macos-26-smoke.yml` is a manually dispatched full-build and
-prerelease-packaging path. It signs and audits the app, but intentionally skips
-local Shadowdriver acceptance and packages the candidate without an accepted
-marker. A CI artifact alone does not establish that consumer gate. The native
-build, signing, packaging, and Shadowdriver integration paths are implemented,
-but the original acceptance scope is not fully covered: the current harness
-does not demonstrate normal GUI operation, independent MV2/MV3 extension
-behavior, uBlock request blocking, or screenshots. The default acceptance path
-also does not exercise the supported `test-staged --app` relocation check.
-Real build and acceptance claims require corresponding phase reports or CI run
-evidence; do not infer those results from passing unit tests or the workflow
-definition.
+prerelease-packaging path. It signs and audits the app, but skips local
+Shadowdriver acceptance and packages the candidate without an accepted marker.
+A CI artifact alone does not establish consumer acceptance. The local harness
+also exercises the supplied-app relocation path. Check the current workroot's
+phase reports before claiming that a build or acceptance phase passed. Do not
+infer those results from unit tests or the workflow definition.
