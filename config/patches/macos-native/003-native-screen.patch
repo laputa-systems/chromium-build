@@ -1,0 +1,44 @@
+--- a/ui/display/mac/screen_mac_headless.mm
++++ b/ui/display/mac/screen_mac_headless.mm
+@@ -5,6 +5,7 @@
+ #include "ui/display/mac/screen_mac_headless.h"
+ 
+ #import <AppKit/AppKit.h>
++#import <CoreGraphics/CoreGraphics.h>
+ 
+ #include <vector>
+ 
+@@ -57,6 +58,33 @@
+ }
+ 
+ void ScreenMacHeadless::CreateDisplayList() {
++  const base::CommandLine& command_line =
++      CHECK_DEREF(base::CommandLine::ForCurrentProcess());
++  if (command_line.HasSwitch("native-automation-compatibility") &&
++      !command_line.HasSwitch(switches::kScreenInfo)) {
++    CHECK(NSScreen.screens.count);
++    bool is_primary = true;
++    base::flat_set<int64_t> internal_display_ids;
++    for (NSScreen* screen in NSScreen.screens) {
++      const CGDirectDisplayID id =
++          [screen.deviceDescription[@"NSScreenNumber"] unsignedIntValue];
++      Display display(id, gfx::ScreenRectFromNSRect(screen.frame));
++      display.set_work_area(gfx::ScreenRectFromNSRect(screen.visibleFrame));
++      const float scale = Display::HasForceDeviceScaleFactor()
++                              ? Display::GetForcedDeviceScaleFactor()
++                              : screen.backingScaleFactor;
++      display.set_device_scale_factor(scale);
++      display.set_size_in_pixels(
++          gfx::ScaleToRoundedSize(display.bounds().size(), scale));
++      if (CGDisplayIsBuiltin(id)) {
++        internal_display_ids.insert(id);
++      }
++      ProcessDisplayChanged(display, is_primary);
++      is_primary = false;
++    }
++    SetInternalDisplayIds(internal_display_ids);
++    return;
++  }
+   std::vector<headless::HeadlessScreenInfo> screen_infos =
+       GetHeadlessScreenInfos();
+   CHECK(!screen_infos.empty());

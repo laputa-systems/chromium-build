@@ -9,6 +9,7 @@ IMAGE=${CHROMIUM_BUILDER_IMAGE:-}
 WORK_VOLUME=${CHROMIUM_WORK_VOLUME:-}
 CACHE_VOLUME=${CHROMIUM_CACHE_VOLUME:-}
 APP_PATH=
+HEADED_REFERENCE=
 INSTALL_PREFIX=${CHROMIUM_INSTALL_PREFIX:-}
 INSTALL_BIN_DIR=${CHROMIUM_INSTALL_BIN_DIR:-}
 JOBS=
@@ -27,7 +28,8 @@ usage() {
         '       chromium-build ensure-source|fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-e|gate-f|poc|build|cache-stats|stage-runtime|test-fast|test|test-staged|package [--arch amd64] [--profile headless-debug|headless-release] [--jobs N]' \
         '       chromium-build install [--profile headless-debug|headless-release] [--prefix DIR] [--bin-dir DIR]' \
         '       chromium-build build-target <ninja-output-or-label> [--arch amd64] [--jobs N]' \
-        '       chromium-build --platform macos doctor|smoke-preflight|update-lock|fetch|prepare|configure|build|cache-stats|stage-runtime|package|test-staged [--arch arm64]'
+        '       chromium-build --platform macos doctor|smoke-preflight|update-lock|fetch|prepare|configure|build|cache-stats|stage-runtime|package|test-staged [--arch arm64]' \
+        '       chromium-build --platform macos test-staged [--headed-reference OBSERVATIONS.json]'
 }
 
 command_name=
@@ -51,6 +53,11 @@ while [ "$#" -gt 0 ]; do
         --app)
             [ "$#" -ge 2 ] || fail '--app needs a value'
             APP_PATH=$2
+            shift 2
+            ;;
+        --headed-reference)
+            [ "$#" -ge 2 ] || fail '--headed-reference needs a report path'
+            HEADED_REFERENCE=$2
             shift 2
             ;;
         --prefix)
@@ -116,6 +123,7 @@ case "$PLATFORM" in
         [ "$YES" = 1 ] && native_args+=(--yes)
         [ "$LATEST" = 1 ] && native_args+=(--latest)
         [ -n "$APP_PATH" ] && native_args+=(--app "$APP_PATH")
+        [ -n "$HEADED_REFERENCE" ] && native_args+=(--headed-reference "$HEADED_REFERENCE")
         [ -n "$JOBS" ] && native_args+=(--jobs "$JOBS")
         if [ "$command_name" = build-target ]; then
             fail 'build-target is currently Linux-only; use macOS build to produce the release target'
@@ -123,6 +131,7 @@ case "$PLATFORM" in
         exec "${CHROMIUM_PYTHON:-python3}" "$ROOT/scripts/macos_backend.py" "${native_args[@]}"
         ;;
     linux)
+        [ -z "$HEADED_REFERENCE" ] || fail '--headed-reference is macOS-only'
         PROFILE=${PROFILE:-headless-debug}
         case "$PROFILE" in
             headless-debug|headless-release) ;;

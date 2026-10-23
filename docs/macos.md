@@ -45,3 +45,38 @@ headless Metal rendering. A supplied app can be tested with
 directory. Use `status` and the work root's JSON phase reports to determine
 which phases passed. A CI package skips local Shadowdriver acceptance and does
 not establish consumer acceptance.
+
+## Native automation compatibility
+
+The macOS-only overlay is documented in
+[`config/patches/macos-native/README.md`](../config/patches/macos-native/README.md).
+`--native-automation-compatibility` enables desktop headless UA normalization,
+the native webdriver policy, and host display geometry. Ordinary behavior
+remains available with the switch disabled. Linux inputs are unchanged.
+
+Preparation records the digest of the actual overlay and source-mutating
+profile compatibility code. Later phases reject stale digests. Appending an
+exact patch to a prepared prefix preserves the existing source and build tree.
+Changing an applied patch requires source recovery before preparation continues.
+
+`test-staged` now requires two independent results: Shadowdriver product
+compatibility and native automation signal acceptance. The second result
+compares headed, headless, explicit automation, direct native CDP, passive
+Shadowdriver, passive restart, and instrumented capture. Its report records
+page-authored values, structured request hints, worker and OOPIF observations,
+and fixture pixels and HTML. Test selection must execute one passing named
+test. The phase records Shadowdriver's revision and a digest of its relevant
+source, tests, generated scripts, and lockfile. Changed acceptance source during
+a run prevents promotion.
+
+The native tests use the staged executable. They neither install Chromium nor
+use an application under `/Applications`. Native compatibility does not promise
+universal resistance to detection. Passive automation omits the capture
+instrumentation. Instrumented capture remains observable.
+
+To keep acceptance headless while using an already captured headed control,
+pass `test-staged --headed-reference /absolute/path/to/observations.json`.
+The reference must contain completed observations with the same browser version,
+host, and fixture policy. No headed browser launches in this mode. The report
+records the reference digest and marks the fresh headed product check unverified;
+promotion records `headless-with-historical-headed-reference` as its scope.

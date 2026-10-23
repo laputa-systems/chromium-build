@@ -16,6 +16,7 @@ import datetime as dt
 import errno
 import fcntl
 import hashlib
+import inspect
 import json
 import os
 from pathlib import Path
@@ -2234,9 +2235,43 @@ def fetch_inputs(layout: WorkLayout) -> dict[str, Any]:
     return report
 
 
-def patch_file(source: Path, patch_path: Path, patch_dir: Path, environment: Mapping[str, str]) -> dict[str, Any]:
+def validate_exact_patch(source: Path, patch_path: Path) -> None:
+    lines = patch_path.read_text(encoding="utf-8").splitlines(keepends=True)
+    target = None
+    index = 0
+    hunks = 0
+    while index < len(lines):
+        line = lines[index]
+        if line.startswith("--- a/"):
+            relative = line[6:].strip()
+            if Path(relative).is_absolute() or ".." in Path(relative).parts:
+                fail(f"invalid native patch path: {relative}")
+            target = (source / relative).read_text(encoding="utf-8").splitlines(keepends=True)
+        match = re.match(r"@@ -(\d+)(?:,\d+)? \+\d+(?:,\d+)? @@", line)
+        if match:
+            if target is None:
+                fail(f"native patch hunk has no target: {patch_path}")
+            start = max(0, int(match.group(1)) - 1)
+            expected = []
+            index += 1
+            while index < len(lines) and lines[index][:1] in {" ", "+", "-", "\\"} and not lines[index].startswith("--- a/"):
+                if lines[index][:1] in {" ", "-"}:
+                    expected.append(lines[index][1:])
+                index += 1
+            if target[start:start + len(expected)] != expected:
+                fail(f"native patch failed dry-run: exact hunk mismatch in {patch_path.name}")
+            hunks += 1
+            continue
+        index += 1
+    if hunks == 0:
+        fail(f"native patch has no hunks: {patch_path}")
+
+
+def patch_file(source: Path, patch_path: Path, patch_dir: Path, environment: Mapping[str, str], *, exact: bool = False) -> dict[str, Any]:
     if not patch_path.is_file():
         fail(f"declared patch is missing: {patch_path}")
+    if exact:
+        validate_exact_patch(source, patch_path)
     patch_dir.mkdir(parents=True, exist_ok=True)
     copied = patch_dir / patch_path.name
     shutil.copy2(patch_path, copied)
@@ -2247,7 +2282,7 @@ def patch_file(source: Path, patch_path: Path, patch_dir: Path, environment: Map
         cwd=source,
         check=False,
     )
-    if dry.returncode:
+    if dry.returncode or (exact and re.search(r"offset|fuzz|skip|reversed|failed", (dry.stdout + dry.stderr), re.IGNORECASE)):
         detail = (dry.stdout or dry.stderr or "").strip()
         fail(f"macOS patch failed dry-run: {patch_path.name}: {detail[-1600:]}")
     applied = command_output(
@@ -2668,6 +2703,40 @@ def stable_digest(value: Any) -> str:
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
+def local_overlay_identity(layout: WorkLayout) -> dict[str, Any]:
+    root = layout.repo_root / "config" / "patches" / "macos-native"
+    series = root / "series"
+    names = series.read_text(encoding="utf-8").splitlines()
+    if not names or any(not re.fullmatch(r"[0-9]{3}-[a-z-]+\.patch", name) for name in names):
+        fail("invalid macOS native compatibility patch series")
+    if len(names) != len(set(names)):
+        fail("duplicate macOS native compatibility patch")
+    patches = [{"name": name, "sha256": sha256(root / name)} for name in names]
+    functions = (apply_macos_profile_compatibility, _apply_disabled_screen_ai_compatibility,
+                 _apply_english_only_locale_compatibility, _apply_managed_profile_controller_link_fix)
+    profile_digest = hashlib.sha256("".join(inspect.getsource(function) for function in functions).encode()).hexdigest()
+    contents = {"patches": patches, "profile_compatibility_sha256": profile_digest}
+    return {**contents, "sha256": stable_digest(contents)}
+
+
+def apply_native_overlay(layout: WorkLayout, environment: Mapping[str, str], skip: int = 0) -> list[dict[str, Any]]:
+    lock = load_lock(layout)
+    if lock["chromium"]["commit"] != "1d17a2e2ee147bb7d6ae2ab6abdb3a2510c17775":
+        fail("macOS native compatibility overlay requires review for this Chromium revision")
+    identity = local_overlay_identity(layout)
+    root = layout.repo_root / "config" / "patches" / "macos-native"
+    return [patch_file(layout.source, root / item["name"],
+                       layout.metadata / "patches" / "macos-native", environment, exact=True)
+            for item in identity["patches"][skip:]]
+
+
+def require_overlay_identity(layout: WorkLayout, record: Mapping[str, Any]) -> str:
+    digest = local_overlay_identity(layout)["sha256"]
+    if record.get("local_overlay_sha256") != digest:
+        fail("local macOS overlay changed; rerun the preceding prepare/configure/build/stage phase")
+    return digest
+
+
 def prepare_source(layout: WorkLayout) -> dict[str, Any]:
     layout.ensure()
     lock = load_lock(layout)
@@ -2685,10 +2754,34 @@ def prepare_source(layout: WorkLayout) -> dict[str, Any]:
         "profile": DEFAULT_PROFILE,
         "macos_compatibility": "safe-browsing-disabled-macos-unit-test-edges-v1",
         "excluded_layers": ["portablelinux", "alpine", "copium", "musl", "headless"],
+        "local_overlay": local_overlay_identity(layout),
     }
     fingerprint = stable_digest(identity)
     if prepare_marker.is_file():
         previous = json.loads(prepare_marker.read_text(encoding="utf-8"))
+        legacy_identity = {key: value for key, value in identity.items() if key != "local_overlay"}
+        if previous.get("identity") == legacy_identity and previous.get("status") == "complete":
+            previous["native_compatibility_patches"] = apply_native_overlay(layout, environment)
+            previous["identity"] = identity
+            previous["fingerprint"] = fingerprint
+            previous["local_overlay_sha256"] = identity["local_overlay"]["sha256"]
+            atomic_json(prepare_marker, previous)
+            return previous
+        old_identity = previous.get("identity", {})
+        old_overlay = old_identity.get("local_overlay", {})
+        old_patches = old_overlay.get("patches", [])
+        new_overlay = identity["local_overlay"]
+        if (previous.get("status") == "complete" and old_patches
+                and {key: value for key, value in old_identity.items() if key != "local_overlay"} == legacy_identity
+                and old_overlay.get("profile_compatibility_sha256") == new_overlay["profile_compatibility_sha256"]
+                and old_patches == new_overlay["patches"][:len(old_patches)]
+                and len(old_patches) < len(new_overlay["patches"])):
+            previous["native_compatibility_patches"].extend(apply_native_overlay(layout, environment, len(old_patches)))
+            previous["identity"] = identity
+            previous["fingerprint"] = fingerprint
+            previous["local_overlay_sha256"] = new_overlay["sha256"]
+            atomic_json(prepare_marker, previous)
+            return previous
         if previous.get("fingerprint") == fingerprint and previous.get("status") == "complete":
             compatibility = apply_macos_profile_compatibility(layout.source)
             if previous.get("macos_compatibility") != compatibility:
@@ -2724,6 +2817,7 @@ def prepare_source(layout: WorkLayout) -> dict[str, Any]:
             core_root / "domain_regex.list",
         )
         compatibility = apply_macos_profile_compatibility(layout.source)
+        native_patches = apply_native_overlay(layout, environment)
         flags = core_root / "flags.gn"
         flags_copy = layout.metadata / "ungoogled-flags.gn"
         shutil.copy2(flags, flags_copy)
@@ -2733,6 +2827,8 @@ def prepare_source(layout: WorkLayout) -> dict[str, Any]:
             "network": "none",
             "fingerprint": fingerprint,
             "identity": identity,
+            "local_overlay_sha256": identity["local_overlay"]["sha256"],
+            "native_compatibility_patches": native_patches,
             "chromium_version": lock["chromium"]["version"],
             "chromium_commit": lock["chromium"]["commit"],
             "source": str(layout.source),
@@ -2825,6 +2921,7 @@ def configure_source(layout: WorkLayout) -> dict[str, Any]:
     prepare = read_json(layout.metadata / "prepare-macos.json", "source preparation report")
     if prepare.get("status") != "complete":
         fail("source preparation is not complete; run prepare")
+    overlay_digest = require_overlay_identity(layout, prepare)
     source = layout.source
     environment = isolated_environment(layout, network="none")
     post_fetch_minimum = int(
@@ -2902,6 +2999,7 @@ def configure_source(layout: WorkLayout) -> dict[str, Any]:
         "args": str(args_path),
         "gn": str(gn),
         "gn_command": gn_command,
+        "local_overlay_sha256": overlay_digest,
         "gn_args_listing_status": listed.returncode,
         "gn_args_listing": args_listing,
         "llvm": {key: value for key, value in llvm.items() if key != "version_tuple"},
@@ -2977,6 +3075,7 @@ def build_source(layout: WorkLayout, jobs: Optional[str]) -> dict[str, Any]:
     configure = read_json(layout.metadata / "configure-macos.json", "configuration report")
     if configure.get("status") != "complete":
         fail("configuration is not complete; run configure")
+    overlay_digest = require_overlay_identity(layout, configure)
     source = layout.source
     if not source.is_dir():
         fail(f"prepared source is missing: {source}")
@@ -3047,6 +3146,7 @@ def build_source(layout: WorkLayout, jobs: Optional[str]) -> dict[str, Any]:
         "ninja": str(ninja),
         "jobs": build_jobs,
         "compiler_cache": actual_cache,
+        "local_overlay_sha256": overlay_digest,
         "locale_cleanup": locale_cleanup,
         "pgo": configure.get("pgo", {}),
     }
@@ -3431,6 +3531,7 @@ def stage_runtime(layout: WorkLayout) -> dict[str, Any]:
     build = read_json(layout.metadata / "build-macos.json", "build report")
     if build.get("status") != "complete":
         fail("the build report is not complete; run build")
+    overlay_digest = require_overlay_identity(layout, build)
     source_app = validate_app_path(build.get("app", layout.output / "Chromium.app"), layout, "built Chromium.app", built=True)
     environment = isolated_environment(layout, network="none")
     source_audit = audit_bundle(source_app, layout, environment)
@@ -3455,6 +3556,7 @@ def stage_runtime(layout: WorkLayout) -> dict[str, Any]:
             "app": str(destination),
             "executable": str(destination / "Contents" / "MacOS" / "Chromium"),
             "source_app": str(source_app),
+            "local_overlay_sha256": overlay_digest,
             "source_audit": source_audit,
             "signing": signing,
             "audit": staged_audit,
@@ -3475,6 +3577,7 @@ def package_bundle(layout: WorkLayout) -> dict[str, Any]:
     candidate = read_json(layout.stage / "candidate.json", "staged candidate")
     if candidate.get("status") != "complete":
         fail("staged candidate is not complete; run stage-runtime")
+    overlay_digest = require_overlay_identity(layout, candidate)
     if candidate.get("audit", {}).get("status") != "complete":
         fail("staged candidate has no complete bundle audit; run stage-runtime")
     app = validate_app_path(candidate.get("app", ""), layout, "staged candidate", built=True)
@@ -3525,6 +3628,7 @@ def package_bundle(layout: WorkLayout) -> dict[str, Any]:
         "architecture": "arm64",
         "app": str(app),
         "fingerprint": fingerprint,
+        "local_overlay_sha256": overlay_digest,
         "archive": str(archive),
         "sha256": digest,
         "size": archive.stat().st_size,
@@ -3559,10 +3663,18 @@ def cargo_executable(environment: Mapping[str, str]) -> Path:
     fail("cargo is unavailable in the controlled toolchain PATH")
 
 
+def shadowdriver_rust_wrapper() -> str:
+    wrapper = command_path("kache", os.environ)
+    if not wrapper:
+        fail("kache is required for Shadowdriver Rust acceptance")
+    return str(Path(wrapper).absolute())
+
+
 def fetch_acceptance_dependencies(layout: WorkLayout, environment: Mapping[str, str]) -> dict[str, Any]:
     manifest, test_source = shadowdriver_acceptance_target(layout)
     cargo = cargo_executable(environment)
     fetch_environment = dict(environment)
+    fetch_environment["RUSTC_WRAPPER"] = shadowdriver_rust_wrapper()
     fetch_environment["CARGO_TARGET_DIR"] = str(layout.harness / "target")
     fetch_environment["SHADOWDRIVER_CACHE_DIR"] = str(layout.cache / "shadowdriver")
     stream_command(
@@ -3580,19 +3692,43 @@ def fetch_acceptance_dependencies(layout: WorkLayout, environment: Mapping[str, 
     }
 
 
-def run_shadowdriver_harness(layout: WorkLayout, lock: Mapping[str, Any], app: Path) -> dict[str, Any]:
+def shadowdriver_test_identity(manifest: Path) -> dict[str, str]:
+    root = manifest.parent
+    paths = [manifest, root / "Cargo.lock", root / "build.rs", root / "ts" / "mod.ts", root / "ts" / "deno.json", root / "ts" / "package.json", root / "ts" / "pnpm-lock.yaml"]
+    for directory in ("src", "crates", "tests", "js/generated", "ts/src", "ts/tests/browser"):
+        paths.extend(path for path in (root / directory).rglob("*") if path.is_file() and path.suffix in {".rs", ".js", ".toml", ".ts"})
+    digest = hashlib.sha256()
+    for path in sorted(set(paths)):
+        if path.is_file():
+            digest.update(str(path.relative_to(root)).encode() + b"\0")
+            digest.update(path.read_bytes())
+    revision = subprocess.run(["git", "rev-parse", "HEAD"], cwd=root, check=True, capture_output=True, text=True).stdout.strip()
+    return {"revision": revision, "source_sha256": digest.hexdigest()}
+
+
+def require_acceptance_execution(log_path: Path) -> None:
+    output = log_path.read_text(encoding="utf-8")
+    if not re.search(r"test staged_chromium_acceptance \.\.\..*?ok", output, re.DOTALL) or not re.search(r"test result: ok\. 1 passed; 0 failed;", output):
+        fail("Shadowdriver acceptance did not execute exactly one passing staged_chromium_acceptance test")
+
+
+def run_shadowdriver_harness(layout: WorkLayout, lock: Mapping[str, Any], app: Path, *, headless_only: bool = False) -> dict[str, Any]:
     environment = isolated_environment(layout, network="none")
     extension = prepare_extension(layout, lock)
     manifest, test_source = shadowdriver_acceptance_target(layout)
     cargo = cargo_executable(environment)
+    test_identity = shadowdriver_test_identity(manifest)
     profile = layout.harness / "profiles" / f"acceptance-{os.getpid()}-{time.time_ns()}"
     harness_environment = dict(environment)
     harness_environment.update(
         {
             "CARGO_TARGET_DIR": str(layout.harness / "target"),
+            "RUSTC_WRAPPER": shadowdriver_rust_wrapper(),
             "SHADOWDRIVER_CACHE_DIR": str(layout.cache / "shadowdriver"),
             "CHROMIUM_TEST_EXECUTABLE": str(app / "Contents" / "MacOS" / "Chromium"),
             "CHROMIUM_TEST_PROFILE": str(profile),
+            "CHROMIUM_TEST_NATIVE_COMPATIBILITY": "enabled",
+            "CHROMIUM_TEST_HEADLESS_ONLY": "1" if headless_only else "0",
             "CHROMIUM_TEST_EXTENSION": str(extension),
         }
     )
@@ -3624,7 +3760,11 @@ def run_shadowdriver_harness(layout: WorkLayout, lock: Mapping[str, Any], app: P
         log_path=layout.logs / "shadowdriver-acceptance.log",
         timeout=3600,
     )
+    require_acceptance_execution(layout.logs / "shadowdriver-acceptance.log")
+    if shadowdriver_test_identity(manifest) != test_identity:
+        fail("Shadowdriver source changed during staged acceptance")
     return {
+        "test_identity": test_identity,
         "status": "complete",
         "network": "none",
         "command": command,
@@ -3635,10 +3775,50 @@ def run_shadowdriver_harness(layout: WorkLayout, lock: Mapping[str, Any], app: P
         "extension": str(extension),
         "pages": 32,
         "architecture": "arm64",
+        "headed": "not-run-headless-only" if headless_only else "passed",
     }
 
 
-def promote_accepted(layout: WorkLayout, candidate: Path, fingerprint: str, environment: Mapping[str, str]) -> Path:
+def run_native_stealth_harness(layout: WorkLayout, app: Path, headed_reference: Optional[Path] = None) -> dict[str, Any]:
+    manifest, _ = shadowdriver_acceptance_target(layout)
+    root = manifest.parent
+    environment = isolated_environment(layout, network="none")
+    deno = command_path("deno", environment) or "/opt/homebrew/bin/deno"
+    if not Path(deno).is_file():
+        fail("Deno is required for the existing Shadowdriver native stealth acceptance")
+    report_path = root / ".work" / "tmp" / f"native-stealth-{time.time_ns()}.json"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    environment.update({"NATIVE_STEALTH_EXECUTABLE": str(app / "Contents" / "MacOS" / "Chromium"),
+                        "NATIVE_STEALTH_REPORT": str(report_path),
+                        "NATIVE_STEALTH_EXPECT_COMPATIBILITY": "1",
+                        "DENO_DIR": str(root / ".work" / "deno"),
+                        "TMPDIR": str(root / ".work" / "tmp")})
+    reference_digest = sha256(headed_reference) if headed_reference else None
+    if headed_reference:
+        environment["NATIVE_STEALTH_HEADED_REFERENCE"] = str(headed_reference)
+    command = [str(deno), "test", "-A", "--config", str(root / "ts" / "deno.json"),
+               str(root / "ts" / "tests" / "browser" / "native_stealth_test.ts")]
+    identity = shadowdriver_test_identity(manifest)
+    log_path = layout.logs / "native-stealth-acceptance.log"
+    stream_command(command, env=environment, cwd=root, log_path=log_path, timeout=600)
+    if not re.search(r"ok \| 1 passed \| 0 failed", log_path.read_text(encoding="utf-8")):
+        fail("native stealth acceptance did not execute exactly one passing test")
+    if identity != shadowdriver_test_identity(manifest):
+        fail("Shadowdriver source changed during native stealth acceptance")
+    if headed_reference and sha256(headed_reference) != reference_digest:
+        fail("headed reference changed during native stealth acceptance")
+    observations = read_json(report_path, "native stealth observations")
+    if observations.get("status") != "passed" or observations.get("compatibility_required") is not True:
+        fail("native stealth observation report has no completed passing acceptance")
+    if {item.get("mode") for item in observations.get("observations", [])} != {"headed-base", "headless-base", "automation-control", "native-automation-control", "native-direct", "native-passive", "native-passive-restart", "native-instrumented"}:
+        fail("native stealth report omitted required controls")
+    return {"status": "complete", "test_identity": identity, "report": str(report_path),
+            "report_sha256": sha256(report_path), "command": command,
+            "headed_reference": str(headed_reference) if headed_reference else None,
+            "headed_reference_sha256": reference_digest}
+
+
+def promote_accepted(layout: WorkLayout, candidate: Path, fingerprint: str, environment: Mapping[str, str], acceptance_scope: str = "headed-and-headless") -> Path:
     destination = layout.accepted / fingerprint / "Chromium.app"
     if destination.exists():
         audit_bundle(destination, layout, environment)
@@ -3651,13 +3831,15 @@ def promote_accepted(layout: WorkLayout, candidate: Path, fingerprint: str, envi
         "fingerprint": fingerprint,
         "app": str(destination),
         "executable": str(destination / "Contents" / "MacOS" / "Chromium"),
+        "local_overlay_sha256": local_overlay_identity(layout)["sha256"],
+        "acceptance_scope": acceptance_scope,
         "accepted_at": dt.datetime.now(dt.timezone.utc).isoformat(),
     }
     atomic_json(layout.stage / "accepted.json", accepted)
     return destination
 
 
-def test_staged(layout: WorkLayout, supplied_app: Optional[str]) -> dict[str, Any]:
+def test_staged(layout: WorkLayout, supplied_app: Optional[str], headed_reference: Optional[str] = None) -> dict[str, Any]:
     layout.ensure()
     lock = load_lock(layout)
     candidate_record: Optional[dict[str, Any]] = None
@@ -3668,26 +3850,32 @@ def test_staged(layout: WorkLayout, supplied_app: Optional[str]) -> dict[str, An
         candidate_record = read_json(layout.stage / "candidate.json", "staged candidate")
         if candidate_record.get("status") != "complete":
             fail("staged candidate is not complete; run stage-runtime")
+        require_overlay_identity(layout, candidate_record)
         app = validate_app_path(candidate_record["app"], layout, "staged candidate", built=True)
         input_kind = "candidate"
     environment = isolated_environment(layout, network="none")
+    reference = canonical_path(headed_reference, "headed reference", must_exist=True) if headed_reference else None
+    acceptance_scope = "headless-with-historical-headed-reference" if reference else "headed-and-headless"
     report: dict[str, Any] = {
         "schema": 1,
         "status": "failed",
         "network": "none",
         "input": input_kind,
+        "local_overlay_sha256": candidate_record.get("local_overlay_sha256") if candidate_record else None,
         "app": str(app),
+        "acceptance_scope": acceptance_scope,
     }
     try:
         report["audit"] = audit_bundle(app, layout, environment)
-        report["shadowdriver"] = run_shadowdriver_harness(layout, lock, app)
+        report["shadowdriver"] = run_shadowdriver_harness(layout, lock, app, headless_only=reference is not None)
+        report["native_stealth"] = run_native_stealth_harness(layout, app, reference)
         fingerprint = bundle_fingerprint(app)
         report["fingerprint"] = fingerprint
         if candidate_record:
             expected = candidate_record.get("fingerprint")
             if expected != fingerprint:
                 fail(f"staged candidate fingerprint changed: expected {expected}, got {fingerprint}")
-            accepted = promote_accepted(layout, app, fingerprint, environment)
+            accepted = promote_accepted(layout, app, fingerprint, environment, acceptance_scope)
             report["accepted"] = str(accepted)
         report["status"] = "complete"
         atomic_json(layout.metadata / "test-staged-macos.json", report)
@@ -3773,6 +3961,7 @@ def parse_arguments(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--profile", required=True)
     parser.add_argument("--command", required=True)
     parser.add_argument("--app")
+    parser.add_argument("--headed-reference")
     parser.add_argument("--jobs")
     parser.add_argument("--yes", action="store_true")
     parser.add_argument("--latest", action="store_true")
@@ -3786,6 +3975,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if repo_root == Path("/"):
             fail(f"refusing filesystem root as repository: {repo_root}")
         arch = normalize_arch(arguments.arch)
+        if arguments.headed_reference and arguments.command != "test-staged":
+            fail("--headed-reference applies only to test-staged")
         if arch != "arm64" or arguments.profile != DEFAULT_PROFILE:
             fail("the native macOS backend supports arm64 and macos-release only")
         configured_root = os.environ.get("CHROMIUM_WORK_ROOT")
@@ -3814,7 +4005,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             elif command == "package":
                 package_bundle(layout)
             elif command == "test-staged":
-                test_staged(layout, arguments.app)
+                test_staged(layout, arguments.app, arguments.headed_reference)
             elif command == "reset":
                 reset_work(layout, arguments.yes)
             elif command == "status":

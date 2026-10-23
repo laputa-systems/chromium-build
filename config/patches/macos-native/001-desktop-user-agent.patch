@@ -1,0 +1,29 @@
+--- a/components/embedder_support/user_agent_utils.cc
++++ b/components/embedder_support/user_agent_utils.cc
+@@ -217,7 +217,13 @@
+ // depending on the Reduce User-Agent reduction phase features.
+ std::string GetUserAgentInternal() {
+   std::string product = GetProductAndVersion();
+-  if (base::CommandLine::ForCurrentProcess()->HasSwitch(kHeadless)) {
++  bool expose_headless = base::CommandLine::ForCurrentProcess()->HasSwitch(kHeadless);
++#if BUILDFLAG(IS_MAC)
++  expose_headless = expose_headless &&
++      !base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "native-automation-compatibility");
++#endif
++  if (expose_headless) {
+     product.insert(0, "Headless");
+   }
+ 
+--- a/content/browser/renderer_host/render_process_host_impl.cc
++++ b/content/browser/renderer_host/render_process_host_impl.cc
+@@ -3869,6 +3869,9 @@
+   // Propagate the following switches to the renderer command line (along
+   // with any associated values) if present in the browser command line.
+   static const char* const kSwitchNames[] = {
++#if BUILDFLAG(IS_MAC)
++      "native-automation-compatibility",
++#endif
+       switches::kDisableInProcessStackTraces,
+       sandbox::policy::switches::kDisableLandlockSandbox,
+       sandbox::policy::switches::kDisableSeccompFilterSandbox,

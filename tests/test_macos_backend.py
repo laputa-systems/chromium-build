@@ -28,6 +28,65 @@ class MacOSBackendTests(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.root, ignore_errors=True)
 
+    def test_native_overlay_content_invalidates_downstream_identity(self):
+        repository = self.root / "checkout"
+        overlay = repository / "config" / "patches" / "macos-native"
+        overlay.mkdir(parents=True)
+        (overlay / "series").write_text("001-test.patch\n")
+        patch = overlay / "001-test.patch"
+        patch.write_text("first")
+        layout = backend.WorkLayout(repository / ".work" / "macos-arm64", repository)
+        first = backend.local_overlay_identity(layout)["sha256"]
+        backend.require_overlay_identity(layout, {"local_overlay_sha256": first})
+        patch.write_text("second")
+        self.assertNotEqual(first, backend.local_overlay_identity(layout)["sha256"])
+        with self.assertRaisesRegex(backend.MacOSFailure, "overlay changed"):
+            backend.require_overlay_identity(layout, {"local_overlay_sha256": first})
+
+    def test_native_patch_rejects_offset_hunks_without_mutating_source(self):
+        source = self.root / "source"
+        source.mkdir()
+        target = source / "file"
+        target.write_text("prefix\nfirst\nsecond\nthird\n")
+        patch = self.root / "001-test.patch"
+        patch.write_text("--- a/file\n+++ b/file\n@@ -1,3 +1,3 @@\n first\n-second\n+replacement\n third\n")
+        with self.assertRaisesRegex(backend.MacOSFailure, "failed dry-run"):
+            backend.patch_file(source, patch, self.root / "patch-records", os.environ, exact=True)
+        self.assertEqual(target.read_text(), "prefix\nfirst\nsecond\nthird\n")
+
+    def test_acceptance_rejects_successful_zero_test_selection(self):
+        log = self.root / "acceptance.log"
+        log.write_text("test result: ok. 0 passed; 0 failed; 1 filtered out\n")
+        with self.assertRaisesRegex(backend.MacOSFailure, "exactly one passing"):
+            backend.require_acceptance_execution(log)
+        log.write_text("test staged_chromium_acceptance ... ok\ntest result: ok. 1 passed; 0 failed; 0 ignored\n")
+        backend.require_acceptance_execution(log)
+
+    def test_headed_reference_keeps_product_acceptance_headless_and_records_scope(self):
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        app = self.root / "Chromium.app"
+        app.mkdir()
+        reference = self.root / "headed.json"
+        reference.write_text("{}")
+        with mock.patch.object(backend, "load_lock", return_value={}), \
+             mock.patch.object(backend, "validate_app_path", return_value=app), \
+             mock.patch.object(backend, "isolated_environment", return_value={}), \
+             mock.patch.object(backend, "audit_bundle", return_value={"status": "complete"}), \
+             mock.patch.object(backend, "bundle_fingerprint", return_value="candidate"), \
+             mock.patch.object(backend, "run_shadowdriver_harness", return_value={"status": "complete"}) as product, \
+             mock.patch.object(backend, "run_native_stealth_harness", return_value={"status": "complete"}) as stealth:
+            report = backend.test_staged(layout, str(app), str(reference))
+            product.assert_called_once_with(layout, {}, app, headless_only=True)
+            stealth.assert_called_once_with(layout, app, reference)
+            self.assertEqual(report["acceptance_scope"], "headless-with-historical-headed-reference")
+            product.reset_mock()
+            stealth.reset_mock()
+            report = backend.test_staged(layout, str(app))
+            product.assert_called_once_with(layout, {}, app, headless_only=False)
+            stealth.assert_called_once_with(layout, app, None)
+            self.assertEqual(report["acceptance_scope"], "headed-and-headless")
+
     def test_work_root_rejects_forbidden_and_ambiguous_paths(self):
         for value in ("/tmp/chromium", "~/chromium", "/Volumes/dev/with space", str(self.repo / ".work")):
             with self.subTest(value=value), self.assertRaises(backend.MacOSFailure):
@@ -368,6 +427,7 @@ class MacOSBackendTests(unittest.TestCase):
             "schema": 1,
             "status": "complete",
             "fingerprint": fingerprint,
+            "local_overlay_sha256": backend.local_overlay_identity(layout)["sha256"],
             "app": str(app),
             "audit": {"status": "complete"},
         }
