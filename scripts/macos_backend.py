@@ -46,7 +46,7 @@ LOCK_RELATIVE = Path("config/macos.inputs.lock")
 OWNERSHIP_SCHEMA = 1
 VERSION_RE = re.compile(r"(?<!\d)(\d+)\.(\d+)(?:\.(\d+))?(?:\.(\d+))?(?!\d)")
 RELEASE_RE = re.compile(r"^(\d+\.\d+\.\d+\.\d+)-(\d+)$")
-COMPILER_CACHE_NAMES = ("ccache", "sccache", "kache")
+COMPILER_CACHE_NAMES = ("ccache", "sccache")
 COMPILER_CACHE_DISABLED = ("off", "none", "disabled")
 COMPILER_CACHE_CHOICES = ("auto", *COMPILER_CACHE_DISABLED, *COMPILER_CACHE_NAMES)
 DOWNLOAD_CHUNK_BYTES = 1024 * 1024
@@ -182,8 +182,7 @@ def compiler_cache_report(environment: Mapping[str, str]) -> dict[str, Any]:
                 "path": environment.get("CHROMIUM_COMPILER_CACHE_WRAPPER", ""),
                 "version": environment.get("CHROMIUM_COMPILER_CACHE_VERSION", ""),
                 "directory": environment.get("CCACHE_DIR")
-                or environment.get("SCCACHE_DIR")
-                or environment.get("KACHE_CACHE_DIR", ""),
+                or environment.get("SCCACHE_DIR", ""),
             }
         )
     else:
@@ -228,8 +227,6 @@ def select_compiler_cache(
             Path("/usr/local/opt") / name / "bin" / name,
             Path("/usr/bin") / name,
         ]
-        if name == "kache":
-            candidate_paths.append(Path.home() / ".cargo" / "bin" / name)
         resolved_from_path = command_path(name, environment)
         if resolved_from_path:
             candidate_paths.append(Path(resolved_from_path))
@@ -248,7 +245,6 @@ def select_compiler_cache(
                 or is_within(path, Path("/opt/homebrew"))
                 or is_within(path, Path("/usr/local"))
                 or is_within(path, Path("/usr/bin"))
-                or (name == "kache" and is_within(path, Path.home() / ".cargo" / "bin"))
             )
             if not in_supported_location:
                 continue
@@ -475,7 +471,7 @@ def isolated_environment(
     )
     for key in tuple(environment):
         if key.startswith(
-            ("RBE_", "GOMA_", "RECLIENT_", "SISO_", "SCCACHE_", "CCACHE_", "DISTCC_", "KACHE_")
+            ("RBE_", "GOMA_", "RECLIENT_", "SISO_", "SCCACHE_", "CCACHE_", "DISTCC_")
         ) or key.startswith("CHROMIUM_COMPILER_CACHE_"):
             environment.pop(key, None)
     for key in (
@@ -538,11 +534,6 @@ def isolated_environment(
     selected_path = [str(layout.tools / "bin"), str(layout.tools / "depot_tools")]
     if llvm_root:
         selected_path.append(str(llvm_root / "bin"))
-    rustc_wrapper = command_path("kache", os.environ)
-    if rustc_wrapper:
-        wrapper_dir = str(Path(rustc_wrapper).resolve().parent)
-        if wrapper_dir not in selected_path:
-            selected_path.append(wrapper_dir)
     for host_tool in ("rustup", "cargo"):
         resolved_host_tool = command_path(host_tool, os.environ)
         if resolved_host_tool:
@@ -592,31 +583,8 @@ def isolated_environment(
                     "CCACHE_COMPILERCHECK": "content",
                 }
             )
-        elif selected_cache["kind"] == "sccache":
-            environment["SCCACHE_DIR"] = selected_cache["directory"]
         else:
-            runtime_directory = layout.cache / "compiler" / "kache-runtime"
-            runtime_directory.mkdir(parents=True, exist_ok=True)
-            if not is_within(runtime_directory.resolve(), layout.root.resolve()):
-                fail(f"Kache runtime directory escapes the work root: {runtime_directory}")
-            config_path = layout.cache / "compiler" / "kache.toml"
-            if config_path.is_symlink() or (config_path.exists() and not config_path.is_file()):
-                fail(f"Kache configuration path is not a regular file: {config_path}")
-            config = (
-                "[cache]\n"
-                f"local_store = {json.dumps(selected_cache['directory'])}\n"
-                f"runtime_dir = {json.dumps(str(runtime_directory))}\n"
-                "daemon_idle_timeout_secs = 600\n"
-            )
-            atomic_write(config_path, config)
-            environment["KACHE_CACHE_DIR"] = selected_cache["directory"]
-            environment["KACHE_RUNTIME_DIR"] = str(runtime_directory)
-            environment["KACHE_CONFIG"] = str(config_path)
-            environment["KACHE_HOST_CONFIG"] = ""
-            environment["KACHE_DAEMON_IDLE_TIMEOUT"] = "600"
-            environment["KACHE_LOG_FILE"] = str(
-                layout.home / "Library" / "Logs" / "kache" / "kache.log"
-            )
+            environment["SCCACHE_DIR"] = selected_cache["directory"]
     else:
         environment["CHROMIUM_COMPILER_CACHE_REASON"] = selected_cache["reason"]
     return environment
@@ -3013,8 +2981,11 @@ def build_source(layout: WorkLayout, jobs: Optional[str]) -> dict[str, Any]:
     if not source.is_dir():
         fail(f"prepared source is missing: {source}")
     configured_cache = configure.get("compiler_cache", {})
+    configured_kind = configured_cache.get("kind")
+    if configured_cache.get("status") == "enabled" and configured_kind not in COMPILER_CACHE_NAMES:
+        fail(f"GN was configured with unsupported compiler cache {configured_kind!r}; rerun configure")
     cache_mode = (
-        str(configured_cache.get("kind"))
+        str(configured_kind)
         if configured_cache.get("status") == "enabled"
         else "off"
     )
@@ -3093,8 +3064,11 @@ def compiler_cache_stats(layout: WorkLayout) -> dict[str, Any]:
     configure_path = layout.metadata / "configure-macos.json"
     if configure_path.is_file():
         configured_cache = read_json(configure_path, "configuration report").get("compiler_cache", {})
+    configured_kind = configured_cache.get("kind")
+    if configured_cache.get("status") == "enabled" and configured_kind not in COMPILER_CACHE_NAMES:
+        fail(f"GN was configured with unsupported compiler cache {configured_kind!r}; rerun configure")
     cache_mode = (
-        str(configured_cache.get("kind"))
+        str(configured_kind)
         if configured_cache.get("status") == "enabled"
         else ("off" if configured_cache else None)
     )
@@ -3111,10 +3085,7 @@ def compiler_cache_stats(layout: WorkLayout) -> dict[str, Any]:
         },
     }
     if cache.get("status") == "enabled":
-        if cache.get("kind") == "kache":
-            stats_command = [str(cache["path"]), "stats", "--since", "24h"]
-        else:
-            stats_command = [str(cache["path"]), "--show-stats"]
+        stats_command = [str(cache["path"]), "--show-stats"]
         result = command_output(stats_command, env=environment, check=False)
         report["status"] = "complete" if result.returncode == 0 else "failed"
         report["output"] = (result.stdout or result.stderr or "").strip()
@@ -3564,36 +3535,15 @@ def package_bundle(layout: WorkLayout) -> dict[str, Any]:
     return report
 
 
-def acceptance_harness_manifest(layout: WorkLayout) -> tuple[Path, Path]:
-    harness = layout.harness / "shadowdriver"
-    source = harness / "src" / "main.rs"
-    manifest = harness / "Cargo.toml"
-    source.parent.mkdir(parents=True, exist_ok=True)
-    support = harness / "src" / "support" / "http.rs"
-    support.parent.mkdir(parents=True, exist_ok=True)
-    support_source = layout.repo_root.parent / "shadowdriver" / "tests" / "support" / "http.rs"
-    if not support_source.is_file():
-        fail(f"Shadowdriver HTTP test support is missing: {support_source}")
-    shutil.copy2(support_source, support)
-    template = layout.repo_root / "scripts" / "shadowdriver_acceptance.rs"
-    if not template.is_file():
-        fail(f"Shadowdriver acceptance source is missing: {template}")
-    shutil.copy2(template, source)
-    atomic_write(
-        manifest,
-        f"""[package]
-name = "chromium-build-shadowdriver-acceptance"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-async-io = "2"
-futures-lite = "2"
-miniserde = "0.1"
-shadowdriver = {{ path = "{layout.repo_root.parent / 'shadowdriver'}" }}
-""",
-    )
-    return manifest, source
+def shadowdriver_acceptance_target(layout: WorkLayout) -> tuple[Path, Path]:
+    shadowdriver = dict(required_reference_paths(layout))["shadowdriver"]
+    manifest = shadowdriver / "Cargo.toml"
+    test_source = shadowdriver / "tests" / "chromium_acceptance.rs"
+    if not manifest.is_file():
+        fail(f"Shadowdriver Cargo manifest is missing: {manifest}")
+    if not test_source.is_file():
+        fail(f"Shadowdriver acceptance test is missing: {test_source}")
+    return manifest, test_source
 
 
 def cargo_executable(environment: Mapping[str, str]) -> Path:
@@ -3610,25 +3560,30 @@ def cargo_executable(environment: Mapping[str, str]) -> Path:
 
 
 def fetch_acceptance_dependencies(layout: WorkLayout, environment: Mapping[str, str]) -> dict[str, Any]:
-    manifest, source = acceptance_harness_manifest(layout)
+    manifest, test_source = shadowdriver_acceptance_target(layout)
     cargo = cargo_executable(environment)
     fetch_environment = dict(environment)
     fetch_environment["CARGO_TARGET_DIR"] = str(layout.harness / "target")
     fetch_environment["SHADOWDRIVER_CACHE_DIR"] = str(layout.cache / "shadowdriver")
     stream_command(
-        [str(cargo), "fetch", "--manifest-path", str(manifest)],
+        [str(cargo), "fetch", "--locked", "--manifest-path", str(manifest)],
         env=fetch_environment,
-        cwd=layout.harness,
+        cwd=manifest.parent,
         log_path=layout.logs / "cargo-fetch.log",
         timeout=3600,
     )
-    return {"manifest": str(manifest), "source": str(source), "cargo": str(cargo), "status": "complete"}
+    return {
+        "manifest": str(manifest),
+        "test_source": str(test_source),
+        "cargo": str(cargo),
+        "status": "complete",
+    }
 
 
 def run_shadowdriver_harness(layout: WorkLayout, lock: Mapping[str, Any], app: Path) -> dict[str, Any]:
     environment = isolated_environment(layout, network="none")
     extension = prepare_extension(layout, lock)
-    manifest, source = acceptance_harness_manifest(layout)
+    manifest, test_source = shadowdriver_acceptance_target(layout)
     cargo = cargo_executable(environment)
     profile = layout.harness / "profiles" / f"acceptance-{os.getpid()}-{time.time_ns()}"
     harness_environment = dict(environment)
@@ -3645,11 +3600,27 @@ def run_shadowdriver_harness(layout: WorkLayout, lock: Mapping[str, Any], app: P
     if not local_network_home:
         fail("the invoking macOS user HOME is required for local Chromium acceptance")
     harness_environment["HOME"] = local_network_home
-    command = [str(cargo), "run", "--offline", "--manifest-path", str(manifest), "--locked"]
+    command = [
+        str(cargo),
+        "test",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        str(manifest),
+        "--package",
+        "shadowdriver",
+        "--test",
+        "chromium_acceptance",
+        "--",
+        "--ignored",
+        "--exact",
+        "staged_chromium_acceptance",
+        "--nocapture",
+    ]
     stream_command(
         command,
         env=harness_environment,
-        cwd=layout.harness,
+        cwd=manifest.parent,
         log_path=layout.logs / "shadowdriver-acceptance.log",
         timeout=3600,
     )
@@ -3658,7 +3629,7 @@ def run_shadowdriver_harness(layout: WorkLayout, lock: Mapping[str, Any], app: P
         "network": "none",
         "command": command,
         "manifest": str(manifest),
-        "source": str(source),
+        "test_source": str(test_source),
         "cargo": str(cargo),
         "profile": str(profile),
         "extension": str(extension),

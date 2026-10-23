@@ -56,10 +56,11 @@ class MacOSBackendTests(unittest.TestCase):
         with self.assertRaisesRegex(backend.MacOSFailure, "work root must not be a symlink"):
             backend.validate_work_root(alias, self.repo)
 
-    def test_acceptance_manifest_uses_the_sibling_shadowdriver_checkout(self):
+    def test_acceptance_target_uses_the_sibling_shadowdriver_checkout(self):
         layout = backend.WorkLayout(self.root, self.repo)
-        manifest, _ = backend.acceptance_harness_manifest(layout)
-        self.assertIn(f'shadowdriver = {{ path = "{self.repo.parent / "shadowdriver"}" }}', manifest.read_text())
+        manifest, test_source = backend.shadowdriver_acceptance_target(layout)
+        self.assertEqual(manifest, self.repo.parent / "shadowdriver" / "Cargo.toml")
+        self.assertEqual(test_source, self.repo.parent / "shadowdriver" / "tests" / "chromium_acceptance.rs")
 
     def test_required_references_use_sibling_checkouts_and_fail_when_missing(self):
         repository = self.root / "checkout"
@@ -95,18 +96,7 @@ class MacOSBackendTests(unittest.TestCase):
         self.assertEqual(environment["NETWORK_MODE"], "none")
         self.assertNotIn("RBE_service", environment)
 
-    def test_isolated_environment_exposes_an_installed_kache_wrapper(self):
-        layout = backend.WorkLayout(self.root / "fresh-work", self.repo)
-        wrappers = {
-            "kache": "/Users/tester/.cargo/bin/kache",
-            "rustup": "/opt/homebrew/bin/rustup",
-            "cargo": "/opt/homebrew/bin/cargo",
-        }
-        with mock.patch.object(backend, "command_path", side_effect=lambda name, env: wrappers.get(name)):
-            environment = backend.isolated_environment(layout)
-
-        self.assertIn("/Users/tester/.cargo/bin", environment["PATH"].split(os.pathsep))
-
+    def test_layout_rejects_a_nonempty_unmarked_root(self):
         foreign = self.root / "foreign"
         foreign.mkdir()
         (foreign / "orphan").write_text("not owned", encoding="utf-8")
@@ -142,49 +132,24 @@ class MacOSBackendTests(unittest.TestCase):
         self.assertNotIn("CCACHE_DIR", environment)
         self.assertNotIn("SCCACHE_DIR", environment)
 
-    def test_kache_compiler_cache_uses_workroot_store_and_runtime(self):
-        layout = backend.WorkLayout(self.root, self.repo)
-        layout.ensure()
-        wrapper = layout.tools / "bin" / "kache"
-        wrapper.parent.mkdir(parents=True)
-        wrapper.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
-        wrapper.chmod(0o755)
-        version = mock.Mock(returncode=0, stdout="kache 1.0.0\n", stderr="")
-        with mock.patch.object(backend, "command_output", return_value=version):
-            environment = backend.isolated_environment(layout, compiler_cache="kache")
-
-        self.assertEqual(environment["CHROMIUM_COMPILER_CACHE_KIND"], "kache")
-        self.assertEqual(environment["KACHE_CACHE_DIR"], str(layout.cache / "compiler" / "kache"))
-        self.assertEqual(environment["KACHE_RUNTIME_DIR"], str(layout.cache / "compiler" / "kache-runtime"))
-        config_path = Path(environment["KACHE_CONFIG"])
-        self.assertTrue(backend.is_within(config_path, layout.root))
-        self.assertIn(f'local_store = "{environment["KACHE_CACHE_DIR"]}"', config_path.read_text())
-        self.assertIn('daemon_idle_timeout_secs = 600', config_path.read_text())
-        self.assertEqual(environment["KACHE_HOST_CONFIG"], "")
-        self.assertEqual(environment["KACHE_DAEMON_IDLE_TIMEOUT"], "600")
-        self.assertEqual(
-            environment["KACHE_LOG_FILE"],
-            str(layout.home / "Library" / "Logs" / "kache" / "kache.log"),
-        )
-
-    def test_kache_cache_rejects_a_workroot_cache_symlink_escape(self):
+    def test_compiler_cache_rejects_a_workroot_cache_symlink_escape(self):
         root = self.root / "build-root"
         layout = backend.WorkLayout(root, self.repo)
         layout.ensure()
         escaped = self.root / "escaped-cache"
         escaped.mkdir()
         (layout.cache / "compiler").symlink_to(escaped, target_is_directory=True)
-        wrapper = layout.tools / "bin" / "kache"
+        wrapper = layout.tools / "bin" / "ccache"
         wrapper.parent.mkdir(parents=True, exist_ok=True)
         wrapper.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
         wrapper.chmod(0o755)
-        version = mock.Mock(returncode=0, stdout="kache 1.0.0\n", stderr="")
+        version = mock.Mock(returncode=0, stdout="ccache version 4.14\n", stderr="")
 
         with mock.patch.object(backend, "command_output", return_value=version):
             with self.assertRaisesRegex(backend.MacOSFailure, "compiler cache directory escapes"):
-                backend.isolated_environment(layout, compiler_cache="kache")
+                backend.isolated_environment(layout, compiler_cache="ccache")
 
-        self.assertFalse((escaped / "kache").exists())
+        self.assertFalse((escaped / "ccache").exists())
 
     def test_documented_compiler_cache_choices_match_the_backend(self):
         documented = f"`MACOS_COMPILER_CACHE=off|{'|'.join(backend.COMPILER_CACHE_NAMES)}|auto`"
@@ -193,10 +158,10 @@ class MacOSBackendTests(unittest.TestCase):
         aliases = "`" + "` and `".join(backend.COMPILER_CACHE_DISABLED[1:]) + "`"
         self.assertIn(f"{aliases} also turn compiler caching off.", instructions)
 
-    def test_kache_cache_stats_uses_the_local_store_report(self):
+    def test_ccache_stats_uses_the_local_store_report(self):
         layout = backend.WorkLayout(self.root, self.repo)
         layout.ensure()
-        wrapper = layout.tools / "bin" / "kache"
+        wrapper = layout.tools / "bin" / "ccache"
         wrapper.parent.mkdir(parents=True, exist_ok=True)
         wrapper.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
         wrapper.chmod(0o755)
@@ -207,16 +172,16 @@ class MacOSBackendTests(unittest.TestCase):
         layout.source.mkdir(parents=True, exist_ok=True)
         backend.atomic_json(
             layout.metadata / "configure-macos.json",
-            {"compiler_cache": {"status": "enabled", "kind": "kache"}},
+            {"compiler_cache": {"status": "enabled", "kind": "ccache"}},
         )
-        version = mock.Mock(returncode=0, stdout="kache 1.0.0\n", stderr="")
+        version = mock.Mock(returncode=0, stdout="ccache version 4.14\n", stderr="")
         stats = mock.Mock(returncode=0, stdout="local stats\n", stderr="")
         ninja_error = mock.Mock(returncode=1, stdout="ninja: no build.ninja\n", stderr="")
 
         def command_result(command, **kwargs):
             if command[-1] == "--version":
                 return version
-            if "stats" in command:
+            if "--show-stats" in command:
                 return stats
             return ninja_error
 
@@ -224,17 +189,17 @@ class MacOSBackendTests(unittest.TestCase):
             report = backend.compiler_cache_stats(layout)
 
         self.assertEqual(report["status"], "complete")
-        self.assertEqual(report["cache"]["directory"], str(layout.cache / "compiler" / "kache"))
+        self.assertEqual(report["cache"]["directory"], str(layout.cache / "compiler" / "ccache"))
         self.assertEqual(report["output"], "local stats")
         self.assertEqual(report["ninja_incremental"]["status"], "unavailable")
         self.assertEqual(len(run.call_args_list), 2)
         self.assertEqual(
             run.call_args_list[1].args[0],
-            [str(wrapper), "stats", "--since", "24h"],
+            [str(wrapper), "--show-stats"],
         )
         self.assertEqual(
-            run.call_args_list[1].kwargs["env"]["KACHE_CACHE_DIR"],
-            str(layout.cache / "compiler" / "kache"),
+            run.call_args_list[1].kwargs["env"]["CCACHE_DIR"],
+            str(layout.cache / "compiler" / "ccache"),
         )
 
     def test_architecture_normalization_is_native_only(self):
