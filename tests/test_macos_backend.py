@@ -342,9 +342,13 @@ class MacOSBackendTests(unittest.TestCase):
         self.assertIn("pnpm", command_text)
         self.assertIn("native_stealth_test.ts", command_text)
         self.assertIn("--pm-on-fail=ignore", command_text)
-        stealth_path = stream.call_args[1]["env"]["PATH"].split(os.pathsep)
-        self.assertIn("/Users/josh/.local/bin", stealth_path)
+        self.assertIn("--testTimeout=600000", command_text)
+        self.assertNotIn(" -- ", f" {command_text} ")
+        stealth_env = stream.call_args[1]["env"]
+        stealth_path = stealth_env["PATH"].split(os.pathsep)
+        self.assertEqual(stealth_path[0], "/Users/josh/.local/bin")
         self.assertIn("/opt/homebrew/bin", stealth_path)
+        self.assertNotIn("CHROMIUM_SANDBOX_PROFILE", stealth_env)
 
     def test_fetch_acceptance_uses_node_toolchain_without_deno_lock(self):
         layout = backend.WorkLayout(self.root, self.repo)

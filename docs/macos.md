@@ -13,10 +13,14 @@ packages stay there. The backend does not install host packages or modify
 
 Sealed phases (`prepare`, `configure`, `build`, `stage-runtime`, `package`) run
 under `/usr/bin/sandbox-exec -p '(version 1)(allow default)(deny network*)'`;
-`test-staged` and its harnesses use the loopback profile, which additionally
-allows localhost and unix-sockets. `NETWORK_MODE` is derived from the wrapper
-actually applied (`none`, `loopback`, or `fetch`); if the wrapper cannot start,
-the phase fails.
+`test-staged` and the Rust product harness use the loopback profile, which
+additionally allows localhost and unix-sockets. `NETWORK_MODE` is derived from
+the wrapper actually applied (`none`, `loopback`, or `fetch`); if the wrapper
+cannot start, the phase fails. The TypeScript native-stealth harness runs
+without the sandbox wrapper but with the same controlled variables: its
+vitest tree spawns Chromium and inspects processes with `ps`, both of which
+Seatbelt refuses under `sandbox-exec` on this host. Its fixtures, browsers,
+and DevTools endpoints are loopback-only by construction.
 
 ## Phases
 

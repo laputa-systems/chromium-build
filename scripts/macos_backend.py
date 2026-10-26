@@ -4339,10 +4339,15 @@ def run_native_stealth_harness(layout: WorkLayout, app: Path, headed_reference: 
     root = manifest.parent
     environment = isolated_environment(layout, network="loopback")
     toolchain = node_toolchain(environment)
-    for host_tool in (toolchain["node"], toolchain["pnpm"]):
+    for host_tool in (toolchain["pnpm"], toolchain["node"]):
         host_tool_dir = str(Path(host_tool).absolute().parent)
         if host_tool_dir not in environment.get("PATH", "").split(os.pathsep):
             environment["PATH"] = host_tool_dir + os.pathsep + environment.get("PATH", "")
+    environment.pop("CHROMIUM_SANDBOX_PROFILE", None)
+    local_network_home = os.environ.get("HOME")
+    if not local_network_home:
+        fail("the invoking macOS user HOME is required for local Chromium acceptance")
+    environment["HOME"] = local_network_home
     report_path = root / ".work" / "tmp" / f"native-stealth-{time.time_ns()}.json"
     report_path.parent.mkdir(parents=True, exist_ok=True)
     environment.update({"NATIVE_STEALTH_EXECUTABLE": str(app / "Contents" / "MacOS" / "Chromium"),
@@ -4352,7 +4357,7 @@ def run_native_stealth_harness(layout: WorkLayout, app: Path, headed_reference: 
     reference_digest = sha256(headed_reference) if headed_reference else None
     if headed_reference:
         environment["NATIVE_STEALTH_HEADED_REFERENCE"] = str(headed_reference)
-    command = [toolchain["pnpm"], "--pm-on-fail=ignore", "--dir", str(root / "ts"), "run", "test:browser", "--",
+    command = [toolchain["pnpm"], "--pm-on-fail=ignore", "--dir", str(root / "ts"), "run", "test:browser", "--testTimeout=600000",
                "tests/browser/native_stealth_test.ts"]
     identity = shadowdriver_test_identity(manifest)
     log_path = layout.logs / "native-stealth-acceptance.log"
