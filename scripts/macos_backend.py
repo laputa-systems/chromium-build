@@ -4024,7 +4024,7 @@ def build_release_manifest(layout: WorkLayout, lock: Mapping[str, Any], candidat
         "signing_status": signing.get("status", "ad-hoc") if isinstance(signing, dict) else "ad-hoc",
         "archive": str(archive),
         "archive_sha256": digest,
-        "payload_sha256": fingerprint,
+        "payload_sha256": str(report.get("fingerprint", "")),
         "compressed_size": archive.stat().st_size,
         "unpacked_size": unpacked,
     }

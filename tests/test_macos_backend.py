@@ -705,6 +705,25 @@ class MacOSBackendTests(unittest.TestCase):
         (app / "Contents" / "MacOS" / "Chromium").write_bytes(b"arm64-test-2")
         self.assertNotEqual(first, backend.bundle_fingerprint(app))
 
+    def test_build_release_manifest_records_payload_digest(self):
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        app = self.root / "Chromium.app"
+        (app / "Contents" / "MacOS").mkdir(parents=True)
+        (app / "Contents" / "MacOS" / "Chromium").write_bytes(b"x")
+        archive = layout.release / "Chromium-1.0-macos-arm64.zip"
+        archive.parent.mkdir(parents=True, exist_ok=True)
+        archive.write_bytes(b"zip-placeholder")
+        lock = {"chromium": {"version": "1.2.3.4", "commit": "c" * 40}, "ungoogled": {"commit": "u" * 40}}
+        candidate = {"local_overlay_sha256": "o" * 64, "build_identity": {"digest": "d", "clang_version": "c", "clang_sha256": "s", "xcode": "x", "sdk": "sdk", "linker": "l", "rust": "r", "gn_args_sha256": "g"}, "signing": {"status": "ad-hoc"}}
+        report = {"status": "complete", "fingerprint": "f" * 64}
+        manifest = backend.build_release_manifest(layout, lock, candidate, report, app, archive, "a" * 64, "local-stage-only")
+        self.assertEqual(manifest["payload_sha256"], "f" * 64)
+        self.assertEqual(manifest["archive_sha256"], "a" * 64)
+        self.assertEqual(manifest["chromium_version"], "1.2.3.4")
+        for key in backend.REQUIRED_MANIFEST_FIELDS:
+            self.assertIn(key, manifest)
+
     def test_package_reuses_audited_candidate_and_publishes_only_archive_assets(self):
         layout = backend.WorkLayout(self.root, self.repo)
         layout.ensure()

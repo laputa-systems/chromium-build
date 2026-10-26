@@ -28,7 +28,7 @@ usage() {
         '       chromium-build ensure-source|fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-e|gate-f|poc|build|cache-stats|stage-runtime|test-fast|test|test-staged|package [--arch amd64] [--profile headless-debug|headless-release] [--jobs N]' \
         '       chromium-build install [--profile headless-debug|headless-release] [--prefix DIR] [--bin-dir DIR]' \
         '       chromium-build build-target <ninja-output-or-label> [--arch amd64] [--jobs N]' \
-        '       chromium-build --platform macos doctor|smoke-preflight|update-lock|fetch|prepare|configure|build|cache-stats|stage-runtime|package|test-staged [--arch arm64]' \
+        '       chromium-build --platform macos doctor|smoke-preflight|update-lock|fetch|prepare|configure|build|cache-stats|stage-runtime|package|verify-release|test-staged [--arch arm64]' \
         '       chromium-build --platform macos test-staged [--headed-reference OBSERVATIONS.json]'
 }
 
@@ -83,7 +83,7 @@ while [ "$#" -gt 0 ]; do
             LATEST=1
             shift
             ;;
-        image|ensure-source|install|fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-e|gate-f|poc|build|cache-stats|stage-runtime|package|test-fast|test|test-staged|doctor|smoke-preflight|update-lock|configure|reset|status)
+        image|ensure-source|install|fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-e|gate-f|poc|build|cache-stats|stage-runtime|package|verify-release|test-fast|test|test-staged|doctor|smoke-preflight|update-lock|configure|reset|status)
             [ -z "$command_name" ] || fail 'only one command may be selected'
             command_name=$1
             shift
