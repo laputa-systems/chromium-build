@@ -1051,6 +1051,23 @@ class MacOSBackendTests(unittest.TestCase):
                 report = backend.audit_bundle(app, layout, {})
         self.assertEqual(report["status"], "complete")
 
+    def test_audit_presign_skips_signature_verify(self):
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        app = self._minimal_app()
+        seen = []
+        with mock.patch.object(backend, "command_output") as run, \
+             mock.patch.object(backend, "macho_architectures", side_effect=lambda p, e: ["arm64"] if "MacOS" in str(p) else None):
+            def fake(command, **kwargs):
+                seen.append(list(command)[0])
+                return mock.Mock(returncode=0, stdout="", stderr="")
+            run.side_effect = fake
+            with mock.patch.object(backend, "xcode_identity", return_value={"xcode": "Xcode 27.0", "sdk": "27.0", "clang": "/c", "clangxx": "/c++", "linker": "/l", "clang_version": "1", "metal": "/m", "metal_version": "1"}):
+                report = backend.audit_bundle(app, layout, {}, require_signatures=False)
+        self.assertEqual(report["status"], "complete")
+        self.assertEqual(report["signature"], "unchecked-pre-sign")
+        self.assertNotIn("/usr/bin/codesign", seen)
+
     def test_macho_audit_alias_handles_archive_like_bundle_names(self):
         layout = backend.WorkLayout(self.root, self.repo)
         layout.ensure()

@@ -3523,7 +3523,7 @@ def codesign_entitlements(path: Path, environment: Mapping[str, str]) -> str:
     return (result.stdout or result.stderr or "").strip()
 
 
-def audit_bundle(app: Path, layout: WorkLayout, environment: Mapping[str, str]) -> dict[str, Any]:
+def audit_bundle(app: Path, layout: WorkLayout, environment: Mapping[str, str], *, require_signatures: bool = True) -> dict[str, Any]:
     """Audit a bundle before signing or acceptance promotion."""
 
     app = validate_app_path(app, layout, "Chromium application")
@@ -3643,14 +3643,18 @@ def audit_bundle(app: Path, layout: WorkLayout, environment: Mapping[str, str]) 
         observed = tuple(int(part) for part in next(iter(minoses.values())).split("."))
         if observed > sdk_version:
             fail(f"bundle minimum OS {next(iter(minoses.values()))} is above the SDK {'.'.join(str(p) for p in sdk_version)}")
-    signature = command_output(
-        ["/usr/bin/codesign", "--verify", "--deep", "--strict", str(app)],
-        env=environment,
-        check=False,
-    )
-    if signature.returncode:
-        detail = (signature.stderr or signature.stdout or "").strip()
-        fail(f"bundle signature is invalid: {detail[-1200:]}")
+    if require_signatures:
+        signature = command_output(
+            ["/usr/bin/codesign", "--verify", "--deep", "--strict", str(app)],
+            env=environment,
+            check=False,
+        )
+        if signature.returncode:
+            detail = (signature.stderr or signature.stdout or "").strip()
+            fail(f"bundle signature is invalid: {detail[-1200:]}")
+        signature_status = "valid"
+    else:
+        signature_status = "unchecked-pre-sign"
     return {
         "status": "complete",
         "app": str(app),
@@ -3659,6 +3663,7 @@ def audit_bundle(app: Path, layout: WorkLayout, environment: Mapping[str, str]) 
         "bundle_version": plist.get("CFBundleShortVersionString", ""),
         "pie": True,
         "minimum_os": next(iter(minoses.values())),
+        "signature": signature_status,
         "load_commands": sorted({hex(c) for relative in mach_o for c in macho_load_command_types(app / relative)}),
         "files": files,
         "mach_o": mach_o,
@@ -3803,7 +3808,7 @@ def stage_runtime(layout: WorkLayout) -> dict[str, Any]:
     require_build_identity(layout, build)
     source_app = validate_app_path(build.get("app", layout.output / "Chromium.app"), layout, "built Chromium.app", built=True)
     environment = isolated_environment(layout, network="none")
-    source_audit = audit_bundle(source_app, layout, environment)
+    source_audit = audit_bundle(source_app, layout, environment, require_signatures=False)
     pending = layout.candidates / f".pending-{os.getpid()}-{time.time_ns()}" / "Chromium.app"
     pending.parent.mkdir(parents=True, exist_ok=False)
     try:
