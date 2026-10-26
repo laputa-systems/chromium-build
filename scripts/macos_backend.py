@@ -4226,6 +4226,7 @@ def run_shadowdriver_harness(layout: WorkLayout, lock: Mapping[str, Any], app: P
             "CARGO_TARGET_DIR": str(layout.harness / "target"),
             "RUSTC_WRAPPER": shadowdriver_rust_wrapper(),
             "SHADOWDRIVER_CACHE_DIR": str(layout.cache / "shadowdriver"),
+            "CHROMIUM_TEST_NO_SANDBOX": "1",
             "CHROMIUM_TEST_EXECUTABLE": str(app / "Contents" / "MacOS" / "Chromium"),
             "CHROMIUM_TEST_PROFILE": str(profile),
             "CHROMIUM_TEST_NATIVE_COMPATIBILITY": "enabled",
