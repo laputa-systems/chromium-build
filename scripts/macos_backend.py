@@ -3714,7 +3714,28 @@ def package_bundle(layout: WorkLayout) -> dict[str, Any]:
     lock = load_lock(layout)
     version = str(lock["chromium"]["version"])
     release = layout.release
-    archive = release / f"Chromium-{version}-macos-arm64.zip"
+    skip_acceptance = os.environ.get("MACOS_SKIP_ACCEPTANCE", "0").lower() in {"1", "true", "yes"}
+    if skip_acceptance:
+        archive = release / f"Chromium-{version}-macos-arm64-experimental.zip"
+        acceptance_status = "skipped"
+    else:
+        accepted_path = layout.stage / "accepted.json"
+        if not accepted_path.is_file():
+            fail("no accepted record; run test-staged with acceptance before package")
+        accepted = read_json(accepted_path, "accepted record")
+        if accepted.get("status") != "complete":
+            fail("accepted record is not complete; run test-staged with acceptance before package")
+        if accepted.get("fingerprint") != fingerprint:
+            fail("accepted fingerprint does not match staged candidate; rerun test-staged")
+        candidate_identity = candidate.get("build_identity") or {}
+        accepted_identity = accepted.get("build_identity") or {}
+        if not candidate_identity or not accepted_identity:
+            fail("accepted build identity is missing; rerun test-staged")
+        for key in ("lock_sha256", "overlay_sha256", "clang_version", "clang_sha256", "xcode", "sdk", "linker", "rust", "gn_args_sha256", "digest"):
+            if str(candidate_identity.get(key, "")) != str(accepted_identity.get(key, "")):
+                fail(f"accepted build identity mismatch in {key}; rerun test-staged")
+        archive = release / f"Chromium-{version}-macos-arm64.zip"
+        acceptance_status = "local-stage-only"
     temporary = release / f".{archive.name}.tmp-{os.getpid()}-{time.time_ns()}"
     environment = isolated_environment(layout, network="none")
     ditto = Path("/usr/bin/ditto")
@@ -3754,7 +3775,7 @@ def package_bundle(layout: WorkLayout) -> dict[str, Any]:
         "archive": str(archive),
         "sha256": digest,
         "size": archive.stat().st_size,
-        "acceptance": "not-run-in-remote-ci" if os.environ.get("MACOS_SKIP_ACCEPTANCE") else "local-stage-only",
+        "acceptance": acceptance_status,
     }
     atomic_json(layout.metadata / "package-macos.json", report)
     print(f"package: created {archive} ({report['size']} bytes)")
@@ -3961,7 +3982,7 @@ def run_native_stealth_harness(layout: WorkLayout, app: Path, headed_reference: 
             "headed_reference_sha256": reference_digest}
 
 
-def promote_accepted(layout: WorkLayout, candidate: Path, fingerprint: str, environment: Mapping[str, str], acceptance_scope: str = "headed-and-headless") -> Path:
+def promote_accepted(layout: WorkLayout, candidate: Path, fingerprint: str, environment: Mapping[str, str], acceptance_scope: str = "headed-and-headless", build_identity: Optional[Mapping[str, Any]] = None) -> Path:
     destination = layout.accepted / fingerprint / "Chromium.app"
     if destination.exists():
         audit_bundle(destination, layout, environment)
@@ -3975,6 +3996,7 @@ def promote_accepted(layout: WorkLayout, candidate: Path, fingerprint: str, envi
         "app": str(destination),
         "executable": str(destination / "Contents" / "MacOS" / "Chromium"),
         "local_overlay_sha256": local_overlay_identity(layout)["sha256"],
+        "build_identity": dict(build_identity) if build_identity else None,
         "acceptance_scope": acceptance_scope,
         "accepted_at": dt.datetime.now(dt.timezone.utc).isoformat(),
     }
@@ -4020,7 +4042,7 @@ def test_staged(layout: WorkLayout, supplied_app: Optional[str], headed_referenc
             expected = candidate_record.get("fingerprint")
             if expected != fingerprint:
                 fail(f"staged candidate fingerprint changed: expected {expected}, got {fingerprint}")
-            accepted = promote_accepted(layout, app, fingerprint, environment, acceptance_scope)
+            accepted = promote_accepted(layout, app, fingerprint, environment, acceptance_scope, build_identity=candidate_record.get("build_identity"))
             report["accepted"] = str(accepted)
         report["status"] = "complete"
         atomic_json(layout.metadata / "test-staged-macos.json", report)

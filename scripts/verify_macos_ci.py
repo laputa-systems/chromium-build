@@ -172,6 +172,12 @@ def verify_package(arguments: argparse.Namespace) -> None:
     release = (Path(arguments.work_root) / "release").resolve()
     require(release in archive.parents, "package escaped the release directory", report)
     require(archive.is_file() and archive.stat().st_size > 0, "package archive is missing", report)
+    acceptance = report.get("acceptance", "")
+    if acceptance == "skipped":
+        require(archive.name.endswith("-experimental.zip"), "skipped acceptance must use experimental archive", report)
+    else:
+        require(not archive.name.endswith("-experimental.zip"), "production package must not use experimental name", report)
+        require(acceptance in ("local-stage-only", "complete"), "package acceptance is not recorded", report)
     digest = sha256(archive)
     require(digest == report.get("sha256"), "package digest does not match its report", report)
     checksum = archive.with_name(f"{archive.name}.sha256")

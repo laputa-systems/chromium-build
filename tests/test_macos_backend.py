@@ -660,6 +660,12 @@ class MacOSBackendTests(unittest.TestCase):
             "audit": {"status": "complete"},
         }
         backend.atomic_json(layout.stage / "candidate.json", candidate)
+        backend.atomic_json(layout.stage / "accepted.json", {
+            "schema": 1, "status": "complete", "fingerprint": fingerprint,
+            "local_overlay_sha256": candidate["local_overlay_sha256"],
+            "build_identity": dict(candidate["build_identity"]),
+            "app": str(app), "executable": str(executable),
+        })
 
         def fake_command(command, **kwargs):
             self.assertEqual(command[0], "/usr/bin/ditto")
@@ -679,6 +685,113 @@ class MacOSBackendTests(unittest.TestCase):
         self.assertEqual(report["sha256"], backend.sha256(archive))
         self.assertFalse((layout.release / "build-manifest.json").exists())
         self.assertFalse((layout.release / "version").exists())
+
+    def test_package_requires_accepted_record(self):
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        app = layout.candidates / ("b" * 64) / "Chromium.app"
+        (app / "Contents" / "MacOS").mkdir(parents=True)
+        (app / "Contents" / "MacOS" / "Chromium").write_bytes(b"x")
+        fingerprint = backend.bundle_fingerprint(app)
+        candidate = {
+            "schema": 1, "status": "complete", "fingerprint": fingerprint,
+            "local_overlay_sha256": backend.local_overlay_identity(layout)["sha256"],
+            "build_identity": {"digest": "d1", "lock_sha256": "a", "overlay_sha256": "b", "clang_version": "c", "clang_sha256": "d", "xcode": "e", "sdk": "f", "linker": "g", "rust": "h", "gn_args_sha256": "i"},
+            "app": str(app), "audit": {"status": "complete"},
+        }
+        backend.atomic_json(layout.stage / "candidate.json", candidate)
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("MACOS_SKIP_ACCEPTANCE", None)
+            with mock.patch.object(backend, "isolated_environment", return_value={}), \
+                 mock.patch.object(backend, "require_build_identity", return_value="d1"):
+                with self.assertRaisesRegex(backend.MacOSFailure, "accepted|acceptance"):
+                    backend.package_bundle(layout)
+
+    def test_package_rejects_fingerprint_mismatch_with_accepted(self):
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        app = layout.candidates / ("c" * 64) / "Chromium.app"
+        (app / "Contents" / "MacOS").mkdir(parents=True)
+        (app / "Contents" / "MacOS" / "Chromium").write_bytes(b"x")
+        fingerprint = backend.bundle_fingerprint(app)
+        candidate = {
+            "schema": 1, "status": "complete", "fingerprint": fingerprint,
+            "local_overlay_sha256": backend.local_overlay_identity(layout)["sha256"],
+            "build_identity": {"digest": "d1", "lock_sha256": "a", "overlay_sha256": "b", "clang_version": "c", "clang_sha256": "d", "xcode": "e", "sdk": "f", "linker": "g", "rust": "h", "gn_args_sha256": "i"},
+            "app": str(app), "audit": {"status": "complete"},
+        }
+        backend.atomic_json(layout.stage / "candidate.json", candidate)
+        backend.atomic_json(layout.stage / "accepted.json", {
+            "schema": 1, "status": "complete", "fingerprint": "different",
+            "local_overlay_sha256": candidate["local_overlay_sha256"],
+            "build_identity": candidate["build_identity"],
+            "app": str(app), "executable": str(app / "Contents" / "MacOS" / "Chromium"),
+        })
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("MACOS_SKIP_ACCEPTANCE", None)
+            with mock.patch.object(backend, "isolated_environment", return_value={}), \
+                 mock.patch.object(backend, "require_build_identity", return_value="d1"):
+                with self.assertRaisesRegex(backend.MacOSFailure, "fingerprint|accepted"):
+                    backend.package_bundle(layout)
+
+    def test_package_rejects_identity_mismatch_with_accepted(self):
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        app = layout.candidates / ("d" * 64) / "Chromium.app"
+        (app / "Contents" / "MacOS").mkdir(parents=True)
+        (app / "Contents" / "MacOS" / "Chromium").write_bytes(b"x")
+        fingerprint = backend.bundle_fingerprint(app)
+        candidate_identity = {"digest": "d1", "lock_sha256": "a", "overlay_sha256": "b", "clang_version": "c", "clang_sha256": "d", "xcode": "e", "sdk": "f", "linker": "g", "rust": "h", "gn_args_sha256": "i"}
+        candidate = {
+            "schema": 1, "status": "complete", "fingerprint": fingerprint,
+            "local_overlay_sha256": backend.local_overlay_identity(layout)["sha256"],
+            "build_identity": candidate_identity,
+            "app": str(app), "audit": {"status": "complete"},
+        }
+        backend.atomic_json(layout.stage / "candidate.json", candidate)
+        accepted_identity = dict(candidate_identity)
+        accepted_identity["lock_sha256"] = "different"
+        backend.atomic_json(layout.stage / "accepted.json", {
+            "schema": 1, "status": "complete", "fingerprint": fingerprint,
+            "local_overlay_sha256": candidate["local_overlay_sha256"],
+            "build_identity": accepted_identity,
+            "app": str(app), "executable": str(app / "Contents" / "MacOS" / "Chromium"),
+        })
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("MACOS_SKIP_ACCEPTANCE", None)
+            with mock.patch.object(backend, "isolated_environment", return_value={}), \
+                 mock.patch.object(backend, "require_build_identity", return_value="d1"):
+                with self.assertRaisesRegex(backend.MacOSFailure, "identity|mismatch"):
+                    backend.package_bundle(layout)
+
+    def test_skipped_acceptance_yields_only_experimental_archive(self):
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        app = layout.candidates / ("e" * 64) / "Chromium.app"
+        (app / "Contents" / "MacOS").mkdir(parents=True)
+        (app / "Contents" / "MacOS" / "Chromium").write_bytes(b"x")
+        fingerprint = backend.bundle_fingerprint(app)
+        candidate = {
+            "schema": 1, "status": "complete", "fingerprint": fingerprint,
+            "local_overlay_sha256": backend.local_overlay_identity(layout)["sha256"],
+            "build_identity": {"digest": "d1", "lock_sha256": "a", "overlay_sha256": "b", "clang_version": "c", "clang_sha256": "d", "xcode": "e", "sdk": "f", "linker": "g", "rust": "h", "gn_args_sha256": "i"},
+            "app": str(app), "audit": {"status": "complete"},
+        }
+        backend.atomic_json(layout.stage / "candidate.json", candidate)
+
+        def fake_command(command, **kwargs):
+            Path(command[-1]).write_bytes(b"zip-placeholder")
+            return mock.Mock(returncode=0, stdout="", stderr="")
+
+        with mock.patch.dict(os.environ, {"MACOS_SKIP_ACCEPTANCE": "1"}), \
+             mock.patch.object(backend, "isolated_environment", return_value={}), \
+             mock.patch.object(backend, "command_output", side_effect=fake_command), \
+             mock.patch.object(backend, "require_build_identity", return_value="d1"), \
+             mock.patch.object(backend, "load_lock", return_value={"chromium": {"version": "1.2.3.4"}}):
+            report = backend.package_bundle(layout)
+        self.assertIn("-experimental.zip", report["archive"])
+        self.assertEqual(report["acceptance"], "skipped")
+        self.assertNotIn("Chromium-1.2.3.4-macos-arm64.zip", report["archive"])
 
     def test_macho_audit_alias_handles_archive_like_bundle_names(self):
         layout = backend.WorkLayout(self.root, self.repo)
