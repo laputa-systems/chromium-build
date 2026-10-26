@@ -341,7 +341,7 @@ class MacOSBackendTests(unittest.TestCase):
         self.assertNotIn("deno", command_text)
         self.assertIn("pnpm", command_text)
         self.assertIn("native_stealth_test.ts", command_text)
-        self.assertIn("--config.manage-package-manager-versions=false", command_text)
+        self.assertIn("--pm-on-fail=ignore", command_text)
         stealth_path = stream.call_args[1]["env"]["PATH"].split(os.pathsep)
         self.assertIn("/Users/josh/.local/bin", stealth_path)
         self.assertIn("/opt/homebrew/bin", stealth_path)
