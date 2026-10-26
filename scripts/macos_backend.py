@@ -49,6 +49,39 @@ SANDBOX_LOOPBACK_PROFILE = (
     "(version 1)(allow default)(deny network*)"
     "(allow network* (remote ip \"localhost:*\"))(allow network* (remote unix-socket))"
 )
+MH_MAGIC_64 = 0xFEEDFACF
+MH_PIE_FLAG = 0x200000
+CPU_TYPE_ARM64 = 0x0100000C
+LC_SEGMENT_64 = 0x19
+LC_SYMTAB = 0x2
+LC_DYSYMTAB = 0xB
+LC_LOAD_DYLIB = 0xC
+LC_ID_DYLIB = 0xD
+LC_LOAD_DYLINKER = 0xE
+LC_UUID = 0x1
+LC_VERSION_MIN_MACOSX = 0x24
+LC_BUILD_VERSION = 0x32
+LC_SOURCE_VERSION = 0x2A
+LC_MAIN = 0x28
+LC_LOAD_WEAK_DYLIB = 0x18
+LC_FUNCTION_STARTS = 0x26
+LC_DATA_IN_CODE = 0x29
+LC_CODE_SIGNATURE = 0x1D
+LC_SEGMENT_SPLIT_INFO = 0x1E
+LC_DYLIB_CODE_SIGN_DRS = 0x2B
+LC_ENCRYPTION_INFO_64 = 0x2C
+LC_LINKER_OPTION = 0x2D
+LC_DYLD_INFO_ONLY = 0x22
+LC_TWOLEVEL_HINTS = 0x16
+LC_ROUTINES_64 = 0x11
+ADMISSIBLE_MACHO_LOAD_COMMANDS = frozenset({
+    LC_SEGMENT_64, LC_SYMTAB, LC_DYSYMTAB, LC_LOAD_DYLIB, LC_ID_DYLIB,
+    LC_LOAD_DYLINKER, LC_UUID, LC_VERSION_MIN_MACOSX, LC_BUILD_VERSION,
+    LC_SOURCE_VERSION, LC_MAIN, LC_LOAD_WEAK_DYLIB, LC_FUNCTION_STARTS,
+    LC_DATA_IN_CODE, LC_CODE_SIGNATURE, LC_SEGMENT_SPLIT_INFO,
+    LC_DYLIB_CODE_SIGN_DRS, LC_ENCRYPTION_INFO_64, LC_LINKER_OPTION,
+    LC_DYLD_INFO_ONLY, LC_TWOLEVEL_HINTS, LC_ROUTINES_64,
+})
 LOCK_RELATIVE = Path("config/macos.inputs.lock")
 OWNERSHIP_SCHEMA = 1
 VERSION_RE = re.compile(r"(?<!\d)(\d+)\.(\d+)(?:\.(\d+))?(?:\.(\d+))?(?!\d)")
@@ -3419,6 +3452,69 @@ def macho_architectures(path: Path, environment: Mapping[str, str]) -> Optional[
     return values
 
 
+def parse_macho_header(path: Path) -> Optional[dict[str, Any]]:
+    try:
+        data = path.read_bytes()
+    except OSError:
+        return None
+    if len(data) < 32:
+        return None
+    import struct
+    magic, cputype, _, _, ncmds, _, flags, _ = struct.unpack_from("<8I", data, 0)
+    if magic != MH_MAGIC_64 or cputype != CPU_TYPE_ARM64:
+        return None
+    commands: list[tuple[int, int]] = []
+    offset = 32
+    minos: Optional[tuple[int, int, int]] = None
+    for _ in range(ncmds):
+        if offset + 8 > len(data):
+            return None
+        cmd, cmdsize = struct.unpack_from("<2I", data, offset)
+        if cmdsize < 8 or offset + cmdsize > len(data):
+            return None
+        commands.append((cmd, cmdsize))
+        if cmd == LC_BUILD_VERSION and cmdsize >= 24:
+            _, _, min_raw, _ = struct.unpack_from("<4I", data, offset + 8)
+            minos = ((min_raw >> 16) & 0xFF, (min_raw >> 8) & 0xFF, min_raw & 0xFF)
+        elif cmd == LC_VERSION_MIN_MACOSX and cmdsize >= 16:
+            ver_raw, _ = struct.unpack_from("<2I", data, offset + 8)
+            candidate = ((ver_raw >> 16) & 0xFF, (ver_raw >> 8) & 0xFF, ver_raw & 0xFF)
+            if minos is None:
+                minos = candidate
+        offset += cmdsize
+    return {"flags": flags, "ncmds": ncmds, "commands": commands, "minos": minos}
+
+
+def macho_has_pie(path: Path) -> bool:
+    header = parse_macho_header(path)
+    if header is None:
+        fail(f"cannot parse Mach-O header: {path}")
+    return bool(header["flags"] & MH_PIE_FLAG)
+
+
+def macho_min_os(path: Path) -> Optional[tuple[int, int, int]]:
+    header = parse_macho_header(path)
+    if header is None:
+        return None
+    return header["minos"]
+
+
+def macho_load_command_types(path: Path) -> set[int]:
+    header = parse_macho_header(path)
+    if header is None:
+        fail(f"cannot parse Mach-O load commands: {path}")
+    return {cmd for cmd, _ in header["commands"]}
+
+
+def codesign_entitlements(path: Path, environment: Mapping[str, str]) -> str:
+    result = command_output(
+        ["/usr/bin/codesign", "-d", "--entitlements", ":-", str(path)],
+        env=environment,
+        check=False,
+    )
+    return (result.stdout or result.stderr or "").strip()
+
+
 def audit_bundle(app: Path, layout: WorkLayout, environment: Mapping[str, str]) -> dict[str, Any]:
     """Audit a bundle before signing or acceptance promotion."""
 
@@ -3510,12 +3606,46 @@ def audit_bundle(app: Path, layout: WorkLayout, environment: Mapping[str, str]) 
 
     if str(executable.relative_to(app)) not in mach_o:
         fail(f"Chromium.app executable is not an arm64 Mach-O: {executable}")
+    minoses: dict[str, str] = {}
+    for relative in mach_o:
+        candidate = app / relative
+        if not macho_has_pie(candidate):
+            fail(f"bundle Mach-O lacks MH_PIE: {candidate}")
+        command_types = macho_load_command_types(candidate)
+        inadmissible = sorted(cmd for cmd in command_types if cmd not in ADMISSIBLE_MACHO_LOAD_COMMANDS)
+        if inadmissible:
+            fail(f"bundle Mach-O uses inadmissible load commands {[hex(c) for c in inadmissible]}: {candidate}")
+        minos = macho_min_os(candidate)
+        if minos is None:
+            fail(f"bundle Mach-O has no minimum OS version: {candidate}")
+        minoses[relative] = f"{minos[0]}.{minos[1]}.{minos[2]}"
+    if len(set(minoses.values())) != 1:
+        fail(f"bundle Mach-O minimum OS versions are not uniform: {minoses}")
+    try:
+        sdk_version = parse_version(xcode_identity(environment)["sdk"])
+    except MacOSFailure:
+        sdk_version = None
+    if sdk_version is not None:
+        observed = tuple(int(part) for part in next(iter(minoses.values())).split("."))
+        if observed > sdk_version:
+            fail(f"bundle minimum OS {next(iter(minoses.values()))} is above the SDK {'.'.join(str(p) for p in sdk_version)}")
+    signature = command_output(
+        ["/usr/bin/codesign", "--verify", "--deep", "--strict", str(app)],
+        env=environment,
+        check=False,
+    )
+    if signature.returncode:
+        detail = (signature.stderr or signature.stdout or "").strip()
+        fail(f"bundle signature is invalid: {detail[-1200:]}")
     return {
         "status": "complete",
         "app": str(app),
         "executable": str(executable),
         "bundle_identifier": plist.get("CFBundleIdentifier", ""),
         "bundle_version": plist.get("CFBundleShortVersionString", ""),
+        "pie": True,
+        "minimum_os": next(iter(minoses.values())),
+        "load_commands": sorted({hex(c) for relative in mach_o for c in macho_load_command_types(app / relative)}),
         "files": files,
         "mach_o": mach_o,
         "dependencies": dependencies,
@@ -3541,6 +3671,7 @@ def sign_bundle(app: Path, layout: WorkLayout, environment: Mapping[str, str]) -
         ):
             code_objects.add(candidate)
     ordered = sorted(code_objects, key=lambda path: len(path.parts), reverse=True)
+    before = {str(target.relative_to(app)): codesign_entitlements(target, environment) for target in ordered}
     signed: list[str] = []
     for code_object in ordered:
         result = command_output(
@@ -3565,13 +3696,18 @@ def sign_bundle(app: Path, layout: WorkLayout, environment: Mapping[str, str]) -
         env=environment,
         check=False,
     )
+    after_app = (entitlements.stdout or entitlements.stderr or "").strip()
+    after = {str(target.relative_to(app)): codesign_entitlements(target, environment) for target in ordered}
+    lost = sorted(key for key in before if before[key] != after.get(key, ""))
+    if lost:
+        fail(f"re-signing changed entitlements for: {', '.join(lost)}")
     return {
         "status": "complete",
         "identity": "-",
         "timestamp": False,
         "signed_objects": signed,
         "verification": (verification.stderr or verification.stdout or "").strip(),
-        "entitlements": (entitlements.stdout or entitlements.stderr or "").strip(),
+        "entitlements": after_app,
     }
 
 

@@ -793,6 +793,149 @@ class MacOSBackendTests(unittest.TestCase):
         self.assertEqual(report["acceptance"], "skipped")
         self.assertNotIn("Chromium-1.2.3.4-macos-arm64.zip", report["archive"])
 
+        self.assertIn("-experimental.zip", report["archive"])
+        self.assertEqual(report["acceptance"], "skipped")
+        self.assertNotIn("Chromium-1.2.3.4-macos-arm64.zip", report["archive"])
+
+    def _write_macho(self, path, *, pie=True, minos=(11, 0, 0), commands=None):
+        import struct
+        if commands is None:
+            commands = []
+        payload = b""
+        for cmd, body in commands:
+            cmdsize = 8 + len(body)
+            payload += struct.pack("<2I", cmd, cmdsize) + body
+        # Prepend LC_BUILD_VERSION for minos unless caller supplied its own minos command
+        has_minos = any(cmd in (backend.LC_BUILD_VERSION, backend.LC_VERSION_MIN_MACOSX) for cmd, _ in commands)
+        prefix = b""
+        if not has_minos and minos is not None:
+            raw = (minos[0] << 16) | (minos[1] << 8) | minos[2]
+            prefix = struct.pack("<8I", backend.LC_BUILD_VERSION, 32, 1, raw, raw, 1, 0, 0)
+        body_all = prefix + payload
+        ncmds = (1 if prefix else 0) + len(commands)
+        flags = backend.MH_PIE_FLAG if pie else 0
+        header = struct.pack("<8I", backend.MH_MAGIC_64, backend.CPU_TYPE_ARM64, 0, 2, ncmds, len(body_all), flags, 0)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(header + body_all)
+
+    def _minimal_app(self, name="Chromium.app", *, pie=True, minos=(11, 0, 0), commands=None, second_minos=None):
+        from pathlib import Path as _P
+        app = _P(str(self.root)) / name
+        exe = app / "Contents" / "MacOS" / "Chromium"
+        self._write_macho(exe, pie=pie, minos=minos, commands=commands)
+        if second_minos is not None:
+            helper = app / "Contents" / "MacOS" / "helper"
+            self._write_macho(helper, pie=True, minos=second_minos, commands=commands)
+        (app / "Contents" / "Info.plist").parent.mkdir(parents=True, exist_ok=True)
+        (app / "Contents" / "Info.plist").write_bytes(
+            b'<?xml version="1.0"?><!DOCTYPE plist><plist version="1.0"><dict>'
+            b'<key>CFBundleExecutable</key><string>Chromium</string>'
+            b'<key>CFBundleIdentifier</key><string>test</string></dict></plist>'
+        )
+        return app
+
+    def test_audit_rejects_missing_pie(self):
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        app = self._minimal_app(pie=False)
+        with mock.patch.object(backend, "command_output") as run, \
+             mock.patch.object(backend, "macho_architectures", side_effect=lambda p, e: ["arm64"] if "MacOS" in str(p) else None):
+            def fake(command, **kwargs):
+                args = list(command)
+                if args[0] == "/usr/bin/otool":
+                    return mock.Mock(returncode=0, stdout="", stderr="")
+                if args[0] == "/usr/bin/codesign":
+                    return mock.Mock(returncode=0, stdout="", stderr="")
+                return mock.Mock(returncode=0, stdout="", stderr="")
+            run.side_effect = fake
+            with self.assertRaisesRegex(backend.MacOSFailure, "MH_PIE|PIE"):
+                backend.audit_bundle(app, layout, {})
+
+    def test_audit_rejects_non_uniform_min_os(self):
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        app = self._minimal_app(minos=(11, 0, 0), second_minos=(12, 0, 0))
+        with mock.patch.object(backend, "command_output") as run, \
+             mock.patch.object(backend, "macho_architectures", side_effect=lambda p, e: ["arm64"] if "MacOS" in str(p) else None):
+            def fake(command, **kwargs):
+                args = list(command)
+                if args[0] == "/usr/bin/otool":
+                    return mock.Mock(returncode=0, stdout="", stderr="")
+                if args[0] == "/usr/bin/codesign":
+                    return mock.Mock(returncode=0, stdout="", stderr="")
+                return mock.Mock(returncode=0, stdout="", stderr="")
+            run.side_effect = fake
+            with mock.patch.object(backend, "xcode_identity", return_value={"xcode": "Xcode 27.0", "sdk": "27.0", "clang": "/c", "clangxx": "/c++", "linker": "/l", "clang_version": "1", "metal": "/m", "metal_version": "1"}):
+                with self.assertRaisesRegex(backend.MacOSFailure, "uniform|minimum OS"):
+                    backend.audit_bundle(app, layout, {})
+
+    def test_audit_rejects_inadmissible_load_command(self):
+        import struct
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        # 0x99 is not in the admissible set
+        app = self._minimal_app(commands=[(0x99, b"12345678")])
+        with mock.patch.object(backend, "command_output") as run, \
+             mock.patch.object(backend, "macho_architectures", side_effect=lambda p, e: ["arm64"] if "MacOS" in str(p) else None):
+            def fake(command, **kwargs):
+                args = list(command)
+                if args[0] == "/usr/bin/otool":
+                    return mock.Mock(returncode=0, stdout="", stderr="")
+                if args[0] == "/usr/bin/codesign":
+                    return mock.Mock(returncode=0, stdout="", stderr="")
+                return mock.Mock(returncode=0, stdout="", stderr="")
+            run.side_effect = fake
+            with mock.patch.object(backend, "xcode_identity", return_value={"xcode": "Xcode 27.0", "sdk": "27.0", "clang": "/c", "clangxx": "/c++", "linker": "/l", "clang_version": "1", "metal": "/m", "metal_version": "1"}):
+                with self.assertRaisesRegex(backend.MacOSFailure, "inadmissible|load command"):
+                    backend.audit_bundle(app, layout, {})
+
+    def test_audit_rejects_invalid_signature(self):
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        app = self._minimal_app()
+        with mock.patch.object(backend, "command_output") as run, \
+             mock.patch.object(backend, "macho_architectures", side_effect=lambda p, e: ["arm64"] if "MacOS" in str(p) else None):
+            def fake(command, **kwargs):
+                args = list(command)
+                if args[0] == "/usr/bin/otool":
+                    return mock.Mock(returncode=0, stdout="", stderr="")
+                if args[0] == "/usr/bin/codesign":
+                    return mock.Mock(returncode=1, stdout="", stderr="invalid signature")
+                return mock.Mock(returncode=0, stdout="", stderr="")
+            run.side_effect = fake
+            with mock.patch.object(backend, "xcode_identity", return_value={"xcode": "Xcode 27.0", "sdk": "27.0", "clang": "/c", "clangxx": "/c++", "linker": "/l", "clang_version": "1", "metal": "/m", "metal_version": "1"}):
+                with self.assertRaisesRegex(backend.MacOSFailure, "signature|invalid"):
+                    backend.audit_bundle(app, layout, {})
+
+    def test_signing_preserves_entitlements(self):
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        app = self.root / "Entitled.app"
+        (app / "Contents" / "MacOS").mkdir(parents=True)
+        binary = app / "Contents" / "MacOS" / "bin"
+        binary.write_bytes(b"x")
+        calls = {"n": 0}
+        def fake(command, **kwargs):
+            args = list(command)
+            if args[0] == "/usr/bin/file":
+                return mock.Mock(returncode=0, stdout="Mach-O 64-bit executable arm64\n", stderr="")
+            if args[0] == "/usr/bin/lipo":
+                return mock.Mock(returncode=0, stdout="arm64", stderr="")
+            if args[:2] == ["/usr/bin/codesign", "--force"]:
+                return mock.Mock(returncode=0, stdout="", stderr="")
+            if args[:2] == ["/usr/bin/codesign", "--verify"]:
+                return mock.Mock(returncode=0, stdout="valid", stderr="")
+            if args[:2] == ["/usr/bin/codesign", "-d"]:
+                calls["n"] += 1
+                # First round (before) returns A; second round (after) returns B to simulate loss
+                if calls["n"] <= 2:
+                    return mock.Mock(returncode=0, stdout="entitlements-A", stderr="")
+                return mock.Mock(returncode=0, stdout="entitlements-B", stderr="")
+            return mock.Mock(returncode=0, stdout="", stderr="")
+        with mock.patch.object(backend, "command_output", side_effect=fake):
+            with self.assertRaisesRegex(backend.MacOSFailure, "entitlements"):
+                backend.sign_bundle(app, layout, {})
+
     def test_macho_audit_alias_handles_archive_like_bundle_names(self):
         layout = backend.WorkLayout(self.root, self.repo)
         layout.ensure()
