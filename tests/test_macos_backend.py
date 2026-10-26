@@ -439,6 +439,43 @@ class MacOSBackendTests(unittest.TestCase):
                     timeout=15,
                 )
 
+    def test_prewarm_boots_browser_and_terminates_cleanly(self):
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        app = self.root / "Chromium.app"
+        (app / "Contents" / "MacOS").mkdir(parents=True)
+        (app / "Contents" / "MacOS" / "Chromium").write_bytes(b"x")
+        profile = self.root / "prewarm-profile"
+        child = mock.Mock()
+        child.poll.return_value = None
+        with mock.patch.object(backend.subprocess, "Popen", return_value=child) as popen, \
+             mock.patch.object(backend.urllib.request, "urlopen") as urlopen, \
+             mock.patch.object(backend.time, "sleep", return_value=None), \
+             mock.patch.object(backend, "EXTENSION_PREWARM_SECONDS", 0):
+            response = mock.MagicMock()
+            response.geturl.return_value = ""
+            urlopen.return_value.__enter__.return_value.read.return_value = b'{"webSocketDebuggerUrl": "ws://127.0.0.1:1/x"}'
+            with mock.patch.object(backend.json, "load", return_value={"webSocketDebuggerUrl": "ws://127.0.0.1:1/x"}):
+                backend.prewarm_extension_profile(layout, app, self.root / "ext", profile, {"NETWORK_MODE": "loopback"})
+        launched = popen.call_args[0][0]
+        self.assertIn("--load-extension=" + str(self.root / "ext"), launched)
+        self.assertIn("--no-sandbox", launched)
+        self.assertIn("--headless=new", launched)
+        child.terminate.assert_called_once()
+        child.wait.assert_called_once()
+
+    def test_prewarm_fails_when_browser_exits_early(self):
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        app = self.root / "Chromium.app"
+        (app / "Contents" / "MacOS").mkdir(parents=True)
+        child = mock.Mock()
+        child.poll.return_value = 1
+        with mock.patch.object(backend.subprocess, "Popen", return_value=child), \
+             mock.patch.object(backend.time, "sleep", return_value=None):
+            with self.assertRaisesRegex(backend.MacOSFailure, "exited before serving"):
+                backend.prewarm_extension_profile(layout, app, self.root / "ext", self.root / "p", {})
+
     def test_loopback_profile_allows_bind_sealed_denies_it(self):
         layout = backend.WorkLayout(self.root, self.repo)
         layout.ensure()

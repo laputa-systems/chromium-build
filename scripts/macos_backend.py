@@ -24,6 +24,7 @@ import platform as host_platform
 import plistlib
 import re
 import shutil
+import socket
 import stat
 import subprocess
 import sys
@@ -4213,6 +4214,57 @@ def require_acceptance_execution(log_path: Path) -> None:
         fail("Shadowdriver acceptance did not execute exactly one passing staged_chromium_acceptance test")
 
 
+EXTENSION_PREWARM_SECONDS = 15
+EXTENSION_PREWARM_ENDPOINT_TIMEOUT_SECONDS = 30
+
+
+def prewarm_extension_profile(layout: WorkLayout, app: Path, extension: Path, profile: Path, environment: Mapping[str, str]) -> None:
+    probe = socket.socket()
+    try:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    finally:
+        probe.close()
+    profile.mkdir(parents=True, exist_ok=True)
+    command = sandbox_prefix_for_env(environment) + [
+        str(app / "Contents" / "MacOS" / "Chromium"),
+        f"--user-data-dir={profile}",
+        f"--remote-debugging-port={port}",
+        "--headless=new",
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--no-sandbox",
+        f"--load-extension={extension}",
+        "about:blank",
+    ]
+    try:
+        child = subprocess.Popen(command, env=dict(environment), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError as error:
+        fail(f"extension pre-warm failed to start: {error}")
+    try:
+        deadline = time.monotonic() + EXTENSION_PREWARM_ENDPOINT_TIMEOUT_SECONDS
+        while True:
+            if child.poll() is not None:
+                fail("extension pre-warm browser exited before serving DevTools")
+            try:
+                with urllib.request.urlopen(f"http://127.0.0.1:{port}/json/version", timeout=2) as response:
+                    if json.load(response).get("webSocketDebuggerUrl"):
+                        break
+            except Exception:
+                pass
+            if time.monotonic() >= deadline:
+                fail("extension pre-warm browser served no DevTools endpoint")
+            time.sleep(0.2)
+        time.sleep(EXTENSION_PREWARM_SECONDS)
+    finally:
+        child.terminate()
+        try:
+            child.wait(timeout=15)
+        except subprocess.TimeoutExpired:
+            child.kill()
+            child.wait()
+
+
 def run_shadowdriver_harness(layout: WorkLayout, lock: Mapping[str, Any], app: Path, *, headless_only: bool = False) -> dict[str, Any]:
     environment = isolated_environment(layout, network="loopback")
     extension = prepare_extension(layout, lock)
@@ -4220,6 +4272,7 @@ def run_shadowdriver_harness(layout: WorkLayout, lock: Mapping[str, Any], app: P
     cargo = cargo_executable(environment)
     test_identity = shadowdriver_test_identity(manifest)
     profile = layout.harness / "profiles" / f"acceptance-{os.getpid()}-{time.time_ns()}"
+    prewarm_extension_profile(layout, app, extension, profile, environment)
     harness_environment = dict(environment)
     harness_environment.update(
         {
