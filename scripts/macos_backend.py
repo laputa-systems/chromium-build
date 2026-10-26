@@ -1408,17 +1408,6 @@ def update_lock(layout: WorkLayout, *, latest: bool = True) -> dict[str, Any]:
             "excluded": ["portablelinux", "alpine", "copium", "musl", "headless"],
         },
     }
-    existing_path = layout.repo_root / LOCK_RELATIVE
-    if existing_path.is_file():
-        try:
-            existing_lock = json.loads(existing_path.read_text(encoding="utf-8"))
-            existing_deno = existing_lock.get("test_inputs", {}).get("deno")
-            if existing_deno:
-                lock["test_inputs"]["deno"] = existing_deno
-        except (OSError, json.JSONDecodeError):
-            pass
-    if "deno" not in lock["test_inputs"]:
-        fail("macOS lock has no pinned deno test input; pin version, URL, size, and sha256 beside ublock_origin")
     atomic_json(layout.repo_root / LOCK_RELATIVE, lock)
     print(f"update-lock: resolved ungoogled {tag}, Chromium {chromium_version} at {chromium_commit}")
     return lock
@@ -1445,9 +1434,6 @@ def load_lock(layout: WorkLayout) -> dict[str, Any]:
     for entry in (lock["chromium"]["source"], lock["ungoogled"]["source"], lock["test_inputs"]["ublock_origin"]):
         if not entry.get("filename") or not entry.get("url") or not entry.get("size") or not re.fullmatch(r"[0-9a-f]{128}", entry.get("sha512", "")):
             fail(f"macOS lock has an incomplete or unverifiable input entry: {entry.get('filename')}")
-    deno_entry = lock.get("test_inputs", {}).get("deno")
-    if not deno_entry or not deno_entry.get("filename") or not deno_entry.get("url") or not deno_entry.get("size") or not re.fullmatch(r"[0-9a-f]{64}", deno_entry.get("sha256", "")) or not re.fullmatch(r"[0-9a-f]{128}", deno_entry.get("sha512", "")):
-        fail(f"macOS lock has an incomplete or unverifiable deno input entry: {path}")
     return lock
 
 
@@ -1464,9 +1450,6 @@ def locked_entries(lock: Mapping[str, Any], *, include_test_inputs: bool = True)
         item = dict(lock["test_inputs"]["ublock_origin"])
         item["name"] = "ublock_origin"
         entries.append(item)
-        deno_item = dict(lock["test_inputs"]["deno"])
-        deno_item["name"] = "deno"
-        entries.append(deno_item)
     return entries
 
 
@@ -3665,52 +3648,29 @@ def shadowdriver_rust_wrapper() -> str:
     return str(Path(wrapper).absolute())
 
 
-def deno_executable(layout: WorkLayout, lock: Mapping[str, Any]) -> Path:
-    entry = lock.get("test_inputs", {}).get("deno")
-    if not entry or not entry.get("filename"):
-        fail("macOS lock has no pinned deno test input")
-    candidate = layout.tools / "bin" / "deno"
-    if not candidate.is_file():
-        fail(f"locked deno is missing in tools/bin: {candidate}; run fetch")
-    if not os.access(candidate, os.X_OK):
-        fail(f"locked deno is not executable: {candidate}")
-    return candidate
-
-
-def ensure_locked_deno(layout: WorkLayout, lock: Mapping[str, Any]) -> Path:
-    entry = lock.get("test_inputs", {}).get("deno")
-    if not entry or not entry.get("filename") or not entry.get("url") or not entry.get("size"):
-        fail("macOS lock has no pinned deno test input")
-    if not re.fullmatch(r"[0-9a-f]{64}", str(entry.get("sha256", ""))):
-        fail(f"macOS lock has an unverifiable deno sha256: {entry.get('filename')}")
-    archive = layout.inputs / str(entry["filename"])
-    verify_locked_file(archive, entry)
-    destination = layout.tools / "bin" / "deno"
-    if destination.is_file() and os.access(destination, os.X_OK):
-        return destination
-    extraction = layout.tmp / f"deno-extract-{os.getpid()}-{time.time_ns()}"
-    try:
-        safe_extract_zip(archive, extraction)
-        candidates = [path for path in extraction.rglob("deno") if path.is_file()]
-        if len(candidates) != 1:
-            fail(f"deno archive has no single deno binary: {archive}")
-        source_binary = candidates[0]
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        temporary = destination.parent / f".deno-{os.getpid()}-{time.time_ns()}"
-        shutil.copy2(source_binary, temporary)
-        temporary.chmod(0o755)
-        os.replace(temporary, destination)
-    finally:
-        shutil.rmtree(extraction, ignore_errors=True)
-    if not destination.is_file() or not os.access(destination, os.X_OK):
-        fail(f"locked deno installation failed: {destination}")
-    return destination
+def node_toolchain(environment: Mapping[str, str]) -> dict[str, str]:
+    node = command_path("node", environment) or command_path("node", os.environ)
+    if not node:
+        for candidate in (Path("/opt/homebrew/bin/node"), Path("/usr/local/bin/node")):
+            if candidate.is_file():
+                node = str(candidate)
+                break
+    if not node or not Path(node).is_file():
+        fail("vanilla node is required for Shadowdriver TypeScript acceptance")
+    pnpm = command_path("pnpm", environment) or command_path("pnpm", os.environ)
+    if not pnpm:
+        for candidate in (Path("/opt/homebrew/bin/pnpm"), Path("/usr/local/bin/pnpm")):
+            if candidate.is_file():
+                pnpm = str(candidate)
+                break
+    if not pnpm or not Path(pnpm).is_file():
+        fail("pnpm is required for Shadowdriver TypeScript acceptance")
+    return {"node": str(node), "pnpm": str(pnpm)}
 
 
 def fetch_acceptance_dependencies(layout: WorkLayout, environment: Mapping[str, str]) -> dict[str, Any]:
     manifest, test_source = shadowdriver_acceptance_target(layout)
-    lock = load_lock(layout)
-    deno = ensure_locked_deno(layout, lock)
+    toolchain = node_toolchain(environment)
     cargo = cargo_executable(environment)
     fetch_environment = dict(environment)
     fetch_environment["RUSTC_WRAPPER"] = shadowdriver_rust_wrapper()
@@ -3727,15 +3687,15 @@ def fetch_acceptance_dependencies(layout: WorkLayout, environment: Mapping[str, 
         "manifest": str(manifest),
         "test_source": str(test_source),
         "cargo": str(cargo),
-        "deno": str(deno),
-        "deno_version": str(lock["test_inputs"]["deno"].get("version", "")),
+        "node": toolchain["node"],
+        "pnpm": toolchain["pnpm"],
         "status": "complete",
     }
 
 
 def shadowdriver_test_identity(manifest: Path) -> dict[str, str]:
     root = manifest.parent
-    paths = [manifest, root / "Cargo.lock", root / "build.rs", root / "ts" / "mod.ts", root / "ts" / "deno.json", root / "ts" / "package.json", root / "ts" / "pnpm-lock.yaml"]
+    paths = [manifest, root / "Cargo.lock", root / "build.rs", root / "ts" / "mod.ts", root / "ts" / "package.json", root / "ts" / "pnpm-lock.yaml"]
     for directory in ("src", "crates", "tests", "js/generated", "ts/src", "ts/tests/browser"):
         paths.extend(path for path in (root / directory).rglob("*") if path.is_file() and path.suffix in {".rs", ".js", ".toml", ".ts"})
     digest = hashlib.sha256()
@@ -3824,25 +3784,23 @@ def run_native_stealth_harness(layout: WorkLayout, app: Path, headed_reference: 
     manifest, _ = shadowdriver_acceptance_target(layout)
     root = manifest.parent
     environment = isolated_environment(layout, network="none")
-    lock = load_lock(layout)
-    deno = deno_executable(layout, lock)
-    verify_locked_file(layout.inputs / str(lock["test_inputs"]["deno"]["filename"]), lock["test_inputs"]["deno"])
+    toolchain = node_toolchain(environment)
     report_path = root / ".work" / "tmp" / f"native-stealth-{time.time_ns()}.json"
     report_path.parent.mkdir(parents=True, exist_ok=True)
     environment.update({"NATIVE_STEALTH_EXECUTABLE": str(app / "Contents" / "MacOS" / "Chromium"),
                         "NATIVE_STEALTH_REPORT": str(report_path),
                         "NATIVE_STEALTH_EXPECT_COMPATIBILITY": "1",
-                        "DENO_DIR": str(root / ".work" / "deno"),
                         "TMPDIR": str(root / ".work" / "tmp")})
     reference_digest = sha256(headed_reference) if headed_reference else None
     if headed_reference:
         environment["NATIVE_STEALTH_HEADED_REFERENCE"] = str(headed_reference)
-    command = [str(deno), "test", "-A", "--config", str(root / "ts" / "deno.json"),
-               str(root / "ts" / "tests" / "browser" / "native_stealth_test.ts")]
+    command = [toolchain["pnpm"], "--dir", str(root / "ts"), "run", "test:browser", "--",
+               "tests/browser/native_stealth_test.ts"]
     identity = shadowdriver_test_identity(manifest)
     log_path = layout.logs / "native-stealth-acceptance.log"
     stream_command(command, env=environment, cwd=root, log_path=log_path, timeout=600)
-    if not re.search(r"ok \| 1 passed \| 0 failed", log_path.read_text(encoding="utf-8")):
+    output = log_path.read_text(encoding="utf-8")
+    if not re.search(r"Test Files\s+1 passed", output) or not re.search(r"Tests\s+1 passed", output):
         fail("native stealth acceptance did not execute exactly one passing test")
     if identity != shadowdriver_test_identity(manifest):
         fail("Shadowdriver source changed during native stealth acceptance")

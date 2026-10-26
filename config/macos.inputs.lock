@@ -50,14 +50,6 @@
   "schema": 1,
   "status": "resolved",
   "test_inputs": {
-    "deno": {
-      "filename": "deno-aarch64-apple-darwin.zip",
-      "sha256": "9f0bf660393da2eaff044cdc7444cb08c73f235849b61d224d825a194ce7c98e",
-      "sha512": "ad5fb5354b815c45af72888b027cd27b7ee4766c179c86f3c7c89c1c44bc8d1adbfab7edcd5a662452349017add8f0317e599583e6c9d9eb639fef3d046bd3f4",
-      "size": 38770795,
-      "url": "https://github.com/denoland/deno/releases/download/v2.9.8/deno-aarch64-apple-darwin.zip",
-      "version": "2.9.8"
-    },
     "ublock_origin": {
       "filename": "uBlock0_1.72.0.chromium.zip",
       "sha256": "c2900bbe9a783e645389cdeb19be632a033ad11d8bee7a94b0d0c316a20a2b05",

@@ -61,7 +61,6 @@ def locked_input_entries(lock: Mapping[str, Any], include_test_inputs: bool) -> 
     ]
     if include_test_inputs:
         entries.append(("ublock-origin", lock["test_inputs"]["ublock_origin"]))
-        entries.append(("deno", lock["test_inputs"]["deno"]))
     return entries
 
 

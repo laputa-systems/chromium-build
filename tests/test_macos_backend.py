@@ -316,53 +316,51 @@ class MacOSBackendTests(unittest.TestCase):
         self.assertEqual(selected["root"], str(bundled))
         self.assertEqual(selected["source"], "bundled")
 
-    def test_locked_deno_hash_mismatch_fails(self):
+    def test_native_stealth_harness_uses_vanilla_node_not_deno(self):
         layout = backend.WorkLayout(self.root, self.repo)
         layout.ensure()
-        entry = {
-            "version": "2.9.8",
-            "filename": "deno-aarch64-apple-darwin.zip",
-            "url": "https://example.invalid/deno.zip",
-            "size": 4,
-            "sha256": "0" * 64,
-            "sha512": "1" * 128,
-        }
-        archive = layout.inputs / entry["filename"]
-        archive.parent.mkdir(parents=True, exist_ok=True)
-        archive.write_bytes(b"bad!")
-        lock = {"test_inputs": {"deno": entry}}
-        with self.assertRaisesRegex(backend.MacOSFailure, "mismatch|SHA"):
-            backend.ensure_locked_deno(layout, lock)
+        app = self.root / "Chromium.app"
+        (app / "Contents" / "MacOS").mkdir(parents=True)
+        (app / "Contents" / "MacOS" / "Chromium").write_bytes(b"x")
+        (layout.logs).mkdir(parents=True, exist_ok=True)
+        (layout.logs / "native-stealth-acceptance.log").write_text(
+            "Test Files  1 passed (1)\nTests  1 passed (1)\n", encoding="utf-8"
+        )
+        report_path = self.repo.parent / "shadowdriver" / ".work" / "tmp" / "probe.json"
+        fake_manifest = self.repo.parent / "shadowdriver" / "Cargo.toml"
+        with mock.patch.object(backend, "isolated_environment", return_value={}), \
+             mock.patch.object(backend, "load_lock", return_value={}), \
+             mock.patch.object(backend, "shadowdriver_acceptance_target", return_value=(fake_manifest, fake_manifest.parent / "tests" / "chromium_acceptance.rs")), \
+             mock.patch.object(backend, "shadowdriver_test_identity", return_value={"revision": "r", "source_sha256": "s"}), \
+             mock.patch.object(backend, "command_path", side_effect=lambda name, env=None: "/opt/homebrew/bin/pnpm" if name == "pnpm" else ("/Users/josh/.local/bin/node" if name == "node" else None)), \
+             mock.patch.object(backend, "stream_command", return_value=None), \
+             mock.patch.object(backend, "read_json", return_value={"status": "passed", "compatibility_required": True, "observations": [{"mode": name} for name in ["headed-base", "headless-base", "automation-control", "native-automation-control", "native-direct", "native-passive", "native-passive-restart", "native-instrumented"]]}), \
+             mock.patch.object(backend, "sha256", return_value="0" * 64):
+            report = backend.run_native_stealth_harness(layout, app)
+        command_text = " ".join(str(part) for part in report["command"])
+        self.assertNotIn("deno", command_text)
+        self.assertIn("pnpm", command_text)
+        self.assertIn("native_stealth_test.ts", command_text)
 
-    def test_deno_resolves_only_from_tools_bin(self):
+    def test_fetch_acceptance_uses_node_toolchain_without_deno_lock(self):
         layout = backend.WorkLayout(self.root, self.repo)
         layout.ensure()
-        tools_deno = layout.tools / "bin" / "deno"
-        tools_deno.parent.mkdir(parents=True, exist_ok=True)
-        tools_deno.write_bytes(b"tools-deno")
-        tools_deno.chmod(0o755)
-        fake_path_deno = self.root / "path-deno"
-        fake_path_deno.write_bytes(b"path-deno")
-        fake_path_deno.chmod(0o755)
-        homebrew_deno = Path("/opt/homebrew/bin/deno")
-        environment = {"PATH": f"{self.root}:{os.environ.get('PATH', '')}"}
-        lock = {
-            "test_inputs": {
-                "deno": {
-                    "version": "test",
-                    "filename": "deno.zip",
-                    "url": "https://example.invalid/deno.zip",
-                    "size": 1,
-                    "sha256": hashlib.sha256(b"x").hexdigest(),
-                    "sha512": hashlib.sha512(b"x").hexdigest(),
-                }
-            }
-        }
-        with mock.patch.object(backend, "command_path", return_value=str(fake_path_deno)):
-            resolved = backend.deno_executable(layout, lock)
-        self.assertEqual(resolved, tools_deno)
-        self.assertNotEqual(str(resolved), str(fake_path_deno))
-        self.assertNotEqual(str(resolved), str(homebrew_deno))
+        lock_without_deno = {"test_inputs": {"ublock_origin": {"filename": "u.x", "url": "https://example.invalid/u.x", "size": 1, "sha512": "a" * 128}}}
+        def fake_path(name, env=None):
+            if name == "pnpm":
+                return "/opt/homebrew/bin/pnpm"
+            if name == "node":
+                return "/Users/josh/.local/bin/node"
+            return None
+        with mock.patch.object(backend, "load_lock", return_value=lock_without_deno), \
+             mock.patch.object(backend, "shadowdriver_acceptance_target", return_value=(self.root / "Cargo.toml", self.root / "t.rs")), \
+             mock.patch.object(backend, "cargo_executable", return_value=self.root / "cargo"), \
+             mock.patch.object(backend, "shadowdriver_rust_wrapper", return_value="kache"), \
+             mock.patch.object(backend, "stream_command", return_value=None), \
+             mock.patch.object(backend, "command_path", side_effect=fake_path):
+            harness = backend.fetch_acceptance_dependencies(layout, {})
+        self.assertEqual(harness["status"], "complete")
+        self.assertNotIn("deno", harness)
 
     def test_xcode_identity_rejects_a_present_but_uninstalled_metal_toolchain(self):
         def result(stdout="", stderr="", returncode=0):
