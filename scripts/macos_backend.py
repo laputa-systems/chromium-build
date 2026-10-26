@@ -4352,7 +4352,7 @@ def run_native_stealth_harness(layout: WorkLayout, app: Path, headed_reference: 
     reference_digest = sha256(headed_reference) if headed_reference else None
     if headed_reference:
         environment["NATIVE_STEALTH_HEADED_REFERENCE"] = str(headed_reference)
-    command = [toolchain["pnpm"], "--dir", str(root / "ts"), "run", "test:browser", "--",
+    command = [toolchain["pnpm"], "--config.manage-package-manager-versions=false", "--dir", str(root / "ts"), "run", "test:browser", "--",
                "tests/browser/native_stealth_test.ts"]
     identity = shadowdriver_test_identity(manifest)
     log_path = layout.logs / "native-stealth-acceptance.log"
