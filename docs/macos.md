@@ -2,8 +2,9 @@
 
 The macOS backend builds the locked ungoogled release as a desktop
 `Chromium.app` on Apple Silicon. It requires macOS 26 or newer, an Xcode SDK and
-Metal Toolchain, LLVM 23.1.0 or newer, and the Rust toolchain pinned by the
-repository. The input lock is [`config/macos.inputs.lock`](../config/macos.inputs.lock).
+Metal Toolchain, the bundled Chromium clang from the prepared source, the Rust
+toolchain pinned by the repository, and the locked `deno` test input resolved
+only from `.work/macos-arm64/tools/bin`. The input lock is [`config/macos.inputs.lock`](../config/macos.inputs.lock).
 
 Set the work root to an absolute child of this checkout's `.work/` directory.
 Downloads, tools, cache stores, source, build output, profiles, logs, and

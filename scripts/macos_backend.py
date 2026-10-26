@@ -729,46 +729,27 @@ def llvm_candidate(root: Path, environment: Mapping[str, str], source: str) -> O
         "llvm_config_version": llvm_version,
         "tools": {name: str(path) for name, path in {**required_tools, **optional_tools}.items()},
         "target": target_text,
-        "preferred": version == PREFERRED_LLVM,
     }
 
 
 def select_llvm(environment: Mapping[str, str], source_root: Optional[Path] = None) -> dict[str, Any]:
-    """Select exact preferred LLVM, otherwise the newest native compatible candidate."""
+    """Select the bundled Chromium clang only; no floor, no fallback."""
 
-    candidates: list[tuple[Path, str]] = []
-    xcode_clang = Path(environment.get("XCODE_CLANG", ""))
-    if xcode_clang.is_file():
-        candidates.append((xcode_clang.parent.parent, "xcode"))
-    explicit = environment.get("CHROMIUM_LLVM_ROOT") or environment.get("LLVM_ROOT")
-    if explicit:
-        candidates.insert(0, (canonical_path(explicit, "LLVM_ROOT", must_exist=True), "explicit"))
-    if source_root:
-        for relative in ("third_party/llvm-build/Release+Asserts", "third_party/llvm-build/Release"):
-            candidates.append((source_root / relative, "chromium-deps"))
-    candidates.extend((item, "homebrew") for item in brew_candidates(environment))
-
-    inspected: list[dict[str, Any]] = []
-    for root, source in candidates:
-        candidate = llvm_candidate(root, environment, source)
-        if candidate:
-            inspected.append(candidate)
-    acceptable = [item for item in inspected if item["version_tuple"] >= MIN_LLVM]
-    if not acceptable:
-        details = ", ".join(f"{item['source']}={item['version']}" for item in inspected) or "no usable LLVM found"
+    if source_root is None or not source_root.is_dir():
         fail(
-            "LLVM/Clang 23.1.0 or newer is required; "
-            f"inspected {details}. Install or expose an existing Homebrew llvm@23/llvm 23.1.x "
-            "or set LLVM_ROOT to a native arm64 toolchain; this builder will not install packages."
+            "bundled LLVM is unavailable; source acquisition has not completed; "
+            "run fetch before doctor"
         )
-    acceptable.sort(key=lambda item: (item["version_tuple"] == PREFERRED_LLVM, item["version_tuple"]), reverse=True)
-    selected = dict(acceptable[0])
-    selected["minimum"] = version_string(MIN_LLVM)
-    selected["preferred"] = version_string(PREFERRED_LLVM)
-    selected["inspected"] = inspected
-    selected["selection_reason"] = (
-        "preferred LLVM 23.1.1" if selected["version_tuple"] == PREFERRED_LLVM else "newest compatible LLVM"
-    )
+    bundled = source_root / "third_party" / "llvm-build" / "Release+Asserts"
+    candidate = llvm_candidate(bundled, environment, "bundled")
+    if candidate is None:
+        fail(
+            f"bundled LLVM clang is missing in the prepared source: {bundled}; "
+            "run fetch and prepare to materialize the bundled toolchain"
+        )
+    selected = dict(candidate)
+    selected["inspected"] = [candidate]
+    selected["selection_reason"] = "bundled-chromium-llvm-only"
     return selected
 
 
@@ -857,7 +838,6 @@ def run_doctor(
             **xcode,
             "sdk_version": version_string(sdk_version),
             "apple_clang_version": version_string(apple_clang_version),
-            "apple_clang_meets_llvm_floor": apple_clang_version >= MIN_LLVM,
         }
         report["checks"]["compiler_cache"] = compiler_cache_report(environment)
         source_root = layout.source if layout.source.is_dir() else None
@@ -1410,9 +1390,7 @@ def update_lock(layout: WorkLayout, *, latest: bool = True) -> dict[str, Any]:
         },
         "rust": {"toolchain": RUST_TOOLCHAIN, "components": ["rust-src", "llvm-tools-preview"]},
         "llvm": {
-            "minimum": version_string(MIN_LLVM),
-            "preferred": version_string(PREFERRED_LLVM),
-            "selection": "prefer-exact-23.1.1-among-chromium-explicit-homebrew-candidates",
+            "selection": "bundled-chromium-llvm-only",
         },
         "test_inputs": {
             "ublock_origin": {
@@ -1430,6 +1408,17 @@ def update_lock(layout: WorkLayout, *, latest: bool = True) -> dict[str, Any]:
             "excluded": ["portablelinux", "alpine", "copium", "musl", "headless"],
         },
     }
+    existing_path = layout.repo_root / LOCK_RELATIVE
+    if existing_path.is_file():
+        try:
+            existing_lock = json.loads(existing_path.read_text(encoding="utf-8"))
+            existing_deno = existing_lock.get("test_inputs", {}).get("deno")
+            if existing_deno:
+                lock["test_inputs"]["deno"] = existing_deno
+        except (OSError, json.JSONDecodeError):
+            pass
+    if "deno" not in lock["test_inputs"]:
+        fail("macOS lock has no pinned deno test input; pin version, URL, size, and sha256 beside ublock_origin")
     atomic_json(layout.repo_root / LOCK_RELATIVE, lock)
     print(f"update-lock: resolved ungoogled {tag}, Chromium {chromium_version} at {chromium_commit}")
     return lock
@@ -1456,6 +1445,9 @@ def load_lock(layout: WorkLayout) -> dict[str, Any]:
     for entry in (lock["chromium"]["source"], lock["ungoogled"]["source"], lock["test_inputs"]["ublock_origin"]):
         if not entry.get("filename") or not entry.get("url") or not entry.get("size") or not re.fullmatch(r"[0-9a-f]{128}", entry.get("sha512", "")):
             fail(f"macOS lock has an incomplete or unverifiable input entry: {entry.get('filename')}")
+    deno_entry = lock.get("test_inputs", {}).get("deno")
+    if not deno_entry or not deno_entry.get("filename") or not deno_entry.get("url") or not deno_entry.get("size") or not re.fullmatch(r"[0-9a-f]{64}", deno_entry.get("sha256", "")) or not re.fullmatch(r"[0-9a-f]{128}", deno_entry.get("sha512", "")):
+        fail(f"macOS lock has an incomplete or unverifiable deno input entry: {path}")
     return lock
 
 
@@ -1472,6 +1464,9 @@ def locked_entries(lock: Mapping[str, Any], *, include_test_inputs: bool = True)
         item = dict(lock["test_inputs"]["ublock_origin"])
         item["name"] = "ublock_origin"
         entries.append(item)
+        deno_item = dict(lock["test_inputs"]["deno"])
+        deno_item["name"] = "deno"
+        entries.append(deno_item)
     return entries
 
 
@@ -3670,8 +3665,52 @@ def shadowdriver_rust_wrapper() -> str:
     return str(Path(wrapper).absolute())
 
 
+def deno_executable(layout: WorkLayout, lock: Mapping[str, Any]) -> Path:
+    entry = lock.get("test_inputs", {}).get("deno")
+    if not entry or not entry.get("filename"):
+        fail("macOS lock has no pinned deno test input")
+    candidate = layout.tools / "bin" / "deno"
+    if not candidate.is_file():
+        fail(f"locked deno is missing in tools/bin: {candidate}; run fetch")
+    if not os.access(candidate, os.X_OK):
+        fail(f"locked deno is not executable: {candidate}")
+    return candidate
+
+
+def ensure_locked_deno(layout: WorkLayout, lock: Mapping[str, Any]) -> Path:
+    entry = lock.get("test_inputs", {}).get("deno")
+    if not entry or not entry.get("filename") or not entry.get("url") or not entry.get("size"):
+        fail("macOS lock has no pinned deno test input")
+    if not re.fullmatch(r"[0-9a-f]{64}", str(entry.get("sha256", ""))):
+        fail(f"macOS lock has an unverifiable deno sha256: {entry.get('filename')}")
+    archive = layout.inputs / str(entry["filename"])
+    verify_locked_file(archive, entry)
+    destination = layout.tools / "bin" / "deno"
+    if destination.is_file() and os.access(destination, os.X_OK):
+        return destination
+    extraction = layout.tmp / f"deno-extract-{os.getpid()}-{time.time_ns()}"
+    try:
+        safe_extract_zip(archive, extraction)
+        candidates = [path for path in extraction.rglob("deno") if path.is_file()]
+        if len(candidates) != 1:
+            fail(f"deno archive has no single deno binary: {archive}")
+        source_binary = candidates[0]
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        temporary = destination.parent / f".deno-{os.getpid()}-{time.time_ns()}"
+        shutil.copy2(source_binary, temporary)
+        temporary.chmod(0o755)
+        os.replace(temporary, destination)
+    finally:
+        shutil.rmtree(extraction, ignore_errors=True)
+    if not destination.is_file() or not os.access(destination, os.X_OK):
+        fail(f"locked deno installation failed: {destination}")
+    return destination
+
+
 def fetch_acceptance_dependencies(layout: WorkLayout, environment: Mapping[str, str]) -> dict[str, Any]:
     manifest, test_source = shadowdriver_acceptance_target(layout)
+    lock = load_lock(layout)
+    deno = ensure_locked_deno(layout, lock)
     cargo = cargo_executable(environment)
     fetch_environment = dict(environment)
     fetch_environment["RUSTC_WRAPPER"] = shadowdriver_rust_wrapper()
@@ -3688,6 +3727,8 @@ def fetch_acceptance_dependencies(layout: WorkLayout, environment: Mapping[str, 
         "manifest": str(manifest),
         "test_source": str(test_source),
         "cargo": str(cargo),
+        "deno": str(deno),
+        "deno_version": str(lock["test_inputs"]["deno"].get("version", "")),
         "status": "complete",
     }
 
@@ -3783,9 +3824,9 @@ def run_native_stealth_harness(layout: WorkLayout, app: Path, headed_reference: 
     manifest, _ = shadowdriver_acceptance_target(layout)
     root = manifest.parent
     environment = isolated_environment(layout, network="none")
-    deno = command_path("deno", environment) or "/opt/homebrew/bin/deno"
-    if not Path(deno).is_file():
-        fail("Deno is required for the existing Shadowdriver native stealth acceptance")
+    lock = load_lock(layout)
+    deno = deno_executable(layout, lock)
+    verify_locked_file(layout.inputs / str(lock["test_inputs"]["deno"]["filename"]), lock["test_inputs"]["deno"])
     report_path = root / ".work" / "tmp" / f"native-stealth-{time.time_ns()}.json"
     report_path.parent.mkdir(parents=True, exist_ok=True)
     environment.update({"NATIVE_STEALTH_EXECUTABLE": str(app / "Contents" / "MacOS" / "Chromium"),

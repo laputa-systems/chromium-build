@@ -267,24 +267,102 @@ class MacOSBackendTests(unittest.TestCase):
         with self.assertRaises(backend.MacOSFailure):
             backend.normalize_arch("x86_64")
 
-    def test_llvm_selection_prefers_2311_and_records_fallback_source(self):
-        explicit = self.root / "llvm"
-        explicit.mkdir()
-        environment = {"CHROMIUM_LLVM_ROOT": str(explicit), "PATH": os.environ.get("PATH", "")}
-        candidate = {
+    def test_select_llvm_requires_prepared_bundled_clang(self):
+        with self.assertRaisesRegex(backend.MacOSFailure, "run fetch"):
+            backend.select_llvm({}, None)
+        empty_source = self.root / "empty-src"
+        empty_source.mkdir()
+        with self.assertRaisesRegex(backend.MacOSFailure, "run fetch"):
+            backend.select_llvm({}, empty_source)
+
+    def test_select_llvm_ignores_explicit_homebrew_and_xcode_roots(self):
+        source = self.root / "src"
+        bundled = source / "third_party" / "llvm-build" / "Release+Asserts"
+        (bundled / "bin").mkdir(parents=True)
+        bundled_candidate = {
+            "root": str(bundled),
+            "source": "bundled",
+            "version": "21.1.0",
+            "version_tuple": (21, 1, 0),
+            "clang": str(bundled / "bin" / "clang"),
+            "clangxx": str(bundled / "bin" / "clang++"),
+        }
+        explicit = self.root / "explicit-llvm"
+        (explicit / "bin").mkdir(parents=True)
+        explicit_candidate = {
             "root": str(explicit),
             "source": "explicit",
             "version": "23.1.1",
             "version_tuple": (23, 1, 1),
             "clang": str(explicit / "bin" / "clang"),
             "clangxx": str(explicit / "bin" / "clang++"),
-            "preferred": True,
         }
-        with mock.patch.object(backend, "llvm_candidate", return_value=candidate):
-            selected = backend.select_llvm(environment)
-        self.assertEqual(selected["version"], "23.1.1")
-        self.assertEqual(selected["selection_reason"], "preferred LLVM 23.1.1")
-        self.assertEqual(selected["minimum"], "23.1.0")
+
+        def fake_candidate(root, environment, source):
+            if str(root) == str(bundled):
+                return dict(bundled_candidate)
+            if str(root) == str(explicit):
+                return dict(explicit_candidate)
+            return None
+
+        environment = {
+            "CHROMIUM_LLVM_ROOT": str(explicit),
+            "XCODE_CLANG": "/fake/xcode/clang",
+            "PATH": os.environ.get("PATH", ""),
+        }
+        with mock.patch.object(backend, "llvm_candidate", side_effect=fake_candidate):
+            with mock.patch.object(backend, "brew_candidates", return_value=[Path("/fake/homebrew/llvm")]):
+                selected = backend.select_llvm(environment, source)
+        self.assertEqual(selected["root"], str(bundled))
+        self.assertEqual(selected["source"], "bundled")
+
+    def test_locked_deno_hash_mismatch_fails(self):
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        entry = {
+            "version": "2.9.8",
+            "filename": "deno-aarch64-apple-darwin.zip",
+            "url": "https://example.invalid/deno.zip",
+            "size": 4,
+            "sha256": "0" * 64,
+            "sha512": "1" * 128,
+        }
+        archive = layout.inputs / entry["filename"]
+        archive.parent.mkdir(parents=True, exist_ok=True)
+        archive.write_bytes(b"bad!")
+        lock = {"test_inputs": {"deno": entry}}
+        with self.assertRaisesRegex(backend.MacOSFailure, "mismatch|SHA"):
+            backend.ensure_locked_deno(layout, lock)
+
+    def test_deno_resolves_only_from_tools_bin(self):
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        tools_deno = layout.tools / "bin" / "deno"
+        tools_deno.parent.mkdir(parents=True, exist_ok=True)
+        tools_deno.write_bytes(b"tools-deno")
+        tools_deno.chmod(0o755)
+        fake_path_deno = self.root / "path-deno"
+        fake_path_deno.write_bytes(b"path-deno")
+        fake_path_deno.chmod(0o755)
+        homebrew_deno = Path("/opt/homebrew/bin/deno")
+        environment = {"PATH": f"{self.root}:{os.environ.get('PATH', '')}"}
+        lock = {
+            "test_inputs": {
+                "deno": {
+                    "version": "test",
+                    "filename": "deno.zip",
+                    "url": "https://example.invalid/deno.zip",
+                    "size": 1,
+                    "sha256": hashlib.sha256(b"x").hexdigest(),
+                    "sha512": hashlib.sha512(b"x").hexdigest(),
+                }
+            }
+        }
+        with mock.patch.object(backend, "command_path", return_value=str(fake_path_deno)):
+            resolved = backend.deno_executable(layout, lock)
+        self.assertEqual(resolved, tools_deno)
+        self.assertNotEqual(str(resolved), str(fake_path_deno))
+        self.assertNotEqual(str(resolved), str(homebrew_deno))
 
     def test_xcode_identity_rejects_a_present_but_uninstalled_metal_toolchain(self):
         def result(stdout="", stderr="", returncode=0):

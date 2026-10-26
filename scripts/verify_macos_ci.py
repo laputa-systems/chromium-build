@@ -61,6 +61,7 @@ def locked_input_entries(lock: Mapping[str, Any], include_test_inputs: bool) -> 
     ]
     if include_test_inputs:
         entries.append(("ublock-origin", lock["test_inputs"]["ublock_origin"]))
+        entries.append(("deno", lock["test_inputs"]["deno"]))
     return entries
 
 
@@ -117,7 +118,8 @@ def verify_preflight(arguments: argparse.Namespace) -> None:
     cache = checks.get("compiler_cache", {})
     require(version_tuple(str(macos.get("version", "0"))) >= (26, 0, 0), "macOS is older than 26", report)
     require(version_tuple(str(xcode.get("sdk_version", "0"))) >= (26, 0, 0), "SDK is older than 26", report)
-    require(version_tuple(str(llvm.get("version", "0"))) >= (23, 1, 0), "LLVM is older than 23.1.0", report)
+    require(llvm.get("source") == "bundled", "LLVM is not the bundled Chromium clang", report)
+    require(llvm.get("selection_reason") == "bundled-chromium-llvm-only", "wrong LLVM selection", report)
     require(rust.get("status") == "complete", "Rust toolchain is incomplete", report)
     require(rust.get("toolchain") == "nightly-2026-09-15", "wrong Rust nightly", report)
     require(rust.get("components") == ["rust-src", "llvm-tools-preview"], "wrong Rust components", report)
