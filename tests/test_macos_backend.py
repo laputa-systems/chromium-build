@@ -333,7 +333,7 @@ class MacOSBackendTests(unittest.TestCase):
              mock.patch.object(backend, "shadowdriver_acceptance_target", return_value=(fake_manifest, fake_manifest.parent / "tests" / "chromium_acceptance.rs")), \
              mock.patch.object(backend, "shadowdriver_test_identity", return_value={"revision": "r", "source_sha256": "s"}), \
              mock.patch.object(backend, "command_path", side_effect=lambda name, env=None: "/opt/homebrew/bin/pnpm" if name == "pnpm" else ("/Users/josh/.local/bin/node" if name == "node" else None)), \
-             mock.patch.object(backend, "stream_command", return_value=None), \
+             mock.patch.object(backend, "stream_command", return_value=None) as stream, \
              mock.patch.object(backend, "read_json", return_value={"status": "passed", "compatibility_required": True, "observations": [{"mode": name} for name in ["headed-base", "headless-base", "automation-control", "native-automation-control", "native-direct", "native-passive", "native-passive-restart", "native-instrumented"]]}), \
              mock.patch.object(backend, "sha256", return_value="0" * 64):
             report = backend.run_native_stealth_harness(layout, app)
@@ -341,6 +341,9 @@ class MacOSBackendTests(unittest.TestCase):
         self.assertNotIn("deno", command_text)
         self.assertIn("pnpm", command_text)
         self.assertIn("native_stealth_test.ts", command_text)
+        stealth_path = stream.call_args[1]["env"]["PATH"].split(os.pathsep)
+        self.assertIn("/Users/josh/.local/bin", stealth_path)
+        self.assertIn("/opt/homebrew/bin", stealth_path)
 
     def test_fetch_acceptance_uses_node_toolchain_without_deno_lock(self):
         layout = backend.WorkLayout(self.root, self.repo)

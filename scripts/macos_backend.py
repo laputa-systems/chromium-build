@@ -4339,6 +4339,10 @@ def run_native_stealth_harness(layout: WorkLayout, app: Path, headed_reference: 
     root = manifest.parent
     environment = isolated_environment(layout, network="loopback")
     toolchain = node_toolchain(environment)
+    for host_tool in (toolchain["node"], toolchain["pnpm"]):
+        host_tool_dir = str(Path(host_tool).absolute().parent)
+        if host_tool_dir not in environment.get("PATH", "").split(os.pathsep):
+            environment["PATH"] = host_tool_dir + os.pathsep + environment.get("PATH", "")
     report_path = root / ".work" / "tmp" / f"native-stealth-{time.time_ns()}.json"
     report_path.parent.mkdir(parents=True, exist_ok=True)
     environment.update({"NATIVE_STEALTH_EXECUTABLE": str(app / "Contents" / "MacOS" / "Chromium"),
