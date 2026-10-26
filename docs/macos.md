@@ -92,3 +92,42 @@ The reference must contain completed observations with the same browser version,
 host, and fixture policy. No headed browser launches in this mode. The report
 records the reference digest and marks the fresh headed product check unverified;
 promotion records `headless-with-historical-headed-reference` as its scope.
+
+## Release configuration vs upstream official
+
+Effective GN args are `config/profiles/macos-release.gn` plus the backend's
+hermetic prefix (see `out/macos-release/args.gn` in a configured tree).
+Security-relevant differences from Chromium's official release configuration:
+
+- `is_official_build=false`, `is_chrome_branded=false` — intentional. This is
+  an unbranded build with no Google services.
+- Proprietary codecs off (no `proprietary_codecs`/`ffmpeg_branding` set;
+  ungoogled default) and `enable_widevine=false` (profile-explicit, confirmed
+  by the absent CDM in the audited bundle) — intentional. No DRM or
+  proprietary binaries ship. Enabling them was never requested.
+- `safe_browsing_mode=0` — intentional per campaign decision; no Safe Browsing
+  or telemetry is restored for the checklist.
+- `use_official_google_api_keys=false` with empty keys — intentional; no
+  Google API identity.
+- `use_thin_lto=false`, `chrome_pgo_phase=0` — intentional. The Xcode 27 SDK
+  ships TAPI targets the bundled lld does not understand, and Chromium's LTO
+  configuration requires lld.
+- `disable_fieldtrial_testing_config=true` — intentional. No field-trial
+  testing config is fetched; the build stays hermetic.
+- `clang_use_chrome_plugins=false` — intentional. Hermetic toolchain; the
+  plugins are build-time checks, not product mitigations.
+- `enable_reporting`, `enable_remoting`, `enable_mdns`,
+  `enable_service_discovery`, `enable_hangout_services_extension` all false —
+  intentional attack-surface reduction; no remoting, discovery, or Hangout
+  services in the unbranded product.
+- `exclude_unwind_tables=true` — intentional. Smaller binary; diagnostics only.
+- `v8_drumbrake_bounds_checks=true` — intentional extra hardening. The locked
+  source defaults this to false on macOS arm64 clang non-component builds;
+  the backend enables V8 sandbox software bounds checks.
+- `symbol_level=1`, `blink_symbol_level=0`, `v8_symbol_level=0` —
+  intentional. Smaller binary; diagnostics only, no mitigation change.
+- V8 sandbox, pointer compression with shared cage, external code space,
+  generated-code validator: not set in our args, so Chromium defaults apply
+  identically to official builds — no difference.
+- PartitionAlloc as malloc and the allocator shim: not set in our args, so
+  Chromium defaults apply identically to official builds — no difference.
