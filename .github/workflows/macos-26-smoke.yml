@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: macos-26-native-full-build
@@ -14,6 +14,8 @@ jobs:
   build:
     runs-on: macos-26
     timeout-minutes: 360
+    permissions:
+      contents: read
     env:
       CHROMIUM_WORK_ROOT: /Volumes/dev/d/chromium-build/.work/macos-arm64
       MACOS_COMPILER_CACHE: off
@@ -26,20 +28,20 @@ jobs:
       MACOS_INPUT_ENTRY_WORKERS: "4"
       RUSTUP_HOME: /Volumes/dev/d/chromium-build/.work/macos-arm64/tools/rustup
       CARGO_HOME: /Volumes/dev/d/chromium-build/.work/macos-arm64/cache/cargo
-      HOMEBREW_CACHE: /Volumes/dev/d/chromium-build/.work/macos-arm64/cache/homebrew
-      HOMEBREW_NO_AUTO_UPDATE: "1"
 
     steps:
-      - name: Clone into the policy work root
+      - name: Clone the exact dispatched commit
         shell: bash
         run: |
           set -euo pipefail
           sudo mkdir -p /Volumes/dev/d
           sudo chown "$(id -u):$(id -g)" /Volumes/dev /Volumes/dev/d
-          git clone --depth=1 --no-tags --filter=blob:none \
-            --branch "$GITHUB_REF_NAME" \
+          git clone --no-checkout --depth=1 --no-tags --filter=blob:none \
             "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" \
             /Volumes/dev/d/chromium-build
+          git -C /Volumes/dev/d/chromium-build fetch --depth=1 origin "$GITHUB_SHA"
+          git -C /Volumes/dev/d/chromium-build checkout "$GITHUB_SHA"
+          test "$(git -C /Volumes/dev/d/chromium-build rev-parse HEAD)" = "$GITHUB_SHA"
 
       - name: Claim the policy work root
         working-directory: /Volumes/dev/d/chromium-build
@@ -61,64 +63,19 @@ jobs:
 
       - name: Restore locked Chromium inputs
         id: restore_inputs
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: /Volumes/dev/d/chromium-build/.work/macos-arm64/inputs
           key: ${{ steps.input_cache_key.outputs.key }}
 
-      - name: Provision ephemeral LLVM and Rust prerequisites
+      - name: Fetch locked Chromium inputs
+        id: fetch_inputs
+        working-directory: /Volumes/dev/d/chromium-build
         shell: bash
         run: |
           set -euo pipefail
-          export PATH="$CARGO_HOME/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
-          mkdir -p "$CHROMIUM_WORK_ROOT/tools/rustup" "$CARGO_HOME" "$HOMEBREW_CACHE"
-
-          if ! command -v rustup >/dev/null 2>&1; then
-            brew install rustup-init
-            "$(brew --prefix rustup-init)/bin/rustup-init" -y --no-modify-path
-          fi
-          command -v rustup >/dev/null 2>&1
-          rustup toolchain install nightly-2026-09-15 \
-            --profile minimal \
-            --component rust-src \
-            --component llvm-tools-preview \
-            --no-self-update
-          rustup run nightly-2026-09-15 rustc --version --verbose
-
-          echo "DEVELOPER_DIR=$(xcode-select -p)" >> "$GITHUB_ENV"
-          llvm_formula=""
-          for formula in llvm@23 llvm; do
-            if brew list --formula "$formula" >/dev/null 2>&1; then
-              llvm_formula="$formula"
-              break
-            fi
-          done
-          if [ -z "$llvm_formula" ]; then
-            if brew info --formula llvm@23 >/dev/null 2>&1; then
-              llvm_formula=llvm@23
-            else
-              llvm_formula=llvm
-            fi
-            brew install "$llvm_formula"
-          fi
-
-          llvm_root="$(brew --prefix "$llvm_formula")"
-          if ! python3 scripts/verify_macos_ci.py verify-llvm \
-            --clang "$llvm_root/bin/clang" \
-            --minimum 23.1.0; then
-            if [ "$llvm_formula" != llvm@23 ] && brew info --formula llvm@23 >/dev/null 2>&1; then
-              llvm_formula=llvm@23
-              brew install "$llvm_formula"
-              llvm_root="$(brew --prefix "$llvm_formula")"
-            else
-              brew upgrade "$llvm_formula"
-              llvm_root="$(brew --prefix "$llvm_formula")"
-            fi
-          fi
-          "$llvm_root/bin/clang" --version
-          LLVM_ROOT="$llvm_root"
-          echo "LLVM_ROOT=$LLVM_ROOT" >> "$GITHUB_ENV"
-          echo "PATH=$CARGO_HOME/bin:$LLVM_ROOT/bin:/opt/homebrew/bin:/usr/local/bin:$PATH" >> "$GITHUB_ENV"
+          unset CCACHE_DIR SCCACHE_DIR RBE_service GOMA_service RECLIENT_service SISO_service || true
+          ./chromium-build --platform macos --arch arm64 --profile macos-release fetch
 
       - name: Run full-build host preflight
         working-directory: /Volumes/dev/d/chromium-build
@@ -131,18 +88,9 @@ jobs:
             --work-root /Volumes/dev/d/chromium-build/.work/macos-arm64 \
             --minimum-free-gb 80
 
-      - name: Fetch locked Chromium inputs
-        id: fetch_inputs
-        working-directory: /Volumes/dev/d/chromium-build
-        shell: bash
-        run: |
-          set -euo pipefail
-          unset CCACHE_DIR SCCACHE_DIR RBE_service GOMA_service RECLIENT_service SISO_service || true
-          ./chromium-build --platform macos --arch arm64 --profile macos-release fetch
-
       - name: Cache locked Chromium inputs
         if: steps.fetch_inputs.outcome == 'success' && steps.restore_inputs.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: /Volumes/dev/d/chromium-build/.work/macos-arm64/inputs
           key: ${{ steps.input_cache_key.outputs.key }}
@@ -199,25 +147,71 @@ jobs:
             --work-root "$CHROMIUM_WORK_ROOT"
           version="$(python3 scripts/verify_macos_ci.py chromium-version --lock config/macos.inputs.lock)"
           release_root="$CHROMIUM_WORK_ROOT/release"
-          archive="$release_root/Chromium-${version}-macos-arm64.zip"
+          archive="$release_root/Chromium-${version}-macos-arm64-experimental.zip"
           test -s "$archive"
           test -s "$archive.sha256"
+          test -s "$release_root/release-manifest.json"
+          test -s "$release_root/SHA256SUMS"
           ls -lh "$archive" "$archive.sha256"
 
-      - name: Upload the prerelease asset
+      - name: Upload the experimental build artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: chromium-macos-arm64-experimental
+          path: |
+            /Volumes/dev/d/chromium-build/.work/macos-arm64/release/Chromium-*-macos-arm64-experimental.zip
+            /Volumes/dev/d/chromium-build/.work/macos-arm64/release/Chromium-*-macos-arm64-experimental.zip.sha256
+            /Volumes/dev/d/chromium-build/.work/macos-arm64/release/release-manifest.json
+            /Volumes/dev/d/chromium-build/.work/macos-arm64/release/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    runs-on: macos-26
+    timeout-minutes: 60
+    needs: build
+    permissions:
+      contents: write
+    env:
+      CHROMIUM_WORK_ROOT: /Volumes/dev/d/chromium-build/.work/macos-arm64
+
+    steps:
+      - name: Clone the exact dispatched commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo mkdir -p /Volumes/dev/d
+          sudo chown "$(id -u):$(id -g)" /Volumes/dev /Volumes/dev/d
+          git clone --no-checkout --depth=1 --no-tags --filter=blob:none \
+            "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" \
+            /Volumes/dev/d/chromium-build
+          git -C /Volumes/dev/d/chromium-build fetch --depth=1 origin "$GITHUB_SHA"
+          git -C /Volumes/dev/d/chromium-build checkout "$GITHUB_SHA"
+          test "$(git -C /Volumes/dev/d/chromium-build rev-parse HEAD)" = "$GITHUB_SHA"
+
+      - name: Download the experimental build artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: chromium-macos-arm64-experimental
+          path: /Volumes/dev/d/chromium-build/.work/macos-arm64/release
+
+      - name: Publish the experimental prerelease
         working-directory: /Volumes/dev/d/chromium-build
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           release_root="$CHROMIUM_WORK_ROOT/release"
           version="$(python3 scripts/verify_macos_ci.py chromium-version --lock config/macos.inputs.lock)"
-          archive="$release_root/Chromium-${version}-macos-arm64.zip"
+          archive="$release_root/Chromium-${version}-macos-arm64-experimental.zip"
+          test -s "$archive"
+          test -s "$archive.sha256"
           tag="chromium-macos-${version}-run-${GITHUB_RUN_ID}"
           notes="$release_root/release-notes.md"
           cat > "$notes" <<EOF
-          Unfinished CI validation prerelease for Chromium $version.
+          Experimental CI validation prerelease for Chromium $version.
 
           - Architecture: arm64
           - Host: macOS 26+
@@ -230,7 +224,7 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --prerelease \
-            --title "Chromium $version macOS arm64 CI build" \
+            --title "Chromium $version macOS arm64 CI build (experimental)" \
             --notes-file "$notes" \
             "$archive" \
             "$archive.sha256"
