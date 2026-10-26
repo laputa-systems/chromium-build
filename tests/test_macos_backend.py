@@ -1013,6 +1013,31 @@ class MacOSBackendTests(unittest.TestCase):
         leftovers = list((layout.root / "verify").rglob("*")) if (layout.root / "verify").exists() else []
         self.assertEqual(leftovers, [])
 
+    def test_admissible_load_command_set_is_pinned(self):
+        self.assertEqual(
+            backend.ADMISSIBLE_MACHO_LOAD_COMMANDS,
+            frozenset({
+                0x19, 0x2, 0xB, 0xC, 0xD, 0xE, 0x1B, 0x24, 0x32,
+                0x2A, 0x28, 0x18, 0x26, 0x29, 0x1D, 0x1E, 0x2B,
+                0x2C, 0x2D, 0x80000022 & ~0x80000000, 0x16, 0x11,
+                0x1A, 0x33, 0x34,
+            }),
+        )
+
+    def test_audit_allows_req_dyld_marked_main(self):
+        import struct
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        app = self._minimal_app(commands=[(0x80000028, b"12345678")])
+        with mock.patch.object(backend, "command_output") as run, \
+             mock.patch.object(backend, "macho_architectures", side_effect=lambda p, e: ["arm64"] if "MacOS" in str(p) else None):
+            def fake(command, **kwargs):
+                return mock.Mock(returncode=0, stdout="", stderr="")
+            run.side_effect = fake
+            with mock.patch.object(backend, "xcode_identity", return_value={"xcode": "Xcode 27.0", "sdk": "27.0", "clang": "/c", "clangxx": "/c++", "linker": "/l", "clang_version": "1", "metal": "/m", "metal_version": "1"}):
+                report = backend.audit_bundle(app, layout, {})
+        self.assertEqual(report["status"], "complete")
+
     def test_macho_audit_alias_handles_archive_like_bundle_names(self):
         layout = backend.WorkLayout(self.root, self.repo)
         layout.ensure()

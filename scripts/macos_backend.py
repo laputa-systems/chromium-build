@@ -52,13 +52,14 @@ SANDBOX_LOOPBACK_PROFILE = (
 MH_MAGIC_64 = 0xFEEDFACF
 MH_PIE_FLAG = 0x200000
 CPU_TYPE_ARM64 = 0x0100000C
+LC_REQ_DYLD = 0x80000000
 LC_SEGMENT_64 = 0x19
 LC_SYMTAB = 0x2
 LC_DYSYMTAB = 0xB
 LC_LOAD_DYLIB = 0xC
 LC_ID_DYLIB = 0xD
 LC_LOAD_DYLINKER = 0xE
-LC_UUID = 0x1
+LC_UUID = 0x1B
 LC_VERSION_MIN_MACOSX = 0x24
 LC_BUILD_VERSION = 0x32
 LC_SOURCE_VERSION = 0x2A
@@ -73,14 +74,18 @@ LC_ENCRYPTION_INFO_64 = 0x2C
 LC_LINKER_OPTION = 0x2D
 LC_DYLD_INFO_ONLY = 0x22
 LC_TWOLEVEL_HINTS = 0x16
-LC_ROUTINES_64 = 0x11
+LC_ROUTINES = 0x11
+LC_ROUTINES_64 = 0x1A
+LC_DYLD_EXPORTS_TRIE = 0x33
+LC_DYLD_CHAINED_FIXUPS = 0x34
 ADMISSIBLE_MACHO_LOAD_COMMANDS = frozenset({
     LC_SEGMENT_64, LC_SYMTAB, LC_DYSYMTAB, LC_LOAD_DYLIB, LC_ID_DYLIB,
     LC_LOAD_DYLINKER, LC_UUID, LC_VERSION_MIN_MACOSX, LC_BUILD_VERSION,
     LC_SOURCE_VERSION, LC_MAIN, LC_LOAD_WEAK_DYLIB, LC_FUNCTION_STARTS,
     LC_DATA_IN_CODE, LC_CODE_SIGNATURE, LC_SEGMENT_SPLIT_INFO,
     LC_DYLIB_CODE_SIGN_DRS, LC_ENCRYPTION_INFO_64, LC_LINKER_OPTION,
-    LC_DYLD_INFO_ONLY, LC_TWOLEVEL_HINTS, LC_ROUTINES_64,
+    LC_DYLD_INFO_ONLY, LC_TWOLEVEL_HINTS, LC_ROUTINES, LC_ROUTINES_64,
+    LC_DYLD_EXPORTS_TRIE, LC_DYLD_CHAINED_FIXUPS,
 })
 LOCK_RELATIVE = Path("config/macos.inputs.lock")
 OWNERSHIP_SCHEMA = 1
@@ -3612,7 +3617,10 @@ def audit_bundle(app: Path, layout: WorkLayout, environment: Mapping[str, str]) 
         if not macho_has_pie(candidate):
             fail(f"bundle Mach-O lacks MH_PIE: {candidate}")
         command_types = macho_load_command_types(candidate)
-        inadmissible = sorted(cmd for cmd in command_types if cmd not in ADMISSIBLE_MACHO_LOAD_COMMANDS)
+        inadmissible = sorted(
+            cmd for cmd in command_types
+            if (cmd & ~LC_REQ_DYLD) not in ADMISSIBLE_MACHO_LOAD_COMMANDS
+        )
         if inadmissible:
             fail(f"bundle Mach-O uses inadmissible load commands {[hex(c) for c in inadmissible]}: {candidate}")
         minos = macho_min_os(candidate)
