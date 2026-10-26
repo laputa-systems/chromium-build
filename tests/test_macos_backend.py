@@ -439,6 +439,24 @@ class MacOSBackendTests(unittest.TestCase):
                     timeout=15,
                 )
 
+    def test_loopback_profile_allows_bind_sealed_denies_it(self):
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        loop_env = backend.isolated_environment(layout, network="loopback")
+        result = backend.command_output(
+            ["python3", "-c", "import socket; s=socket.socket(); s.bind(('127.0.0.1',0)); print(s.getsockname()[1])"],
+            env=loop_env,
+            timeout=15,
+        )
+        self.assertTrue(result.stdout.strip().isdigit())
+        sealed_env = backend.isolated_environment(layout, network="none")
+        with self.assertRaises(backend.MacOSFailure):
+            backend.command_output(
+                ["python3", "-c", "import socket; s=socket.socket(); s.bind(('127.0.0.1',0))"],
+                env=sealed_env,
+                timeout=15,
+            )
+
     def test_phase_recording_network_none_without_wrapper_fails(self):
         with self.assertRaisesRegex(backend.MacOSFailure, "wrapper|NETWORK_MODE|sandbox"):
             backend.require_sandboxed_environment({}, expected="none")

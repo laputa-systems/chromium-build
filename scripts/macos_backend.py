@@ -48,6 +48,7 @@ SANDBOX_SEALED_PROFILE = "(version 1)(allow default)(deny network*)"
 SANDBOX_LOOPBACK_PROFILE = (
     "(version 1)(allow default)(deny network*)"
     "(allow network* (remote ip \"localhost:*\"))(allow network* (remote unix-socket))"
+    "(allow network-bind (local ip \"localhost:*\"))"
 )
 MH_MAGIC_64 = 0xFEEDFACF
 MH_PIE_FLAG = 0x200000
