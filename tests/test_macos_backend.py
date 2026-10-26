@@ -444,7 +444,7 @@ class MacOSBackendTests(unittest.TestCase):
         layout.ensure()
         loop_env = backend.isolated_environment(layout, network="loopback")
         result = backend.command_output(
-            ["python3", "-c", "import socket; s=socket.socket(); s.bind(('127.0.0.1',0)); print(s.getsockname()[1])"],
+            ["python3", "-c", "import socket; s=socket.socket(); s.bind(('127.0.0.1',0)); s.listen(128); print(s.getsockname()[1])"],
             env=loop_env,
             timeout=15,
         )
