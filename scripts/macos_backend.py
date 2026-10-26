@@ -3913,9 +3913,188 @@ def package_bundle(layout: WorkLayout) -> dict[str, Any]:
         "size": archive.stat().st_size,
         "acceptance": acceptance_status,
     }
+    manifest = build_release_manifest(layout, lock, candidate, report, app, archive, digest, acceptance_status)
+    write_release_files(layout, manifest, archive, digest)
     atomic_json(layout.metadata / "package-macos.json", report)
     print(f"package: created {archive} ({report['size']} bytes)")
     return report
+
+
+REQUIRED_MANIFEST_FIELDS = (
+    "schema", "status", "source_commit", "source_clean", "chromium_version",
+    "chromium_commit", "ungoogled_commit", "clang_version", "clang_sha256",
+    "lock_sha256", "overlay_sha256", "build_identity_digest", "host_os",
+    "host_arch", "xcode", "sdk", "linker", "rust_toolchain", "gn_args_sha256",
+    "acceptance_scope", "acceptance_result", "shadowdriver_revision",
+    "shadowdriver_source_sha256", "skipped_capabilities", "signing_status",
+    "archive", "archive_sha256", "payload_sha256", "compressed_size", "unpacked_size",
+)
+
+
+def build_release_manifest(layout: WorkLayout, lock: Mapping[str, Any], candidate: Mapping[str, Any], report: Mapping[str, Any], app: Path, archive: Path, digest: str, acceptance_status: str) -> dict[str, Any]:
+    source_commit = ""
+    source_clean: Any = None
+    try:
+        head = command_output(["git", "-C", str(layout.source), "rev-parse", "HEAD"], env=os.environ, check=False)
+        if head.returncode == 0 and head.stdout.strip():
+            source_commit = head.stdout.strip()
+            dirty = command_output(["git", "-C", str(layout.source), "status", "--porcelain", "--untracked-files=all"], env=os.environ, check=False)
+            source_clean = dirty.returncode == 0 and not dirty.stdout.strip()
+    except MacOSFailure:
+        pass
+    build_identity = candidate.get("build_identity") or {}
+    test_staged_path = layout.metadata / "test-staged-macos.json"
+    acceptance_scope: Any = None
+    acceptance_result: Any = report.get("status")
+    shadowdriver_revision: Any = None
+    shadowdriver_source: Any = None
+    skipped: list[str] = []
+    if test_staged_path.is_file():
+        try:
+            staged = json.loads(test_staged_path.read_text(encoding="utf-8"))
+            acceptance_scope = staged.get("acceptance_scope")
+            shadowdriver = staged.get("shadowdriver") or {}
+            test_identity = shadowdriver.get("test_identity") or {}
+            shadowdriver_revision = test_identity.get("revision")
+            shadowdriver_source = test_identity.get("source_sha256")
+            if staged.get("acceptance_scope") == "headless-with-historical-headed-reference":
+                skipped.append("fresh-headed-control")
+        except (OSError, json.JSONDecodeError):
+            pass
+    if acceptance_status == "skipped":
+        skipped.append("acceptance-skipped")
+    signing = candidate.get("signing") or {}
+    unpacked = 0
+    for base, _, files in os.walk(app):
+        for name in files:
+            try:
+                unpacked += (Path(base) / name).stat().st_size
+            except OSError:
+                pass
+    try:
+        host_os = command_output(["sw_vers", "-productVersion"], env=os.environ, check=False).stdout.strip()
+    except MacOSFailure:
+        host_os = host_platform.mac_ver()[0]
+    manifest = {
+        "schema": 1,
+        "status": "complete",
+        "source_commit": source_commit,
+        "source_clean": source_clean,
+        "chromium_version": lock["chromium"]["version"],
+        "chromium_commit": lock["chromium"]["commit"],
+        "ungoogled_commit": lock["ungoogled"]["commit"],
+        "clang_version": str(build_identity.get("clang_version", "")),
+        "clang_sha256": str(build_identity.get("clang_sha256", "")),
+        "lock_sha256": sha256(layout.repo_root / LOCK_RELATIVE),
+        "overlay_sha256": str(candidate.get("local_overlay_sha256", "")),
+        "build_identity_digest": str(build_identity.get("digest", "")),
+        "host_os": host_os,
+        "host_arch": host_platform.machine(),
+        "xcode": str(build_identity.get("xcode", "")),
+        "sdk": str(build_identity.get("sdk", "")),
+        "linker": str(build_identity.get("linker", "")),
+        "rust_toolchain": str(build_identity.get("rust", RUST_TOOLCHAIN)),
+        "gn_args_sha256": str(build_identity.get("gn_args_sha256", "")),
+        "acceptance_scope": acceptance_scope,
+        "acceptance_result": acceptance_result,
+        "shadowdriver_revision": shadowdriver_revision,
+        "shadowdriver_source_sha256": shadowdriver_source,
+        "skipped_capabilities": skipped,
+        "signing_status": signing.get("status", "ad-hoc") if isinstance(signing, dict) else "ad-hoc",
+        "archive": str(archive),
+        "archive_sha256": digest,
+        "payload_sha256": fingerprint,
+        "compressed_size": archive.stat().st_size,
+        "unpacked_size": unpacked,
+    }
+    missing = [key for key in REQUIRED_MANIFEST_FIELDS if key not in manifest]
+    if missing:
+        fail(f"release manifest is missing fields: {', '.join(missing)}")
+    return manifest
+
+
+def write_release_files(layout: WorkLayout, manifest: Mapping[str, Any], archive: Path, digest: str) -> None:
+    staging = layout.release / f".tmp-release-{os.getpid()}-{time.time_ns()}"
+    staging.mkdir(parents=True, exist_ok=False)
+    try:
+        manifest_text = json.dumps(manifest, indent=2, sort_keys=True) + "\n"
+        (staging / "release-manifest.json").write_text(manifest_text, encoding="utf-8")
+        sums_text = f"{digest}  {archive.name}\n{hashlib.sha256(manifest_text.encode()).hexdigest()}  release-manifest.json\n"
+        (staging / "SHA256SUMS").write_text(sums_text, encoding="utf-8")
+        os.replace(staging / "release-manifest.json", layout.release / "release-manifest.json")
+        os.replace(staging / "SHA256SUMS", layout.release / "SHA256SUMS")
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+
+
+def verify_release_bundle(layout: WorkLayout) -> dict[str, Any]:
+    report = read_json(layout.metadata / "package-macos.json", "package report")
+    if report.get("status") != "complete":
+        fail("package report is not complete; run package")
+    manifest_path = layout.release / "release-manifest.json"
+    if not manifest_path.is_file():
+        fail("release manifest is missing; run package")
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        fail(f"cannot read release manifest: {error}")
+    missing = [key for key in REQUIRED_MANIFEST_FIELDS if key not in manifest]
+    if missing:
+        fail(f"release manifest is missing fields: {', '.join(missing)}")
+    archive = Path(str(report.get("archive", "")))
+    if not archive.is_file():
+        fail(f"release archive is missing: {archive}")
+    if sha256(archive) != report.get("sha256") or sha256(archive) != manifest.get("archive_sha256"):
+        fail("release archive digest mismatch; refusing to verify")
+    verify_root = layout.root / "verify"
+    verify_root.mkdir(parents=True, exist_ok=True)
+    destination_parent = verify_root / f"extract-{os.getpid()}-{time.time_ns()}"
+    if destination_parent.exists():
+        fail(f"verify destination already exists: {destination_parent}")
+    try:
+        destination_parent.mkdir(parents=True, exist_ok=False)
+        environment = isolated_environment(layout, network="none")
+        ditto = Path("/usr/bin/ditto")
+        if not ditto.is_file():
+            fail("macOS verification requires /usr/bin/ditto")
+        command_output([str(ditto), "-x", "-k", str(archive), str(destination_parent)], env=environment, cwd=layout.root)
+        apps = list(destination_parent.rglob("Chromium.app"))
+        if len(apps) != 1:
+            fail(f"extracted archive has {len(apps)} Chromium.app bundles, expected 1")
+        extracted = apps[0]
+        expected_parent = destination_parent.resolve()
+        if extracted.parent.resolve() == expected_parent:
+            staged_dir = destination_parent / "staged"
+            staged_dir.mkdir(exist_ok=True)
+            relocated = staged_dir / "Chromium.app"
+            if relocated.exists():
+                shutil.rmtree(relocated)
+            os.replace(extracted, relocated)
+            extracted = relocated
+        verification = command_output([str("/usr/bin/codesign"), "--verify", "--deep", "--strict", str(extracted)], env=environment, check=False)
+        if verification.returncode:
+            detail = (verification.stderr or verification.stdout or "").strip()
+            fail(f"extracted bundle failed signature verification: {detail[-1200:]}")
+        audit_bundle(extracted, layout, environment)
+        plist = extracted / "Contents" / "Info.plist"
+        lock = load_lock(layout)
+        try:
+            with plist.open("rb") as stream:
+                info = plistlib.load(stream)
+        except (OSError, plistlib.InvalidFileException) as error:
+            fail(f"cannot read extracted Info.plist: {error}")
+        if info.get("CFBundleShortVersionString") != lock["chromium"]["version"]:
+            fail("extracted bundle version does not match the lock")
+        smoke = test_staged(layout, str(extracted))
+        if smoke.get("status") != "complete":
+            fail("extracted bundle smoke acceptance did not complete")
+        result = {"schema": 1, "status": "complete", "app": str(extracted), "archive": str(archive), "manifest": str(manifest_path)}
+        atomic_json(layout.metadata / "verify-release-macos.json", result)
+        print(f"verify-release: extracted copy passes at {extracted}")
+        return result
+    except Exception:
+        shutil.rmtree(destination_parent, ignore_errors=True)
+        raise
 
 
 def shadowdriver_acceptance_target(layout: WorkLayout) -> tuple[Path, Path]:
@@ -4307,6 +4486,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 stage_runtime(layout)
             elif command == "package":
                 package_bundle(layout)
+            elif command == "verify-release":
+                verify_release_bundle(layout)
             elif command == "test-staged":
                 test_staged(layout, arguments.app, arguments.headed_reference)
             elif command == "reset":

@@ -676,6 +676,8 @@ class MacOSBackendTests(unittest.TestCase):
             mock.patch.object(backend, "isolated_environment", return_value={}),
             mock.patch.object(backend, "command_output", side_effect=fake_command),
             mock.patch.object(backend, "require_build_identity", return_value="test"),
+            mock.patch.object(backend, "build_release_manifest", return_value={key: "v" for key in backend.REQUIRED_MANIFEST_FIELDS}),
+            mock.patch.object(backend, "write_release_files", return_value=None),
         ):
             report = backend.package_bundle(layout)
 
@@ -787,12 +789,10 @@ class MacOSBackendTests(unittest.TestCase):
              mock.patch.object(backend, "isolated_environment", return_value={}), \
              mock.patch.object(backend, "command_output", side_effect=fake_command), \
              mock.patch.object(backend, "require_build_identity", return_value="d1"), \
-             mock.patch.object(backend, "load_lock", return_value={"chromium": {"version": "1.2.3.4"}}):
+             mock.patch.object(backend, "build_release_manifest", return_value={key: "v" for key in backend.REQUIRED_MANIFEST_FIELDS}), \
+             mock.patch.object(backend, "write_release_files", return_value=None), \
+             mock.patch.object(backend, "load_lock", return_value={"chromium": {"version": "1.2.3.4", "commit": "c" * 40}, "ungoogled": {"commit": "u" * 40}}):
             report = backend.package_bundle(layout)
-        self.assertIn("-experimental.zip", report["archive"])
-        self.assertEqual(report["acceptance"], "skipped")
-        self.assertNotIn("Chromium-1.2.3.4-macos-arm64.zip", report["archive"])
-
         self.assertIn("-experimental.zip", report["archive"])
         self.assertEqual(report["acceptance"], "skipped")
         self.assertNotIn("Chromium-1.2.3.4-macos-arm64.zip", report["archive"])
@@ -935,6 +935,83 @@ class MacOSBackendTests(unittest.TestCase):
         with mock.patch.object(backend, "command_output", side_effect=fake):
             with self.assertRaisesRegex(backend.MacOSFailure, "entitlements"):
                 backend.sign_bundle(app, layout, {})
+
+    def test_verify_release_rejects_mutated_archive(self):
+        import zipfile
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        app = layout.candidates / ("f" * 64) / "Chromium.app"
+        (app / "Contents" / "MacOS").mkdir(parents=True)
+        (app / "Contents" / "MacOS" / "Chromium").write_bytes(b"x")
+        (app / "Contents" / "Info.plist").write_bytes(
+            b'<?xml version="1.0"?><plist version="1.0"><dict>'
+            b'<key>CFBundleExecutable</key><string>Chromium</string></dict></plist>'
+        )
+        archive = layout.release / "Chromium-1.0-macos-arm64.zip"
+        archive.parent.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(archive, "w") as zf:
+            for path in sorted(app.rglob("*")):
+                if path.is_file():
+                    zf.write(path, path.relative_to(app.parent))
+        digest = backend.sha256(archive)
+        manifest = {key: "v" for key in backend.REQUIRED_MANIFEST_FIELDS}
+        manifest.update({"archive": str(archive), "archive_sha256": digest})
+        backend.atomic_json(layout.metadata / "package-macos.json", {
+            "schema": 1, "status": "complete", "archive": str(archive), "sha256": digest,
+        })
+        backend.atomic_json(layout.release / "release-manifest.json", manifest)
+        # Mutate one byte of a copy
+        mutated = layout.release / "mutated.zip"
+        data = bytearray(archive.read_bytes())
+        data[10] ^= 0xFF
+        mutated.write_bytes(bytes(data))
+        backend.atomic_json(layout.metadata / "package-macos.json", {
+            "schema": 1, "status": "complete", "archive": str(mutated), "sha256": digest,
+        })
+        with self.assertRaisesRegex(backend.MacOSFailure, "digest mismatch|mismatch"):
+            backend.verify_release_bundle(layout)
+        leftovers = list((layout.root / "verify").rglob("*")) if (layout.root / "verify").exists() else []
+        self.assertEqual(leftovers, [])
+
+    def test_verify_release_rejects_missing_manifest_field(self):
+        import zipfile
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        app = layout.candidates / ("f" * 64) / "Chromium.app"
+        (app / "Contents").mkdir(parents=True)
+        archive = layout.release / "Chromium-1.0-macos-arm64.zip"
+        archive.parent.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(archive, "w") as zf:
+            zf.writestr("empty", b"x")
+        digest = backend.sha256(archive)
+        backend.atomic_json(layout.metadata / "package-macos.json", {
+            "schema": 1, "status": "complete", "archive": str(archive), "sha256": digest,
+        })
+        manifest = {key: "v" for key in backend.REQUIRED_MANIFEST_FIELDS if key != "archive_sha256"}
+        backend.atomic_json(layout.release / "release-manifest.json", manifest)
+        with self.assertRaisesRegex(backend.MacOSFailure, "missing fields|missing"):
+            backend.verify_release_bundle(layout)
+        leftovers = list((layout.root / "verify").rglob("*")) if (layout.root / "verify").exists() else []
+        self.assertEqual(leftovers, [])
+
+    def test_verify_release_rejects_digest_mismatch_and_cleans_up(self):
+        import zipfile
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        archive = layout.release / "Chromium-1.0-macos-arm64.zip"
+        archive.parent.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(archive, "w") as zf:
+            zf.writestr("empty", b"x")
+        manifest = {key: "v" for key in backend.REQUIRED_MANIFEST_FIELDS}
+        manifest.update({"archive": str(archive), "archive_sha256": "0" * 64})
+        backend.atomic_json(layout.metadata / "package-macos.json", {
+            "schema": 1, "status": "complete", "archive": str(archive), "sha256": "0" * 64,
+        })
+        backend.atomic_json(layout.release / "release-manifest.json", manifest)
+        with self.assertRaisesRegex(backend.MacOSFailure, "digest mismatch|mismatch"):
+            backend.verify_release_bundle(layout)
+        leftovers = list((layout.root / "verify").rglob("*")) if (layout.root / "verify").exists() else []
+        self.assertEqual(leftovers, [])
 
     def test_macho_audit_alias_handles_archive_like_bundle_names(self):
         layout = backend.WorkLayout(self.root, self.repo)
