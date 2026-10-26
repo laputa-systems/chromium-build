@@ -447,6 +447,72 @@ class MacOSBackendTests(unittest.TestCase):
         sealed_env = backend.isolated_environment(layout, network="none")
         backend.require_sandboxed_environment(sealed_env, expected="none")
 
+    def test_build_identity_rejects_stale_report(self):
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        with self.assertRaisesRegex(backend.MacOSFailure, "not complete|stale|status"):
+            backend.require_build_identity(layout, {"status": "failed", "build_identity": {"digest": "x"}})
+
+    def test_build_identity_rejects_altered_lock(self):
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        current = {"digest": "good", "lock_sha256": "aaa", "overlay_sha256": "bbb", "clang_version": "1", "clang_sha256": "ccc", "xcode": "x", "sdk": "s", "linker": "l", "rust": "r", "gn_args_sha256": "g"}
+        altered = dict(current)
+        altered["lock_sha256"] = "zzz"
+        with self.assertRaisesRegex(backend.MacOSFailure, "lock|identity|mismatch|stale"):
+            backend.require_build_identity(layout, {"status": "complete", "build_identity": altered}, current=current)
+
+    def test_build_identity_rejects_altered_overlay(self):
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        current = {"digest": "good", "lock_sha256": "aaa", "overlay_sha256": "bbb", "clang_version": "1", "clang_sha256": "ccc", "xcode": "x", "sdk": "s", "linker": "l", "rust": "r", "gn_args_sha256": "g"}
+        stale = dict(current)
+        stale["overlay_sha256"] = "zzz"
+        with self.assertRaisesRegex(backend.MacOSFailure, "overlay|identity|mismatch|stale"):
+            backend.require_build_identity(layout, {"status": "complete", "build_identity": stale}, current=current)
+
+    def test_build_identity_rejects_altered_gn_args(self):
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        current = {"digest": "good", "lock_sha256": "aaa", "overlay_sha256": "bbb", "clang_version": "1", "clang_sha256": "ccc", "xcode": "x", "sdk": "s", "linker": "l", "rust": "r", "gn_args_sha256": "g"}
+        stale = dict(current)
+        stale["gn_args_sha256"] = "zzz"
+        with self.assertRaisesRegex(backend.MacOSFailure, "GN|identity|mismatch|stale"):
+            backend.require_build_identity(layout, {"status": "complete", "build_identity": stale}, current=current)
+
+    def test_build_identity_preserves_incremental_on_unchanged(self):
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        current = {"digest": "good", "lock_sha256": "aaa", "overlay_sha256": "bbb", "clang_version": "1", "clang_sha256": "ccc", "xcode": "x", "sdk": "s", "linker": "l", "rust": "r", "gn_args_sha256": "g"}
+        backend.require_build_identity(layout, {"status": "complete", "build_identity": dict(current)}, current=current)
+
+    def test_build_identity_rejects_mismatched_clang(self):
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        current = {"digest": "good", "lock_sha256": "aaa", "overlay_sha256": "bbb", "clang_version": "1", "clang_sha256": "ccc", "xcode": "x", "sdk": "s", "linker": "l", "rust": "r", "gn_args_sha256": "g"}
+        stale = dict(current)
+        stale["clang_sha256"] = "zzz"
+        with self.assertRaisesRegex(backend.MacOSFailure, "clang|identity|mismatch|stale"):
+            backend.require_build_identity(layout, {"status": "complete", "build_identity": stale}, current=current)
+
+    def test_build_identity_rejects_mismatched_xcode(self):
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        current = {"digest": "good", "lock_sha256": "aaa", "overlay_sha256": "bbb", "clang_version": "1", "clang_sha256": "ccc", "xcode": "x", "sdk": "s", "linker": "l", "rust": "r", "gn_args_sha256": "g"}
+        stale = dict(current)
+        stale["xcode"] = "zzz"
+        with self.assertRaisesRegex(backend.MacOSFailure, "xcode|Xcode|identity|mismatch|stale"):
+            backend.require_build_identity(layout, {"status": "complete", "build_identity": stale}, current=current)
+
+    def test_build_identity_rejects_wrong_source_version(self):
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        current = {"digest": "good", "lock_sha256": "aaa", "overlay_sha256": "bbb", "clang_version": "1", "clang_sha256": "ccc", "xcode": "x", "sdk": "s", "linker": "l", "rust": "r", "gn_args_sha256": "g"}
+        stale = dict(current)
+        stale["lock_sha256"] = "different-source-version"
+        with self.assertRaisesRegex(backend.MacOSFailure, "lock|source|identity|mismatch|stale"):
+            backend.require_build_identity(layout, {"status": "complete", "build_identity": stale}, current=current)
+
     def test_xcode_identity_rejects_a_present_but_uninstalled_metal_toolchain(self):
         def result(stdout="", stderr="", returncode=0):
             return mock.Mock(stdout=stdout, stderr=stderr, returncode=returncode)
@@ -589,6 +655,7 @@ class MacOSBackendTests(unittest.TestCase):
             "status": "complete",
             "fingerprint": fingerprint,
             "local_overlay_sha256": backend.local_overlay_identity(layout)["sha256"],
+            "build_identity": {"digest": "test", "lock_sha256": "a", "overlay_sha256": "b", "clang_version": "c", "clang_sha256": "d", "xcode": "e", "sdk": "f", "linker": "g", "rust": "h", "gn_args_sha256": "i"},
             "app": str(app),
             "audit": {"status": "complete"},
         }
@@ -602,6 +669,7 @@ class MacOSBackendTests(unittest.TestCase):
         with (
             mock.patch.object(backend, "isolated_environment", return_value={}),
             mock.patch.object(backend, "command_output", side_effect=fake_command),
+            mock.patch.object(backend, "require_build_identity", return_value="test"),
         ):
             report = backend.package_bundle(layout)
 

@@ -2748,6 +2748,81 @@ def local_overlay_identity(layout: WorkLayout) -> dict[str, Any]:
     return {**contents, "sha256": stable_digest(contents)}
 
 
+def current_build_components(
+    layout: WorkLayout,
+    *,
+    llvm: Optional[Mapping[str, Any]] = None,
+    xcode: Optional[Mapping[str, Any]] = None,
+    gn_args_text: Optional[str] = None,
+) -> dict[str, str]:
+    lock_path = layout.repo_root / LOCK_RELATIVE
+    lock_sha = sha256(lock_path) if lock_path.is_file() else "missing-lock"
+    overlay_sha = local_overlay_identity(layout)["sha256"]
+    if llvm is None:
+        try:
+            source_root = layout.source if layout.source.is_dir() else None
+            resolved = select_llvm({}, source_root)
+            clang_version = str(resolved.get("version", ""))
+            clang_binary = Path(str(resolved.get("clang", "")))
+            clang_hash = sha256(clang_binary) if clang_binary.is_file() else "missing-clang"
+        except MacOSFailure:
+            clang_version = "missing-clang"
+            clang_hash = "missing-clang"
+    else:
+        clang_version = str(llvm.get("version", ""))
+        clang_binary = Path(str(llvm.get("clang", "")))
+        clang_hash = sha256(clang_binary) if clang_binary.is_file() else "missing-clang"
+    if xcode is None:
+        try:
+            current_xcode = xcode_identity(dict(os.environ))
+            xcode_version = str(current_xcode.get("xcode", ""))
+            sdk_version = str(current_xcode.get("sdk", ""))
+            linker_path = str(current_xcode.get("linker", ""))
+        except MacOSFailure:
+            xcode_version = "missing-xcode"
+            sdk_version = "missing-sdk"
+            linker_path = "missing-linker"
+    else:
+        xcode_version = str(xcode.get("xcode", ""))
+        sdk_version = str(xcode.get("sdk", ""))
+        linker_path = str(xcode.get("linker", ""))
+    if gn_args_text is None:
+        args_path = layout.metadata / f"{DEFAULT_PROFILE}.args.gn"
+        gn_args_text = args_path.read_text(encoding="utf-8") if args_path.is_file() else "-"
+    components = {
+        "lock_sha256": lock_sha,
+        "overlay_sha256": overlay_sha,
+        "clang_version": clang_version,
+        "clang_sha256": clang_hash,
+        "xcode": xcode_version,
+        "sdk": sdk_version,
+        "linker": linker_path,
+        "rust": RUST_TOOLCHAIN,
+        "gn_args_sha256": hashlib.sha256(gn_args_text.encode()).hexdigest(),
+    }
+    return {**components, "digest": stable_digest(components)}
+
+
+def require_build_identity(
+    layout: WorkLayout,
+    predecessor: Mapping[str, Any],
+    *,
+    current: Optional[Mapping[str, Any]] = None,
+) -> str:
+    if predecessor.get("status") != "complete":
+        fail("predecessor report is not complete; rerun the preceding phase")
+    recorded = predecessor.get("build_identity")
+    if not isinstance(recorded, dict) or not recorded.get("digest"):
+        fail("predecessor report predates build identity; rerun the preceding phase")
+    resolved = dict(current) if current is not None else current_build_components(layout)
+    for key in ("lock_sha256", "overlay_sha256", "clang_version", "clang_sha256", "xcode", "sdk", "linker", "rust", "gn_args_sha256"):
+        if str(recorded.get(key, "")) != str(resolved.get(key, "")):
+            fail(f"build identity mismatch in {key}; stale report, rerun the preceding phase")
+    if str(recorded.get("digest", "")) != str(resolved.get("digest", "")):
+        fail("build identity digest mismatch; stale report, rerun the preceding phase")
+    return str(resolved.get("digest", ""))
+
+
 def apply_native_overlay(layout: WorkLayout, environment: Mapping[str, str], skip: int = 0) -> list[dict[str, Any]]:
     lock = load_lock(layout)
     if lock["chromium"]["commit"] != "1d17a2e2ee147bb7d6ae2ab6abdb3a2510c17775":
@@ -2988,6 +3063,17 @@ def configure_source(layout: WorkLayout) -> dict[str, Any]:
     )
     args_path = layout.metadata / f"{DEFAULT_PROFILE}.args.gn"
     atomic_write(args_path, args_text.rstrip() + "\n")
+    identity = current_build_components(layout, llvm=llvm, xcode=xcode, gn_args_text=args_text)
+    previous_path = layout.metadata / "configure-macos.json"
+    if previous_path.is_file():
+        try:
+            previous = json.loads(previous_path.read_text(encoding="utf-8"))
+            if previous.get("status") == "complete" and isinstance(previous.get("build_identity"), dict):
+                if previous["build_identity"].get("digest") == identity.get("digest"):
+                    print(f"configure: unchanged build identity reused at {layout.output}")
+                    return previous
+        except (OSError, json.JSONDecodeError):
+            pass
     layout.output.mkdir(parents=True, exist_ok=True)
     shutil.copy2(args_path, layout.output / "args.gn")
     gn = find_executable(
@@ -3029,6 +3115,7 @@ def configure_source(layout: WorkLayout) -> dict[str, Any]:
         "gn": str(gn),
         "gn_command": gn_command,
         "local_overlay_sha256": overlay_digest,
+        "build_identity": identity,
         "gn_args_listing_status": listed.returncode,
         "gn_args_listing": args_listing,
         "llvm": {key: value for key, value in llvm.items() if key != "version_tuple"},
@@ -3105,6 +3192,7 @@ def build_source(layout: WorkLayout, jobs: Optional[str]) -> dict[str, Any]:
     if configure.get("status") != "complete":
         fail("configuration is not complete; run configure")
     overlay_digest = require_overlay_identity(layout, configure)
+    require_build_identity(layout, configure)
     source = layout.source
     if not source.is_dir():
         fail(f"prepared source is missing: {source}")
@@ -3176,6 +3264,7 @@ def build_source(layout: WorkLayout, jobs: Optional[str]) -> dict[str, Any]:
         "jobs": build_jobs,
         "compiler_cache": actual_cache,
         "local_overlay_sha256": overlay_digest,
+        "build_identity": configure.get("build_identity"),
         "locale_cleanup": locale_cleanup,
         "pgo": configure.get("pgo", {}),
     }
@@ -3561,6 +3650,7 @@ def stage_runtime(layout: WorkLayout) -> dict[str, Any]:
     if build.get("status") != "complete":
         fail("the build report is not complete; run build")
     overlay_digest = require_overlay_identity(layout, build)
+    require_build_identity(layout, build)
     source_app = validate_app_path(build.get("app", layout.output / "Chromium.app"), layout, "built Chromium.app", built=True)
     environment = isolated_environment(layout, network="none")
     source_audit = audit_bundle(source_app, layout, environment)
@@ -3586,6 +3676,7 @@ def stage_runtime(layout: WorkLayout) -> dict[str, Any]:
             "executable": str(destination / "Contents" / "MacOS" / "Chromium"),
             "source_app": str(source_app),
             "local_overlay_sha256": overlay_digest,
+            "build_identity": build.get("build_identity"),
             "source_audit": source_audit,
             "signing": signing,
             "audit": staged_audit,
@@ -3607,6 +3698,7 @@ def package_bundle(layout: WorkLayout) -> dict[str, Any]:
     if candidate.get("status") != "complete":
         fail("staged candidate is not complete; run stage-runtime")
     overlay_digest = require_overlay_identity(layout, candidate)
+    require_build_identity(layout, candidate)
     if candidate.get("audit", {}).get("status") != "complete":
         fail("staged candidate has no complete bundle audit; run stage-runtime")
     app = validate_app_path(candidate.get("app", ""), layout, "staged candidate", built=True)
@@ -3658,6 +3750,7 @@ def package_bundle(layout: WorkLayout) -> dict[str, Any]:
         "app": str(app),
         "fingerprint": fingerprint,
         "local_overlay_sha256": overlay_digest,
+        "build_identity": candidate.get("build_identity"),
         "archive": str(archive),
         "sha256": digest,
         "size": archive.stat().st_size,
@@ -3901,6 +3994,7 @@ def test_staged(layout: WorkLayout, supplied_app: Optional[str], headed_referenc
         if candidate_record.get("status") != "complete":
             fail("staged candidate is not complete; run stage-runtime")
         require_overlay_identity(layout, candidate_record)
+        require_build_identity(layout, candidate_record)
         app = validate_app_path(candidate_record["app"], layout, "staged candidate", built=True)
         input_kind = "candidate"
     environment = isolated_environment(layout, network="loopback")
@@ -3912,6 +4006,7 @@ def test_staged(layout: WorkLayout, supplied_app: Optional[str], headed_referenc
         "network": "loopback",
         "input": input_kind,
         "local_overlay_sha256": candidate_record.get("local_overlay_sha256") if candidate_record else None,
+        "build_identity": candidate_record.get("build_identity") if candidate_record else None,
         "app": str(app),
         "acceptance_scope": acceptance_scope,
     }
