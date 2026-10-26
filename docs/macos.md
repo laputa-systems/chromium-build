@@ -11,6 +11,13 @@ Downloads, tools, cache stores, source, build output, profiles, logs, and
 packages stay there. The backend does not install host packages or modify
 `/Applications`, Xcode, keychains, or sibling checkouts.
 
+Sealed phases (`prepare`, `configure`, `build`, `stage-runtime`, `package`) run
+under `/usr/bin/sandbox-exec -p '(version 1)(allow default)(deny network*)'`;
+`test-staged` and its harnesses use the loopback profile, which additionally
+allows localhost and unix-sockets. `NETWORK_MODE` is derived from the wrapper
+actually applied (`none`, `loopback`, or `fetch`); if the wrapper cannot start,
+the phase fails.
+
 ## Phases
 
 `update-lock --latest` is a maintainer action for selecting new inputs. Normal

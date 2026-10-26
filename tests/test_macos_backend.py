@@ -362,6 +362,91 @@ class MacOSBackendTests(unittest.TestCase):
         self.assertEqual(harness["status"], "complete")
         self.assertNotIn("deno", harness)
 
+    def test_sealed_profile_blocks_loopback(self):
+        import http.server
+        import threading
+        import urllib.request
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"ok")
+
+            def log_message(self, *args):
+                pass
+
+        server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+        port = server.server_address[1]
+        thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True)
+        thread.start()
+        try:
+            layout = backend.WorkLayout(self.root, self.repo)
+            layout.ensure()
+            sealed_env = backend.isolated_environment(layout, network="none")
+            self.assertEqual(sealed_env["NETWORK_MODE"], "none")
+            with self.assertRaises(Exception):
+                backend.command_output(
+                    ["python3", "-c", f"import urllib.request; urllib.request.urlopen('http://127.0.0.1:{port}/', timeout=5).read()"],
+                    env=sealed_env,
+                    timeout=15,
+                )
+        finally:
+            server.shutdown()
+            server.server_close()
+
+    def test_loopback_profile_allows_loopback(self):
+        import http.server
+        import threading
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"ok")
+
+            def log_message(self, *args):
+                pass
+
+        server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+        port = server.server_address[1]
+        thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True)
+        thread.start()
+        try:
+            layout = backend.WorkLayout(self.root, self.repo)
+            layout.ensure()
+            loop_env = backend.isolated_environment(layout, network="loopback")
+            self.assertEqual(loop_env["NETWORK_MODE"], "loopback")
+            result = backend.command_output(
+                ["python3", "-c", f"import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:{port}/', timeout=5).read().decode())"],
+                env=loop_env,
+                timeout=15,
+            )
+            self.assertIn("ok", result.stdout)
+        finally:
+            server.shutdown()
+            server.server_close()
+
+    def test_both_profiles_block_non_loopback(self):
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        for mode in ("none", "loopback"):
+            env = backend.isolated_environment(layout, network=mode)
+            with self.assertRaises(backend.MacOSFailure, msg=mode):
+                backend.command_output(
+                    ["python3", "-c", "import socket; socket.create_connection(('192.0.2.1', 80), timeout=3)"],
+                    env=env,
+                    timeout=15,
+                )
+
+    def test_phase_recording_network_none_without_wrapper_fails(self):
+        with self.assertRaisesRegex(backend.MacOSFailure, "wrapper|NETWORK_MODE|sandbox"):
+            backend.require_sandboxed_environment({}, expected="none")
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        sealed_env = backend.isolated_environment(layout, network="none")
+        backend.require_sandboxed_environment(sealed_env, expected="none")
+
     def test_xcode_identity_rejects_a_present_but_uninstalled_metal_toolchain(self):
         def result(stdout="", stderr="", returncode=0):
             return mock.Mock(stdout=stdout, stderr=stderr, returncode=returncode)

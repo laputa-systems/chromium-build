@@ -43,6 +43,12 @@ FULL_BUILD_MIN_FREE_GB = 80
 POST_FETCH_MIN_FREE_GB = 40
 RUST_TOOLCHAIN = "nightly-2026-09-15"
 DEFAULT_PROFILE = "macos-release"
+SANDBOX_EXECUTABLE = Path("/usr/bin/sandbox-exec")
+SANDBOX_SEALED_PROFILE = "(version 1)(allow default)(deny network*)"
+SANDBOX_LOOPBACK_PROFILE = (
+    "(version 1)(allow default)(deny network*)"
+    "(allow network* (remote ip \"localhost:*\"))(allow network* (remote unix-socket))"
+)
 LOCK_RELATIVE = Path("config/macos.inputs.lock")
 OWNERSHIP_SCHEMA = 1
 VERSION_RE = re.compile(r"(?<!\d)(\d+)\.(\d+)(?:\.(\d+))?(?:\.(\d+))?(?!\d)")
@@ -296,9 +302,12 @@ def command_output(
     timeout: Optional[float] = None,
     check: bool = True,
 ) -> subprocess.CompletedProcess[str]:
+    effective = list(command)
+    if env is not None:
+        effective = sandbox_prefix_for_env(env) + effective
     try:
         result = subprocess.run(
-            list(command),
+            effective,
             cwd=str(cwd) if cwd else None,
             env=dict(env) if env else None,
             check=False,
@@ -324,12 +333,13 @@ def stream_command(
     log_path: Path,
     timeout: Optional[float] = None,
 ) -> None:
+    effective = sandbox_prefix_for_env(env) + list(command)
     log_path.parent.mkdir(parents=True, exist_ok=True)
     started = time.monotonic()
     try:
         with log_path.open("w", encoding="utf-8") as log:
             process = subprocess.Popen(
-                list(command),
+                effective,
                 cwd=str(cwd) if cwd else None,
                 env=dict(env),
                 stdout=subprocess.PIPE,
@@ -455,6 +465,36 @@ def work_lock(layout: WorkLayout) -> Iterator[None]:
             fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
 
 
+def sandbox_profile_for_network(network: str) -> Optional[str]:
+    if network == "none":
+        return SANDBOX_SEALED_PROFILE
+    if network == "loopback":
+        return SANDBOX_LOOPBACK_PROFILE
+    if network == "fetch":
+        return None
+    fail(f"unknown network mode for sandbox wrapper: {network}")
+
+
+def sandbox_prefix_for_env(environment: Mapping[str, str]) -> list[str]:
+    profile = environment.get("CHROMIUM_SANDBOX_PROFILE")
+    if not profile:
+        return []
+    if not SANDBOX_EXECUTABLE.is_file() or not os.access(SANDBOX_EXECUTABLE, os.X_OK):
+        fail("sandbox-exec wrapper cannot start; phase fails")
+    return [str(SANDBOX_EXECUTABLE), "-p", profile]
+
+
+def require_sandboxed_environment(environment: Mapping[str, str], expected: str = "none") -> None:
+    profile = environment.get("CHROMIUM_SANDBOX_PROFILE")
+    mode = environment.get("NETWORK_MODE")
+    if not profile or mode != expected:
+        fail(f"phase records network={expected} without the sandbox wrapper; NETWORK_MODE={mode}")
+    if expected == "none" and profile != SANDBOX_SEALED_PROFILE:
+        fail("sealed phase does not use the sealed sandbox profile")
+    if expected == "loopback" and profile != SANDBOX_LOOPBACK_PROFILE:
+        fail("loopback phase does not use the loopback sandbox profile")
+
+
 def isolated_environment(
     layout: WorkLayout,
     *,
@@ -465,6 +505,12 @@ def isolated_environment(
 ) -> dict[str, str]:
     """Build the child environment before invoking any project tool."""
 
+    if network not in ("none", "loopback", "fetch"):
+        fail(f"unknown network mode for sandbox wrapper: {network}")
+    profile = sandbox_profile_for_network(network)
+    if profile is not None:
+        if not SANDBOX_EXECUTABLE.is_file() or not os.access(SANDBOX_EXECUTABLE, os.X_OK):
+            fail("sandbox-exec wrapper cannot start; phase fails")
     layout.ensure()
     environment = dict(os.environ)
     environment["DEVELOPER_DIR"] = environment.get("DEVELOPER_DIR") or (
@@ -521,6 +567,7 @@ def isolated_environment(
             "VPYTHON_BYPASS": "0",
             "PYTHONNOUSERSITE": "1",
             "NETWORK_MODE": network,
+            "CHROMIUM_SANDBOX_MODE": network,
             "CHROMIUM_BUILD_ROOT": str(layout.repo_root),
             "CHROMIUM_WORK_ROOT": str(layout.root),
             "CHROMIUM_METADATA_ROOT": str(layout.metadata),
@@ -532,6 +579,10 @@ def isolated_environment(
             "CHROMIUM_COMPILER_CACHE_ROOT": str(layout.cache / "compiler"),
         }
     )
+    if profile is not None:
+        environment["CHROMIUM_SANDBOX_PROFILE"] = profile
+    else:
+        environment.pop("CHROMIUM_SANDBOX_PROFILE", None)
     selected_path = [str(layout.tools / "bin"), str(layout.tools / "depot_tools")]
     if llvm_root:
         selected_path.append(str(llvm_root / "bin"))
@@ -3714,7 +3765,7 @@ def require_acceptance_execution(log_path: Path) -> None:
 
 
 def run_shadowdriver_harness(layout: WorkLayout, lock: Mapping[str, Any], app: Path, *, headless_only: bool = False) -> dict[str, Any]:
-    environment = isolated_environment(layout, network="none")
+    environment = isolated_environment(layout, network="loopback")
     extension = prepare_extension(layout, lock)
     manifest, test_source = shadowdriver_acceptance_target(layout)
     cargo = cargo_executable(environment)
@@ -3767,7 +3818,7 @@ def run_shadowdriver_harness(layout: WorkLayout, lock: Mapping[str, Any], app: P
     return {
         "test_identity": test_identity,
         "status": "complete",
-        "network": "none",
+        "network": "loopback",
         "command": command,
         "manifest": str(manifest),
         "test_source": str(test_source),
@@ -3783,7 +3834,7 @@ def run_shadowdriver_harness(layout: WorkLayout, lock: Mapping[str, Any], app: P
 def run_native_stealth_harness(layout: WorkLayout, app: Path, headed_reference: Optional[Path] = None) -> dict[str, Any]:
     manifest, _ = shadowdriver_acceptance_target(layout)
     root = manifest.parent
-    environment = isolated_environment(layout, network="none")
+    environment = isolated_environment(layout, network="loopback")
     toolchain = node_toolchain(environment)
     report_path = root / ".work" / "tmp" / f"native-stealth-{time.time_ns()}.json"
     report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -3852,13 +3903,13 @@ def test_staged(layout: WorkLayout, supplied_app: Optional[str], headed_referenc
         require_overlay_identity(layout, candidate_record)
         app = validate_app_path(candidate_record["app"], layout, "staged candidate", built=True)
         input_kind = "candidate"
-    environment = isolated_environment(layout, network="none")
+    environment = isolated_environment(layout, network="loopback")
     reference = canonical_path(headed_reference, "headed reference", must_exist=True) if headed_reference else None
     acceptance_scope = "headless-with-historical-headed-reference" if reference else "headed-and-headless"
     report: dict[str, Any] = {
         "schema": 1,
         "status": "failed",
-        "network": "none",
+        "network": "loopback",
         "input": input_kind,
         "local_overlay_sha256": candidate_record.get("local_overlay_sha256") if candidate_record else None,
         "app": str(app),
