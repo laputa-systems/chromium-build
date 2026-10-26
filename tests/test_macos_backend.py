@@ -797,7 +797,7 @@ class MacOSBackendTests(unittest.TestCase):
         self.assertEqual(report["acceptance"], "skipped")
         self.assertNotIn("Chromium-1.2.3.4-macos-arm64.zip", report["archive"])
 
-    def _write_macho(self, path, *, pie=True, minos=(11, 0, 0), commands=None):
+    def _write_macho(self, path, *, pie=True, minos=(11, 0, 0), commands=None, filetype=2):
         import struct
         if commands is None:
             commands = []
@@ -814,7 +814,7 @@ class MacOSBackendTests(unittest.TestCase):
         body_all = prefix + payload
         ncmds = (1 if prefix else 0) + len(commands)
         flags = backend.MH_PIE_FLAG if pie else 0
-        header = struct.pack("<8I", backend.MH_MAGIC_64, backend.CPU_TYPE_ARM64, 0, 2, ncmds, len(body_all), flags, 0)
+        header = struct.pack("<8I", backend.MH_MAGIC_64, backend.CPU_TYPE_ARM64, 0, filetype, ncmds, len(body_all), flags, 0)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(header + body_all)
 
@@ -1034,6 +1034,19 @@ class MacOSBackendTests(unittest.TestCase):
             def fake(command, **kwargs):
                 return mock.Mock(returncode=0, stdout="", stderr="")
             run.side_effect = fake
+            with mock.patch.object(backend, "xcode_identity", return_value={"xcode": "Xcode 27.0", "sdk": "27.0", "clang": "/c", "clangxx": "/c++", "linker": "/l", "clang_version": "1", "metal": "/m", "metal_version": "1"}):
+                report = backend.audit_bundle(app, layout, {})
+        self.assertEqual(report["status"], "complete")
+
+    def test_audit_allows_dylib_without_pie(self):
+        layout = backend.WorkLayout(self.root, self.repo)
+        layout.ensure()
+        app = self._minimal_app()
+        dylib = app / "Contents" / "MacOS" / "libtest.dylib"
+        self._write_macho(dylib, pie=False, filetype=backend.MH_DYLIB)
+        with mock.patch.object(backend, "command_output") as run, \
+             mock.patch.object(backend, "macho_architectures", side_effect=lambda p, e: ["arm64"] if "MacOS" in str(p) else None):
+            run.side_effect = lambda command, **kwargs: mock.Mock(returncode=0, stdout="", stderr="")
             with mock.patch.object(backend, "xcode_identity", return_value={"xcode": "Xcode 27.0", "sdk": "27.0", "clang": "/c", "clangxx": "/c++", "linker": "/l", "clang_version": "1", "metal": "/m", "metal_version": "1"}):
                 report = backend.audit_bundle(app, layout, {})
         self.assertEqual(report["status"], "complete")

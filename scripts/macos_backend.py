@@ -51,6 +51,9 @@ SANDBOX_LOOPBACK_PROFILE = (
 )
 MH_MAGIC_64 = 0xFEEDFACF
 MH_PIE_FLAG = 0x200000
+MH_EXECUTE = 0x2
+MH_DYLIB = 0x6
+MH_BUNDLE = 0x8
 CPU_TYPE_ARM64 = 0x0100000C
 LC_REQ_DYLD = 0x80000000
 LC_SEGMENT_64 = 0x19
@@ -3465,7 +3468,7 @@ def parse_macho_header(path: Path) -> Optional[dict[str, Any]]:
     if len(data) < 32:
         return None
     import struct
-    magic, cputype, _, _, ncmds, _, flags, _ = struct.unpack_from("<8I", data, 0)
+    magic, cputype, _, filetype, ncmds, _, flags, _ = struct.unpack_from("<8I", data, 0)
     if magic != MH_MAGIC_64 or cputype != CPU_TYPE_ARM64:
         return None
     commands: list[tuple[int, int]] = []
@@ -3487,7 +3490,7 @@ def parse_macho_header(path: Path) -> Optional[dict[str, Any]]:
             if minos is None:
                 minos = candidate
         offset += cmdsize
-    return {"flags": flags, "ncmds": ncmds, "commands": commands, "minos": minos}
+    return {"flags": flags, "filetype": filetype, "ncmds": ncmds, "commands": commands, "minos": minos}
 
 
 def macho_has_pie(path: Path) -> bool:
@@ -3614,7 +3617,10 @@ def audit_bundle(app: Path, layout: WorkLayout, environment: Mapping[str, str]) 
     minoses: dict[str, str] = {}
     for relative in mach_o:
         candidate = app / relative
-        if not macho_has_pie(candidate):
+        header = parse_macho_header(candidate)
+        if header is None:
+            fail(f"cannot parse Mach-O header: {candidate}")
+        if header["filetype"] == MH_EXECUTE and not (header["flags"] & MH_PIE_FLAG):
             fail(f"bundle Mach-O lacks MH_PIE: {candidate}")
         command_types = macho_load_command_types(candidate)
         inadmissible = sorted(
