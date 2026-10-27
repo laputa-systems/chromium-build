@@ -38,8 +38,6 @@ import zipfile
 
 
 MIN_MACOS = (26, 0, 0)
-MIN_LLVM = (23, 1, 0)
-PREFERRED_LLVM = (23, 1, 1)
 FULL_BUILD_MIN_FREE_GB = 80
 POST_FETCH_MIN_FREE_GB = 40
 RUST_TOOLCHAIN = "nightly-2026-09-15"
@@ -751,33 +749,6 @@ def translated_execution(environment: Mapping[str, str]) -> bool:
         return True
     arch = command_output(["arch"], env=environment, check=False)
     return arch.returncode == 0 and arch.stdout.strip() not in {"arm64", "aarch64"}
-
-
-def brew_candidates(environment: Mapping[str, str]) -> list[Path]:
-    candidates: list[Path] = []
-    brew = command_path("brew", environment)
-    if brew:
-        for formula in ("llvm", "llvm@23"):
-            result = command_output([brew, "--prefix", formula], env=environment, check=False)
-            if result.returncode == 0 and result.stdout.strip():
-                candidates.append(Path(result.stdout.strip()))
-    candidates.extend(
-        Path(item)
-        for item in (
-            "/opt/homebrew/opt/llvm",
-            "/opt/homebrew/opt/llvm@23",
-            "/usr/local/opt/llvm",
-            "/usr/local/opt/llvm@23",
-        )
-    )
-    unique: list[Path] = []
-    seen: set[str] = set()
-    for candidate in candidates:
-        resolved = candidate.resolve(strict=False)
-        if str(resolved) not in seen:
-            seen.add(str(resolved))
-            unique.append(resolved)
-    return unique
 
 
 def llvm_candidate(root: Path, environment: Mapping[str, str], source: str) -> Optional[dict[str, Any]]:
@@ -2890,6 +2861,7 @@ def prepare_source(layout: WorkLayout) -> dict[str, Any]:
     if not layout.source.is_dir():
         fail(f"source acquisition has not completed: {layout.source}; run fetch")
     environment = isolated_environment(layout, network="none")
+    require_sandboxed_environment(environment)
     prepare_marker = layout.metadata / "prepare-macos.json"
     identity = {
         "lock": {
@@ -3071,6 +3043,7 @@ def configure_source(layout: WorkLayout) -> dict[str, Any]:
     overlay_digest = require_overlay_identity(layout, prepare)
     source = layout.source
     environment = isolated_environment(layout, network="none")
+    require_sandboxed_environment(environment)
     post_fetch_minimum = int(
         os.environ.get("MACOS_POST_FETCH_MIN_FREE_GB", str(POST_FETCH_MIN_FREE_GB))
     )
@@ -3254,6 +3227,7 @@ def build_source(layout: WorkLayout, jobs: Optional[str]) -> dict[str, Any]:
         llvm_root=Path(configure["llvm"]["root"]),
         compiler_cache=cache_mode,
     )
+    require_sandboxed_environment(environment)
     actual_cache = compiler_cache_report(environment)
     if configured_cache.get("status") == "enabled" and actual_cache.get("path") != configured_cache.get("path"):
         fail(
@@ -3484,7 +3458,7 @@ def parse_macho_header(path: Path) -> Optional[dict[str, Any]]:
             return None
         commands.append((cmd, cmdsize))
         if cmd == LC_BUILD_VERSION and cmdsize >= 24:
-            _, _, min_raw, _ = struct.unpack_from("<4I", data, offset + 8)
+            _, min_raw, _, _ = struct.unpack_from("<4I", data, offset + 8)
             minos = ((min_raw >> 16) & 0xFF, (min_raw >> 8) & 0xFF, min_raw & 0xFF)
         elif cmd == LC_VERSION_MIN_MACOSX and cmdsize >= 16:
             ver_raw, _ = struct.unpack_from("<2I", data, offset + 8)
@@ -3522,6 +3496,9 @@ def codesign_entitlements(path: Path, environment: Mapping[str, str]) -> str:
         env=environment,
         check=False,
     )
+    if result.returncode:
+        detail = (result.stderr or result.stdout or "").strip()
+        fail(f"cannot read entitlements for {path}: {detail[-500:]}")
     return (result.stdout or result.stderr or "").strip()
 
 
@@ -3810,6 +3787,7 @@ def stage_runtime(layout: WorkLayout) -> dict[str, Any]:
     require_build_identity(layout, build)
     source_app = validate_app_path(build.get("app", layout.output / "Chromium.app"), layout, "built Chromium.app", built=True)
     environment = isolated_environment(layout, network="none")
+    require_sandboxed_environment(environment)
     source_audit = audit_bundle(source_app, layout, environment, require_signatures=False)
     pending = layout.candidates / f".pending-{os.getpid()}-{time.time_ns()}" / "Chromium.app"
     pending.parent.mkdir(parents=True, exist_ok=False)
@@ -3868,6 +3846,9 @@ def package_bundle(layout: WorkLayout) -> dict[str, Any]:
             "staged candidate fingerprint changed: "
             f"expected {candidate.get('fingerprint')}, got {fingerprint}"
         )
+    environment = isolated_environment(layout, network="none")
+    require_sandboxed_environment(environment)
+    audit_bundle(app, layout, environment)
     lock = load_lock(layout)
     version = str(lock["chromium"]["version"])
     release = layout.release
@@ -3894,7 +3875,6 @@ def package_bundle(layout: WorkLayout) -> dict[str, Any]:
         archive = release / f"Chromium-{version}-macos-arm64.zip"
         acceptance_status = "local-stage-only"
     temporary = release / f".{archive.name}.tmp-{os.getpid()}-{time.time_ns()}"
-    environment = isolated_environment(layout, network="none")
     ditto = Path("/usr/bin/ditto")
     if not ditto.is_file():
         fail("macOS packaging requires /usr/bin/ditto")
@@ -3963,6 +3943,8 @@ def build_release_manifest(layout: WorkLayout, lock: Mapping[str, Any], candidat
             source_clean = dirty.returncode == 0 and not dirty.stdout.strip()
     except MacOSFailure:
         pass
+    if not source_commit:
+        fail("cannot determine the source commit for the release manifest")
     build_identity = candidate.get("build_identity") or {}
     test_staged_path = layout.metadata / "test-staged-macos.json"
     acceptance_scope: Any = None
@@ -4067,6 +4049,11 @@ def verify_release_bundle(layout: WorkLayout) -> dict[str, Any]:
         fail(f"release archive is missing: {archive}")
     if sha256(archive) != report.get("sha256") or sha256(archive) != manifest.get("archive_sha256"):
         fail("release archive digest mismatch; refusing to verify")
+    lock = load_lock(layout)
+    if sha256(layout.repo_root / LOCK_RELATIVE) != manifest.get("lock_sha256"):
+        fail("release manifest lock digest mismatch; refusing to verify")
+    if local_overlay_identity(layout)["sha256"] != manifest.get("overlay_sha256"):
+        fail("release manifest overlay digest mismatch; refusing to verify")
     verify_root = layout.root / "verify"
     verify_root.mkdir(parents=True, exist_ok=True)
     destination_parent = verify_root / f"extract-{os.getpid()}-{time.time_ns()}"
@@ -4096,6 +4083,8 @@ def verify_release_bundle(layout: WorkLayout) -> dict[str, Any]:
         if verification.returncode:
             detail = (verification.stderr or verification.stdout or "").strip()
             fail(f"extracted bundle failed signature verification: {detail[-1200:]}")
+        if bundle_fingerprint(extracted) != manifest.get("payload_sha256"):
+            fail("extracted bundle payload digest mismatch; refusing to verify")
         audit_bundle(extracted, layout, environment)
         plist = extracted / "Contents" / "Info.plist"
         lock = load_lock(layout)
