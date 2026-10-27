@@ -1,6 +1,6 @@
 # chromium-build
 
-Builds ungoogled Chromium through a containerized Linux musl backend and a
+Builds ungoogled Chromium through an amd64-only Linux musl backend and a
 native macOS arm64 backend. `./chromium-build`, the input locks, profiles,
 patch inventories, and phase reports define current behavior.
 
@@ -18,8 +18,8 @@ patch inventories, and phase reports define current behavior.
 
 ## Guides
 
-- Linux musl builds, profiles, gates, packaging, and installation:
-  [Linux](docs/linux.md).
+- Linux musl builds (amd64-only; Linux/arm64 is out of scope), profiles,
+  gates, packaging, and installation: [Linux](docs/linux.md).
 - Native macOS builds, cache selection, staged acceptance, and packaging:
   [macOS](docs/macos.md).
 - macOS compiler cache selector: `MACOS_COMPILER_CACHE=off|ccache|sccache|auto`;
@@ -28,7 +28,7 @@ patch inventories, and phase reports define current behavior.
   [Gate F oracle](docs/gate-f-oracle.md).
 
 The Makefile contains command shortcuts. `config/inputs.lock`,
-`config/macos.inputs.lock`, the architecture package locks, and the profile
+`config/packages.amd64.lock`, `config/macos.inputs.lock`, and the profile
 files are authoritative for pinned inputs.
 
 ## Commands
