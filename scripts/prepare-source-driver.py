@@ -3,15 +3,21 @@
 
 from __future__ import annotations
 
-import os
 import json
-from pathlib import Path
+import os
 import shutil
 import tarfile
 import tempfile
+from pathlib import Path
 
-from script_support import ScriptFailure, atomic_write, fail_main, require_file, require_network, run
-
+from script_support import (
+    ScriptFailure,
+    atomic_write,
+    fail_main,
+    require_file,
+    require_network,
+    run,
+)
 
 LOCAL_PATCHES = (
     "gate-e-hermetic-smoke.patch",

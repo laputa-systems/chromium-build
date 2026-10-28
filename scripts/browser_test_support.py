@@ -5,7 +5,6 @@ import fcntl
 import hashlib
 import json
 import os
-from pathlib import Path
 import select
 import signal
 import socket
@@ -13,6 +12,7 @@ import subprocess
 import tempfile
 import time
 import urllib.parse
+from pathlib import Path
 
 
 class CdpError(RuntimeError):
@@ -74,7 +74,7 @@ class WebSocket:
                 raise TimeoutError("timed out reading WebSocket handshake")
             try:
                 chunk = self.sock.recv(4096)
-            except socket.timeout:
+            except TimeoutError:
                 continue
             if not chunk:
                 raise CdpError("CDP socket closed during WebSocket handshake")
@@ -86,7 +86,7 @@ class WebSocket:
         while len(self.buffer) < count:
             try:
                 chunk = self.sock.recv(4096)
-            except socket.timeout:
+            except TimeoutError:
                 raise TimeoutError("timed out reading CDP WebSocket")
             if not chunk:
                 raise CdpError("Chrome closed the CDP socket")
@@ -553,9 +553,9 @@ def launch_chromium(binary, profile_dir, args, log_path, *, pipe=False):
                 except OSError:
                     pass
     try:
-        setattr(process, "_chromium_process_group", os.getpgid(process.pid))
+        process._chromium_process_group = os.getpgid(process.pid)
     except OSError:
-        setattr(process, "_chromium_process_group", None)
+        process._chromium_process_group = None
     log.close()
     if pipe_transport is not None:
         return process, CdpConnection(pipe_transport)

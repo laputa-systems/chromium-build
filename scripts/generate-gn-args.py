@@ -7,7 +7,6 @@ import os
 import re
 from pathlib import Path
 
-
 OPTIONAL_ARGS = ("devtools_skip_typecheck", "devtools_bundle")
 
 

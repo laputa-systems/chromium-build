@@ -8,7 +8,6 @@ import re
 import sys
 from pathlib import Path
 
-
 COMPILER = re.compile(r"(?:^|[\s\"])/opt/chromium-llvm/bin/clang(?:\+\+)?(?=[\s\"]|$)")
 ARCHIVE = re.compile(r"(?:^|[\s\"])/opt/chromium-llvm/bin/llvm-ar(?=[\s\"]|$)")
 RANLIB = re.compile(r"(?:^|[\s\"])/opt/chromium-llvm/bin/llvm-ranlib(?=[\s\"]|$)")

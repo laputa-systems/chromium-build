@@ -6,17 +6,16 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-from pathlib import Path
 import re
 import subprocess
 import sys
-from typing import Any, Mapping
-
+from collections.abc import Mapping
+from pathlib import Path
+from typing import Any
 
 SCRIPT_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_ROOT))
-import macos_backend  # noqa: E402
-
+import macos_backend
 
 VERSION_RE = re.compile(r"version\s+(\d+)\.(\d+)(?:\.(\d+))?")
 SHA512_RE = re.compile(r"[0-9a-f]{128}")

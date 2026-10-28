@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Policy checks for the macOS release workflow file."""
 
-from pathlib import Path
 import re
 import unittest
-
+from pathlib import Path
 
 WORKFLOW = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "macos-26-smoke.yml"
 

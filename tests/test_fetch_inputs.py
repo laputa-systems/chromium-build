@@ -1,11 +1,10 @@
 """Permissions for verified inputs consumed by the unprivileged browser tests."""
 
 import hashlib
-from pathlib import Path
 import runpy
 import tempfile
 import unittest
-
+from pathlib import Path
 
 FETCH_ONE = runpy.run_path(
     str(Path(__file__).resolve().parents[1] / "scripts/fetch-inputs.py")

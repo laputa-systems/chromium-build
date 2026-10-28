@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import argparse
 import os
-from pathlib import Path
 import subprocess
+from pathlib import Path
 
 from script_support import ScriptFailure, command_path, fail_main
 

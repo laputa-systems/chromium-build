@@ -5,14 +5,13 @@ import base64
 import hashlib
 import json
 import os
-from pathlib import Path
 import stat
 import sys
 import tempfile
 import time
 import unittest
+from pathlib import Path
 from unittest import mock
-
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
@@ -111,9 +110,9 @@ class BrowserTestSupportTests(unittest.TestCase):
             support.WebSocket("ws://127.0.0.1:9222/devtools/page/1")
 
         invalid = HandshakeSocket(valid=False)
-        with mock.patch.object(support.socket, "create_connection", return_value=invalid):
-            with self.assertRaisesRegex(support.CdpError, "Sec-WebSocket-Accept"):
-                support.WebSocket("ws://127.0.0.1:9222/devtools/page/1")
+        with mock.patch.object(support.socket, "create_connection", return_value=invalid), \
+             self.assertRaisesRegex(support.CdpError, "Sec-WebSocket-Accept"):
+            support.WebSocket("ws://127.0.0.1:9222/devtools/page/1")
 
     def test_websocket_sends_masked_short_extended_and_large_frames(self):
         sock = FakeSocket()
@@ -165,9 +164,8 @@ class BrowserTestSupportTests(unittest.TestCase):
             websocket = object.__new__(support.WebSocket)
             websocket.sock = FakeSocket(frame)
             websocket.buffer = b""
-            with self.subTest(message=message):
-                with self.assertRaises(support.CdpError):
-                    websocket.receive()
+            with self.subTest(message=message), self.assertRaises(support.CdpError):
+                websocket.receive()
 
     def test_cdp_connection_preserves_events_and_reports_protocol_errors(self):
         transport = FakeTransport(

@@ -9,7 +9,6 @@ import shlex
 import sys
 from pathlib import Path
 
-
 TOOLCHAIN = "/opt/chromium-llvm"
 CCACHE = "/usr/bin/ccache"
 COMPILERS = {"clang", "clang++"}

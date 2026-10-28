@@ -6,7 +6,14 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from script_support import ScriptFailure, command_path, fail_main, require_directory, require_file, run
+from script_support import (
+    ScriptFailure,
+    command_path,
+    fail_main,
+    require_directory,
+    require_file,
+    run,
+)
 
 
 def main() -> None:

@@ -14,12 +14,18 @@ import sys
 import tempfile
 import threading
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
-import urllib.error
 from pathlib import Path
 
-from browser_test_support import CdpConnection, WebSocket, chromium_args, launch_chromium, terminate_process
+from browser_test_support import (
+    CdpConnection,
+    WebSocket,
+    chromium_args,
+    launch_chromium,
+    terminate_process,
+)
 
 
 def write_json(path, value):

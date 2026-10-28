@@ -2,16 +2,16 @@
 """Fetch and verify the locked source inputs."""
 
 import argparse
-from concurrent.futures import ThreadPoolExecutor
 import hashlib
-from http.client import HTTPMessage
 import json
 import os
 import tempfile
-from typing import IO
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
+from http.client import HTTPMessage
 from pathlib import Path
+from typing import IO
 from urllib.request import Request
 
 from script_support import fail_main, require_file, require_network

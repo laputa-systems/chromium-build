@@ -7,7 +7,6 @@ import hashlib
 import http.server
 import json
 import os
-from pathlib import Path
 import shutil
 import socket
 import ssl
@@ -20,6 +19,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import zipfile
+from pathlib import Path
 
 from browser_test_support import (
     CdpConnection,
@@ -30,7 +30,6 @@ from browser_test_support import (
     temporary_profile,
     terminate_process,
 )
-
 
 UBLOCK_SHA512 = "ce98b58145bc1263ca919e9e329b2b402257d8b8eef325ec2b83392812f69ed62aba41866a3a7daecc166f2b5a18392467e9aae5af9d208b51cf1b02cc20d121"
 DOWNLOAD_BYTES = b"hermetic-download-ok\n"

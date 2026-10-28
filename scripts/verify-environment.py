@@ -6,9 +6,9 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from pathlib import Path
 import platform
 import tempfile
+from pathlib import Path
 
 from script_support import ScriptFailure, atomic_write, fail_main, require_file, run
 

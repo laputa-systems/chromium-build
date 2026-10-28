@@ -9,7 +9,14 @@ import json
 import os
 from pathlib import Path
 
-from script_support import atomic_json, command_path, fail_main, require_file, run, ScriptFailure
+from script_support import (
+    ScriptFailure,
+    atomic_json,
+    command_path,
+    fail_main,
+    require_file,
+    run,
+)
 
 
 def main() -> None:

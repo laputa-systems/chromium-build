@@ -25,7 +25,7 @@ def digest(path):
 def subset(expected, actual, path="lock"):
     if isinstance(expected, dict):
         if not isinstance(actual, dict):
-            raise ValueError(f"{path}: expected object")
+            raise TypeError(f"{path}: expected object")
         for key, value in expected.items():
             if key not in actual:
                 raise ValueError(f"{path}.{key}: missing")
@@ -73,7 +73,7 @@ def environment(lock_path, metadata_path, architecture):
     }
     try:
         subset(expected, metadata)
-    except ValueError as error:
+    except (ValueError, TypeError) as error:
         raise SystemExit(str(error)) from error
 
 

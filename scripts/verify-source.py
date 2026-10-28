@@ -8,8 +8,6 @@ import re
 import sys
 from pathlib import Path
 
-
-
 VERSION_RE = re.compile(r"^(MAJOR|MINOR|BUILD|PATCH)=(\d+)\s*$", re.MULTILINE)
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 STATES = {"apply", "superseded", "not-applicable"}
@@ -188,7 +186,7 @@ def unbundle_checks(args):
                 if ".git" in root_path.parts or "out" in root_path.parts:
                     continue
                 for filename in files:
-                    if not (filename.endswith(".gn") or filename.endswith(".gni")):
+                    if not filename.endswith((".gn", ".gni")):
                         continue
                     path = root_path / filename
                     if needle in path.read_text(encoding="utf-8", errors="replace"):

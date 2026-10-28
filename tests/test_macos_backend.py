@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
 """Focused tests for the native macOS path and its ownership boundary."""
 
-from pathlib import Path
 import hashlib
 import io
 import os
 import shutil
+import sys
 import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
-
-
-import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
@@ -204,9 +202,9 @@ class MacOSBackendTests(unittest.TestCase):
         wrapper.chmod(0o755)
         version = mock.Mock(returncode=0, stdout="ccache version 4.14\n", stderr="")
 
-        with mock.patch.object(backend, "command_output", return_value=version):
-            with self.assertRaisesRegex(backend.MacOSFailure, "compiler cache directory escapes"):
-                backend.isolated_environment(layout, compiler_cache="ccache")
+        with mock.patch.object(backend, "command_output", return_value=version), \
+             self.assertRaisesRegex(backend.MacOSFailure, "compiler cache directory escapes"):
+            backend.isolated_environment(layout, compiler_cache="ccache")
 
         self.assertFalse((escaped / "ccache").exists())
 
@@ -325,7 +323,6 @@ class MacOSBackendTests(unittest.TestCase):
         (layout.logs / "native-stealth-acceptance.log").write_text(
             "Test Files  1 passed (1)\nTests  1 passed (1)\n", encoding="utf-8"
         )
-        report_path = self.repo.parent / "shadowdriver" / ".work" / "tmp" / "probe.json"
         fake_manifest = self.repo.parent / "shadowdriver" / "Cargo.toml"
         with mock.patch.object(backend, "isolated_environment", return_value={}), \
              mock.patch.object(backend, "load_lock", return_value={}), \
@@ -372,7 +369,6 @@ class MacOSBackendTests(unittest.TestCase):
     def test_sealed_profile_blocks_loopback(self):
         import http.server
         import threading
-        import urllib.request
 
         class Handler(http.server.BaseHTTPRequestHandler):
             def do_GET(self):
@@ -392,7 +388,7 @@ class MacOSBackendTests(unittest.TestCase):
             layout.ensure()
             sealed_env = backend.isolated_environment(layout, network="none")
             self.assertEqual(sealed_env["NETWORK_MODE"], "none")
-            with self.assertRaises(Exception):
+            with self.assertRaises(backend.MacOSFailure):
                 backend.command_output(
                     ["python3", "-c", f"import urllib.request; urllib.request.urlopen('http://127.0.0.1:{port}/', timeout=5).read()"],
                     env=sealed_env,
@@ -479,18 +475,18 @@ class MacOSBackendTests(unittest.TestCase):
         child = mock.Mock()
         child.poll.return_value = 1
         with mock.patch.object(backend.subprocess, "Popen", return_value=child), \
-             mock.patch.object(backend.time, "sleep", return_value=None):
-            with self.assertRaisesRegex(backend.MacOSFailure, "exited before serving"):
-                backend.prewarm_extension_profile(layout, app, self.root / "ext", self.root / "p", {})
+             mock.patch.object(backend.time, "sleep", return_value=None), \
+             self.assertRaisesRegex(backend.MacOSFailure, "exited before serving"):
+            backend.prewarm_extension_profile(layout, app, self.root / "ext", self.root / "p", {})
 
     def test_sealed_entry_rejects_unwrapped_environment(self):
         layout = backend.WorkLayout(self.root, self.repo)
         layout.ensure()
         layout.source.mkdir(parents=True, exist_ok=True)
         with mock.patch.object(backend, "load_lock", return_value={"chromium": {"version": "1.2.3.4"}}), \
-             mock.patch.object(backend, "isolated_environment", return_value={}):
-            with self.assertRaisesRegex(backend.MacOSFailure, "wrapper"):
-                backend.prepare_source(layout)
+             mock.patch.object(backend, "isolated_environment", return_value={}), \
+             self.assertRaisesRegex(backend.MacOSFailure, "wrapper"):
+            backend.prepare_source(layout)
 
     def test_loopback_profile_allows_bind_sealed_denies_it(self):
         layout = backend.WorkLayout(self.root, self.repo)
@@ -599,9 +595,9 @@ class MacOSBackendTests(unittest.TestCase):
             result(stdout="/usr/bin/clang\n"),
             result(stderr=missing_metal, returncode=1),
         ]
-        with mock.patch.object(backend, "command_output", side_effect=responses):
-            with self.assertRaisesRegex(backend.MacOSFailure, "Metal Toolchain is unavailable"):
-                backend.xcode_identity({})
+        with mock.patch.object(backend, "command_output", side_effect=responses), \
+             self.assertRaisesRegex(backend.MacOSFailure, "Metal Toolchain is unavailable"):
+            backend.xcode_identity({})
 
     def test_llvm_candidate_requires_native_binutils(self):
         llvm = self.root / "llvm"
@@ -751,9 +747,9 @@ class MacOSBackendTests(unittest.TestCase):
         lock = {"chromium": {"version": "1.2.3.4", "commit": "c" * 40}, "ungoogled": {"commit": "u" * 40}}
         candidate = {"local_overlay_sha256": "o" * 64, "build_identity": {}, "signing": {"status": "ad-hoc"}}
         report = {"status": "complete", "fingerprint": "f" * 64}
-        with mock.patch.object(backend, "command_output", return_value=mock.Mock(returncode=1, stdout="", stderr="no repo")):
-            with self.assertRaisesRegex(backend.MacOSFailure, "source commit"):
-                backend.build_release_manifest(layout, lock, candidate, report, app, archive, "a" * 64, "local-stage-only")
+        with mock.patch.object(backend, "command_output", return_value=mock.Mock(returncode=1, stdout="", stderr="no repo")), \
+             self.assertRaisesRegex(backend.MacOSFailure, "source commit"):
+            backend.build_release_manifest(layout, lock, candidate, report, app, archive, "a" * 64, "local-stage-only")
 
     def test_package_reuses_audited_candidate_and_publishes_only_archive_assets(self):
         layout = backend.WorkLayout(self.root, self.repo)
@@ -822,9 +818,9 @@ class MacOSBackendTests(unittest.TestCase):
             with mock.patch.object(backend, "isolated_environment", return_value={}), \
                  mock.patch.object(backend, "require_build_identity", return_value="d1"), \
                  mock.patch.object(backend, "audit_bundle", return_value={"status": "complete"}), \
-                 mock.patch.object(backend, "require_sandboxed_environment", return_value=None):
-                with self.assertRaisesRegex(backend.MacOSFailure, "accepted|acceptance"):
-                    backend.package_bundle(layout)
+                 mock.patch.object(backend, "require_sandboxed_environment", return_value=None), \
+                 self.assertRaisesRegex(backend.MacOSFailure, "accepted|acceptance"):
+                backend.package_bundle(layout)
 
     def test_package_rejects_fingerprint_mismatch_with_accepted(self):
         layout = backend.WorkLayout(self.root, self.repo)
@@ -851,9 +847,9 @@ class MacOSBackendTests(unittest.TestCase):
             with mock.patch.object(backend, "isolated_environment", return_value={}), \
                  mock.patch.object(backend, "require_build_identity", return_value="d1"), \
                  mock.patch.object(backend, "audit_bundle", return_value={"status": "complete"}), \
-                 mock.patch.object(backend, "require_sandboxed_environment", return_value=None):
-                with self.assertRaisesRegex(backend.MacOSFailure, "fingerprint|accepted"):
-                    backend.package_bundle(layout)
+                 mock.patch.object(backend, "require_sandboxed_environment", return_value=None), \
+                 self.assertRaisesRegex(backend.MacOSFailure, "fingerprint|accepted"):
+                backend.package_bundle(layout)
 
     def test_package_rejects_identity_mismatch_with_accepted(self):
         layout = backend.WorkLayout(self.root, self.repo)
@@ -883,9 +879,9 @@ class MacOSBackendTests(unittest.TestCase):
             with mock.patch.object(backend, "isolated_environment", return_value={}), \
                  mock.patch.object(backend, "require_build_identity", return_value="d1"), \
                  mock.patch.object(backend, "audit_bundle", return_value={"status": "complete"}), \
-                 mock.patch.object(backend, "require_sandboxed_environment", return_value=None):
-                with self.assertRaisesRegex(backend.MacOSFailure, "identity|mismatch"):
-                    backend.package_bundle(layout)
+                 mock.patch.object(backend, "require_sandboxed_environment", return_value=None), \
+                 self.assertRaisesRegex(backend.MacOSFailure, "identity|mismatch"):
+                backend.package_bundle(layout)
 
     def test_skipped_acceptance_yields_only_experimental_archive(self):
         layout = backend.WorkLayout(self.root, self.repo)
@@ -989,12 +985,11 @@ class MacOSBackendTests(unittest.TestCase):
                     return mock.Mock(returncode=0, stdout="", stderr="")
                 return mock.Mock(returncode=0, stdout="", stderr="")
             run.side_effect = fake
-            with mock.patch.object(backend, "xcode_identity", return_value={"xcode": "Xcode 27.0", "sdk": "27.0", "clang": "/c", "clangxx": "/c++", "linker": "/l", "clang_version": "1", "metal": "/m", "metal_version": "1"}):
-                with self.assertRaisesRegex(backend.MacOSFailure, "uniform|minimum OS"):
-                    backend.audit_bundle(app, layout, {})
+            with mock.patch.object(backend, "xcode_identity", return_value={"xcode": "Xcode 27.0", "sdk": "27.0", "clang": "/c", "clangxx": "/c++", "linker": "/l", "clang_version": "1", "metal": "/m", "metal_version": "1"}), \
+                 self.assertRaisesRegex(backend.MacOSFailure, "uniform|minimum OS"):
+                backend.audit_bundle(app, layout, {})
 
     def test_audit_rejects_inadmissible_load_command(self):
-        import struct
         layout = backend.WorkLayout(self.root, self.repo)
         layout.ensure()
         # 0x99 is not in the admissible set
@@ -1009,9 +1004,9 @@ class MacOSBackendTests(unittest.TestCase):
                     return mock.Mock(returncode=0, stdout="", stderr="")
                 return mock.Mock(returncode=0, stdout="", stderr="")
             run.side_effect = fake
-            with mock.patch.object(backend, "xcode_identity", return_value={"xcode": "Xcode 27.0", "sdk": "27.0", "clang": "/c", "clangxx": "/c++", "linker": "/l", "clang_version": "1", "metal": "/m", "metal_version": "1"}):
-                with self.assertRaisesRegex(backend.MacOSFailure, "inadmissible|load command"):
-                    backend.audit_bundle(app, layout, {})
+            with mock.patch.object(backend, "xcode_identity", return_value={"xcode": "Xcode 27.0", "sdk": "27.0", "clang": "/c", "clangxx": "/c++", "linker": "/l", "clang_version": "1", "metal": "/m", "metal_version": "1"}), \
+                 self.assertRaisesRegex(backend.MacOSFailure, "inadmissible|load command"):
+                backend.audit_bundle(app, layout, {})
 
     def test_audit_rejects_invalid_signature(self):
         layout = backend.WorkLayout(self.root, self.repo)
@@ -1027,9 +1022,9 @@ class MacOSBackendTests(unittest.TestCase):
                     return mock.Mock(returncode=1, stdout="", stderr="invalid signature")
                 return mock.Mock(returncode=0, stdout="", stderr="")
             run.side_effect = fake
-            with mock.patch.object(backend, "xcode_identity", return_value={"xcode": "Xcode 27.0", "sdk": "27.0", "clang": "/c", "clangxx": "/c++", "linker": "/l", "clang_version": "1", "metal": "/m", "metal_version": "1"}):
-                with self.assertRaisesRegex(backend.MacOSFailure, "signature|invalid"):
-                    backend.audit_bundle(app, layout, {})
+            with mock.patch.object(backend, "xcode_identity", return_value={"xcode": "Xcode 27.0", "sdk": "27.0", "clang": "/c", "clangxx": "/c++", "linker": "/l", "clang_version": "1", "metal": "/m", "metal_version": "1"}), \
+                 self.assertRaisesRegex(backend.MacOSFailure, "signature|invalid"):
+                backend.audit_bundle(app, layout, {})
 
     def test_signing_preserves_entitlements(self):
         layout = backend.WorkLayout(self.root, self.repo)
@@ -1056,9 +1051,9 @@ class MacOSBackendTests(unittest.TestCase):
                     return mock.Mock(returncode=0, stdout="entitlements-A", stderr="")
                 return mock.Mock(returncode=0, stdout="entitlements-B", stderr="")
             return mock.Mock(returncode=0, stdout="", stderr="")
-        with mock.patch.object(backend, "command_output", side_effect=fake):
-            with self.assertRaisesRegex(backend.MacOSFailure, "entitlements"):
-                backend.sign_bundle(app, layout, {})
+        with mock.patch.object(backend, "command_output", side_effect=fake), \
+             self.assertRaisesRegex(backend.MacOSFailure, "entitlements"):
+            backend.sign_bundle(app, layout, {})
 
     def test_signing_fails_when_entitlements_unreadable(self):
         layout = backend.WorkLayout(self.root, self.repo)
@@ -1071,9 +1066,9 @@ class MacOSBackendTests(unittest.TestCase):
             if args[:2] == ["/usr/bin/codesign", "-d"]:
                 return mock.Mock(returncode=1, stdout="", stderr="oops")
             return mock.Mock(returncode=0, stdout="", stderr="")
-        with mock.patch.object(backend, "command_output", side_effect=fake):
-            with self.assertRaisesRegex(backend.MacOSFailure, "cannot read entitlements"):
-                backend.sign_bundle(app, layout, {})
+        with mock.patch.object(backend, "command_output", side_effect=fake), \
+             self.assertRaisesRegex(backend.MacOSFailure, "cannot read entitlements"):
+            backend.sign_bundle(app, layout, {})
 
     def test_verify_release_rejects_mutated_archive(self):
         import zipfile
@@ -1164,7 +1159,6 @@ class MacOSBackendTests(unittest.TestCase):
         )
 
     def test_audit_allows_req_dyld_marked_main(self):
-        import struct
         layout = backend.WorkLayout(self.root, self.repo)
         layout.ensure()
         app = self._minimal_app(commands=[(0x80000028, b"12345678")])
@@ -1205,7 +1199,7 @@ class MacOSBackendTests(unittest.TestCase):
         with mock.patch.object(backend, "command_output") as run, \
              mock.patch.object(backend, "macho_architectures", side_effect=lambda p, e: ["arm64"] if "MacOS" in str(p) else None):
             def fake(command, **kwargs):
-                seen.append(list(command)[0])
+                seen.append(next(iter(command)))
                 return mock.Mock(returncode=0, stdout="", stderr="")
             run.side_effect = fake
             with mock.patch.object(backend, "xcode_identity", return_value={"xcode": "Xcode 27.0", "sdk": "27.0", "clang": "/c", "clangxx": "/c++", "linker": "/l", "clang_version": "1", "metal": "/m", "metal_version": "1"}):

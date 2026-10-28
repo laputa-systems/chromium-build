@@ -14,12 +14,11 @@ import argparse
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import shutil
 import subprocess
 import tempfile
-
+from pathlib import Path
 
 # musl's libc is also its loader; the host must provide it.
 HOST_LIBRARIES = {"libc.musl-x86_64.so.1", "libc.musl-aarch64.so.1", "ld-musl-x86_64.so.1", "ld-musl-aarch64.so.1"}
@@ -152,9 +151,7 @@ def main() -> None:
         launcher = temporary / "chromium"
         launcher.write_text(LAUNCHER, encoding="utf-8")
         for path in temporary.rglob("*"):
-            if path.is_dir():
-                path.chmod(0o755)
-            elif path.name in {"chrome", "chromium"} or (path.parent.name == "lib" and is_elf(path)):
+            if path.is_dir() or path.name in {"chrome", "chromium"} or (path.parent.name == "lib" and is_elf(path)):
                 path.chmod(0o755)
             else:
                 path.chmod(0o644)

@@ -10,16 +10,12 @@ candidate-versus-accepted bundle publication.
 from __future__ import annotations
 
 import argparse
-from contextlib import contextmanager
-from concurrent.futures import ThreadPoolExecutor
 import datetime as dt
-import errno
 import fcntl
 import hashlib
 import inspect
 import json
 import os
-from pathlib import Path
 import platform as host_platform
 import plistlib
 import re
@@ -30,12 +26,15 @@ import subprocess
 import sys
 import tarfile
 import time
-from typing import Any, Iterator, Mapping, Optional, Sequence
 import urllib.error
 import urllib.parse
 import urllib.request
 import zipfile
-
+from collections.abc import Iterator, Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Any
 
 MIN_MACOS = (26, 0, 0)
 FULL_BUILD_MIN_FREE_GB = 80
@@ -210,7 +209,7 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def command_path(name: str, env: Optional[Mapping[str, str]] = None) -> Optional[str]:
+def command_path(name: str, env: Mapping[str, str] | None = None) -> str | None:
     return shutil.which(name, path=(env or os.environ).get("PATH"))
 
 
@@ -244,7 +243,7 @@ def select_compiler_cache(
     layout: WorkLayout,
     environment: Mapping[str, str],
     *,
-    requested: Optional[str] = None,
+    requested: str | None = None,
 ) -> dict[str, Any]:
     """Select an existing local compiler cache without changing host packages.
 
@@ -338,9 +337,9 @@ def select_compiler_cache(
 def command_output(
     command: Sequence[str],
     *,
-    env: Optional[Mapping[str, str]] = None,
-    cwd: Optional[Path] = None,
-    timeout: Optional[float] = None,
+    env: Mapping[str, str] | None = None,
+    cwd: Path | None = None,
+    timeout: float | None = None,
     check: bool = True,
 ) -> subprocess.CompletedProcess[str]:
     effective = list(command)
@@ -370,9 +369,9 @@ def stream_command(
     command: Sequence[str],
     *,
     env: Mapping[str, str],
-    cwd: Optional[Path],
+    cwd: Path | None,
     log_path: Path,
-    timeout: Optional[float] = None,
+    timeout: float | None = None,
 ) -> None:
     effective = sandbox_prefix_for_env(env) + list(command)
     log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -471,7 +470,7 @@ class WorkLayout:
                     "schema": OWNERSHIP_SCHEMA,
                     "root": str(self.root),
                     "repository": str(self.repo_root),
-                    "created_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+                    "created_at": dt.datetime.now(dt.UTC).isoformat(),
                 },
             )
         for directory in self.all_directories:
@@ -506,7 +505,7 @@ def work_lock(layout: WorkLayout) -> Iterator[None]:
             fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
 
 
-def sandbox_profile_for_network(network: str) -> Optional[str]:
+def sandbox_profile_for_network(network: str) -> str | None:
     if network == "none":
         return SANDBOX_SEALED_PROFILE
     if network == "loopback":
@@ -540,18 +539,19 @@ def isolated_environment(
     layout: WorkLayout,
     *,
     network: str = "none",
-    extra: Optional[Mapping[str, str]] = None,
-    llvm_root: Optional[Path] = None,
-    compiler_cache: Optional[str] = None,
+    extra: Mapping[str, str] | None = None,
+    llvm_root: Path | None = None,
+    compiler_cache: str | None = None,
 ) -> dict[str, str]:
     """Build the child environment before invoking any project tool."""
 
     if network not in ("none", "loopback", "fetch"):
         fail(f"unknown network mode for sandbox wrapper: {network}")
     profile = sandbox_profile_for_network(network)
-    if profile is not None:
-        if not SANDBOX_EXECUTABLE.is_file() or not os.access(SANDBOX_EXECUTABLE, os.X_OK):
-            fail("sandbox-exec wrapper cannot start; phase fails")
+    if profile is not None and (
+        not SANDBOX_EXECUTABLE.is_file() or not os.access(SANDBOX_EXECUTABLE, os.X_OK)
+    ):
+        fail("sandbox-exec wrapper cannot start; phase fails")
     layout.ensure()
     environment = dict(os.environ)
     environment["DEVELOPER_DIR"] = environment.get("DEVELOPER_DIR") or (
@@ -559,8 +559,17 @@ def isolated_environment(
     )
     for key in tuple(environment):
         if key.startswith(
-            ("RBE_", "GOMA_", "RECLIENT_", "SISO_", "SCCACHE_", "CCACHE_", "DISTCC_")
-        ) or key.startswith("CHROMIUM_COMPILER_CACHE_"):
+            (
+                "RBE_",
+                "GOMA_",
+                "RECLIENT_",
+                "SISO_",
+                "SCCACHE_",
+                "CCACHE_",
+                "DISTCC_",
+                "CHROMIUM_COMPILER_CACHE_",
+            )
+        ):
             environment.pop(key, None)
     for key in (
         "CC",
@@ -751,7 +760,7 @@ def translated_execution(environment: Mapping[str, str]) -> bool:
     return arch.returncode == 0 and arch.stdout.strip() not in {"arm64", "aarch64"}
 
 
-def llvm_candidate(root: Path, environment: Mapping[str, str], source: str) -> Optional[dict[str, Any]]:
+def llvm_candidate(root: Path, environment: Mapping[str, str], source: str) -> dict[str, Any] | None:
     clang = root / "bin" / "clang"
     cxx = root / "bin" / "clang++"
     if not clang.is_file() or not cxx.is_file():
@@ -797,7 +806,7 @@ def llvm_candidate(root: Path, environment: Mapping[str, str], source: str) -> O
     }
 
 
-def select_llvm(environment: Mapping[str, str], source_root: Optional[Path] = None) -> dict[str, Any]:
+def select_llvm(environment: Mapping[str, str], source_root: Path | None = None) -> dict[str, Any]:
     """Select the bundled Chromium clang only; no floor, no fallback."""
 
     if source_root is None or not source_root.is_dir():
@@ -847,7 +856,7 @@ def run_doctor(
     layout: WorkLayout,
     *,
     require_references: bool = True,
-    minimum_free_gb: Optional[int] = None,
+    minimum_free_gb: int | None = None,
     enforce_full_build_floor: bool = True,
 ) -> dict[str, Any]:
     layout.ensure()
@@ -1084,7 +1093,7 @@ def configured_positive_int(name: str, default: int, maximum: int) -> int:
     return value
 
 
-def _open_locked_response(url: str, headers: Optional[Mapping[str, str]] = None):
+def _open_locked_response(url: str, headers: Mapping[str, str] | None = None):
     request_headers = {"User-Agent": "chromium-build-native-macos"}
     request_headers.update(headers or {})
     request = urllib.request.Request(url, headers=request_headers)
@@ -1283,7 +1292,7 @@ def download_locked_entries(entries: Sequence[Mapping[str, Any]], inputs: Path) 
         return list(executor.map(lambda entry: download_locked(entry, inputs), entries))
 
 
-def core_series_digest(archive: Path) -> Optional[str]:
+def core_series_digest(archive: Path) -> str | None:
     try:
         with tarfile.open(archive, "r:gz") as stream:
             member = next((item for item in stream.getmembers() if item.name.endswith("/patches/series")), None)
@@ -1426,7 +1435,7 @@ def update_lock(layout: WorkLayout, *, latest: bool = True) -> dict[str, Any]:
         "status": "resolved",
         "platform": "macos",
         "architecture": "arm64",
-        "resolved_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+        "resolved_at": dt.datetime.now(dt.UTC).isoformat(),
         "chromium": {
             "version": chromium_version,
             "commit": chromium_commit,
@@ -1874,12 +1883,12 @@ def run_native_hooks(
         "solutions = [\n"
         "  {\n"
         "    'name': 'src',\n"
-        "    'url': 'https://chromium.googlesource.com/chromium/src.git@%s',\n"
+        f"    'url': 'https://chromium.googlesource.com/chromium/src.git@{lock['chromium']['commit']}',\n"
         "    'managed': False,\n"
-        "    'custom_deps': %s,\n"
+        f"    'custom_deps': {custom_deps_text},\n"
         "  },\n"
         "]\n"
-    ) % (lock["chromium"]["commit"], custom_deps_text)
+    )
     atomic_write(gclient_config, config)
     if archive_has_deps_closure:
         if sync_stamp.is_file():
@@ -2063,7 +2072,7 @@ def materialize_archive_dependency_metadata(
                     common_variables,
                     common_variables,
                 )
-            except Exception as error:  # depot_tools exposes its own parser error type.
+            except Exception as error:  # noqa: BLE001 -- depot_tools exposes its own parser error type.
                 fail(f"could not parse locked DEPS file {deps_file}: {error}")
             variables = dict(common_variables)
             variables.update(parsed.get("vars", {}))
@@ -2076,7 +2085,7 @@ def materialize_archive_dependency_metadata(
                     try:
                         if not gclient_eval.EvaluateCondition(condition, variables):
                             continue
-                    except Exception:
+                    except Exception:  # noqa: BLE001, S110
                         # A new condition is safer to materialize than to let
                         # a hook fail because its archive checkout lacks .git.
                         pass
@@ -2765,9 +2774,9 @@ def local_overlay_identity(layout: WorkLayout) -> dict[str, Any]:
 def current_build_components(
     layout: WorkLayout,
     *,
-    llvm: Optional[Mapping[str, Any]] = None,
-    xcode: Optional[Mapping[str, Any]] = None,
-    gn_args_text: Optional[str] = None,
+    llvm: Mapping[str, Any] | None = None,
+    xcode: Mapping[str, Any] | None = None,
+    gn_args_text: str | None = None,
 ) -> dict[str, str]:
     lock_path = layout.repo_root / LOCK_RELATIVE
     lock_sha = sha256(lock_path) if lock_path.is_file() else "missing-lock"
@@ -2821,7 +2830,7 @@ def require_build_identity(
     layout: WorkLayout,
     predecessor: Mapping[str, Any],
     *,
-    current: Optional[Mapping[str, Any]] = None,
+    current: Mapping[str, Any] | None = None,
 ) -> str:
     if predecessor.get("status") != "complete":
         fail("predecessor report is not complete; rerun the preceding phase")
@@ -2967,10 +2976,8 @@ def prepare_source(layout: WorkLayout) -> dict[str, Any]:
         atomic_write(layout.metadata / "source-complete.stamp", "status=complete\nnetwork=none\n")
         print(f"prepare: applied {len(patch_records)} ungoogled patches; source is {layout.source}")
         return report
-    except Exception:
-        # Preserve the partial source for diagnosis, but never publish success.
-        raise
     finally:
+        # Preserve the partial source for diagnosis, but never publish success.
         shutil.rmtree(config_extract, ignore_errors=True)
 
 
@@ -3084,10 +3091,13 @@ def configure_source(layout: WorkLayout) -> dict[str, Any]:
     if previous_path.is_file():
         try:
             previous = json.loads(previous_path.read_text(encoding="utf-8"))
-            if previous.get("status") == "complete" and isinstance(previous.get("build_identity"), dict):
-                if previous["build_identity"].get("digest") == identity.get("digest"):
-                    print(f"configure: unchanged build identity reused at {layout.output}")
-                    return previous
+            if (
+                previous.get("status") == "complete"
+                and isinstance(previous.get("build_identity"), dict)
+                and previous["build_identity"].get("digest") == identity.get("digest")
+            ):
+                print(f"configure: unchanged build identity reused at {layout.output}")
+                return previous
         except (OSError, json.JSONDecodeError):
             pass
     layout.output.mkdir(parents=True, exist_ok=True)
@@ -3202,7 +3212,7 @@ def clean_single_locale_outputs(layout: WorkLayout) -> dict[str, Any]:
     }
 
 
-def build_source(layout: WorkLayout, jobs: Optional[str]) -> dict[str, Any]:
+def build_source(layout: WorkLayout, jobs: str | None) -> dict[str, Any]:
     layout.ensure()
     configure = read_json(layout.metadata / "configure-macos.json", "configuration report")
     if configure.get("status") != "complete":
@@ -3378,7 +3388,7 @@ def validate_app_path(raw: str | Path, layout: WorkLayout, label: str, *, built:
     return app
 
 
-def path_is_forbidden_dependency(value: str, layout: WorkLayout) -> Optional[str]:
+def path_is_forbidden_dependency(value: str, layout: WorkLayout) -> str | None:
     forbidden = (
         "/opt/homebrew",
         "/usr/local",
@@ -3419,7 +3429,7 @@ def macho_audit_path(path: Path, layout: WorkLayout) -> Iterator[Path]:
             alias.unlink(missing_ok=True)
 
 
-def macho_architectures(path: Path, environment: Mapping[str, str]) -> Optional[list[str]]:
+def macho_architectures(path: Path, environment: Mapping[str, str]) -> list[str] | None:
     file_command = "/usr/bin/file"
     lipo_command = "/usr/bin/lipo"
     if not Path(file_command).is_file() or not Path(lipo_command).is_file():
@@ -3436,7 +3446,7 @@ def macho_architectures(path: Path, environment: Mapping[str, str]) -> Optional[
     return values
 
 
-def parse_macho_header(path: Path) -> Optional[dict[str, Any]]:
+def parse_macho_header(path: Path) -> dict[str, Any] | None:
     try:
         data = path.read_bytes()
     except OSError:
@@ -3449,7 +3459,7 @@ def parse_macho_header(path: Path) -> Optional[dict[str, Any]]:
         return None
     commands: list[tuple[int, int]] = []
     offset = 32
-    minos: Optional[tuple[int, int, int]] = None
+    minos: tuple[int, int, int] | None = None
     for _ in range(ncmds):
         if offset + 8 > len(data):
             return None
@@ -3476,7 +3486,7 @@ def macho_has_pie(path: Path) -> bool:
     return bool(header["flags"] & MH_PIE_FLAG)
 
 
-def macho_min_os(path: Path) -> Optional[tuple[int, int, int]]:
+def macho_min_os(path: Path) -> tuple[int, int, int] | None:
     header = parse_macho_header(path)
     if header is None:
         return None
@@ -3661,9 +3671,7 @@ def sign_bundle(app: Path, layout: WorkLayout, environment: Mapping[str, str]) -
     for candidate in app.rglob("*"):
         if candidate.is_symlink():
             continue
-        if candidate.is_dir() and candidate.suffix.lower() in {".app", ".framework", ".xpc", ".appex", ".plugin"}:
-            code_objects.add(candidate)
-        elif candidate.is_file() and (
+        if candidate.is_dir() and candidate.suffix.lower() in {".app", ".framework", ".xpc", ".appex", ".plugin"} or candidate.is_file() and (
             candidate.suffix.lower() in {".dylib", ".so", ".bundle"}
             or macho_architectures(candidate, environment) is not None
         ):
@@ -4079,7 +4087,7 @@ def verify_release_bundle(layout: WorkLayout) -> dict[str, Any]:
                 shutil.rmtree(relocated)
             os.replace(extracted, relocated)
             extracted = relocated
-        verification = command_output([str("/usr/bin/codesign"), "--verify", "--deep", "--strict", str(extracted)], env=environment, check=False)
+        verification = command_output(["/usr/bin/codesign", "--verify", "--deep", "--strict", str(extracted)], env=environment, check=False)
         if verification.returncode:
             detail = (verification.stderr or verification.stdout or "").strip()
             fail(f"extracted bundle failed signature verification: {detail[-1200:]}")
@@ -4239,7 +4247,7 @@ def prewarm_extension_profile(layout: WorkLayout, app: Path, extension: Path, pr
                 with urllib.request.urlopen(f"http://127.0.0.1:{port}/json/version", timeout=2) as response:
                     if json.load(response).get("webSocketDebuggerUrl"):
                         break
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass
             if time.monotonic() >= deadline:
                 fail("extension pre-warm browser served no DevTools endpoint")
@@ -4323,7 +4331,7 @@ def run_shadowdriver_harness(layout: WorkLayout, lock: Mapping[str, Any], app: P
     }
 
 
-def run_native_stealth_harness(layout: WorkLayout, app: Path, headed_reference: Optional[Path] = None) -> dict[str, Any]:
+def run_native_stealth_harness(layout: WorkLayout, app: Path, headed_reference: Path | None = None) -> dict[str, Any]:
     manifest, _ = shadowdriver_acceptance_target(layout)
     root = manifest.parent
     environment = isolated_environment(layout, network="loopback")
@@ -4369,7 +4377,7 @@ def run_native_stealth_harness(layout: WorkLayout, app: Path, headed_reference: 
             "headed_reference_sha256": reference_digest}
 
 
-def promote_accepted(layout: WorkLayout, candidate: Path, fingerprint: str, environment: Mapping[str, str], acceptance_scope: str = "headed-and-headless", build_identity: Optional[Mapping[str, Any]] = None) -> Path:
+def promote_accepted(layout: WorkLayout, candidate: Path, fingerprint: str, environment: Mapping[str, str], acceptance_scope: str = "headed-and-headless", build_identity: Mapping[str, Any] | None = None) -> Path:
     destination = layout.accepted / fingerprint / "Chromium.app"
     if destination.exists():
         audit_bundle(destination, layout, environment)
@@ -4385,16 +4393,16 @@ def promote_accepted(layout: WorkLayout, candidate: Path, fingerprint: str, envi
         "local_overlay_sha256": local_overlay_identity(layout)["sha256"],
         "build_identity": dict(build_identity) if build_identity else None,
         "acceptance_scope": acceptance_scope,
-        "accepted_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+        "accepted_at": dt.datetime.now(dt.UTC).isoformat(),
     }
     atomic_json(layout.stage / "accepted.json", accepted)
     return destination
 
 
-def test_staged(layout: WorkLayout, supplied_app: Optional[str], headed_reference: Optional[str] = None) -> dict[str, Any]:
+def test_staged(layout: WorkLayout, supplied_app: str | None, headed_reference: str | None = None) -> dict[str, Any]:
     layout.ensure()
     lock = load_lock(layout)
-    candidate_record: Optional[dict[str, Any]] = None
+    candidate_record: dict[str, Any] | None = None
     if supplied_app:
         app = validate_app_path(supplied_app, layout, "--app Chromium.app")
         input_kind = "supplied"
@@ -4507,7 +4515,7 @@ def status_work(layout: WorkLayout) -> dict[str, Any]:
     return result
 
 
-def parse_arguments(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+def parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="native macOS arm64 Chromium builder")
     parser.add_argument("--repo-root", required=True)
     parser.add_argument("--platform", required=True, choices=["macos"])
@@ -4522,7 +4530,7 @@ def parse_arguments(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     arguments = parse_arguments(argv)
     try:
         repo_root = canonical_path(arguments.repo_root, "repository root", must_exist=True)

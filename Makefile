@@ -21,12 +21,14 @@ DOCKER ?= docker
 .NOTPARALLEL:
 .PHONY: image fetch prepare gate-a gate-b gate-c gate-d gate-e gate-f gates
 .PHONY: release-linux package install
-.PHONY: bootstrap full-build resume-build build-target stage-runtime test-fast test-functional test-staged cache-stats resume-check graph-breakdown check-py
+.PHONY: bootstrap full-build resume-build build-target stage-runtime test-fast test-functional test-staged cache-stats resume-check graph-breakdown check-py lint
 .PHONY: macos-doctor macos-smoke-preflight macos-update-lock macos-fetch macos-prepare macos-configure macos-cache-stats macos-build macos-stage-runtime macos-test-staged
 
-check-py:
-	PYTHONPATH=scripts:tests uv run --with ruff --with ty ruff check scripts tests
+check-py: lint
 	PYTHONPATH=scripts:tests uv run --with ruff --with ty ty check scripts tests
+
+lint:
+	PYTHONPATH=scripts:tests uv run --with ruff ruff check scripts tests
 
 image:
 	$(CHROMIUM_BUILD) image
