@@ -25,10 +25,10 @@ DOCKER ?= docker
 .PHONY: macos-doctor macos-smoke-preflight macos-update-lock macos-fetch macos-prepare macos-configure macos-cache-stats macos-build macos-stage-runtime macos-test-staged
 
 check-py: lint
-	PYTHONPATH=scripts:tests uv run --with ruff --with ty ty check scripts tests
+	PYTHONPATH=scripts:tests uv run ty check scripts tests
 
 lint:
-	PYTHONPATH=scripts:tests uv run --with ruff ruff check scripts tests
+	PYTHONPATH=scripts:tests uv run ruff check scripts tests
 
 image:
 	$(CHROMIUM_BUILD) image
