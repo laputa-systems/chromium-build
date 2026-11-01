@@ -65,6 +65,7 @@ def is_assembler(tokens):
 
 def scan_text(text, label, failures):
     text = text.replace("prebuilt_rustc_sysroot", "")
+    text = text.replace("local_rustc_sysroot", "")
     for needle, description in FORBIDDEN_TEXT.items():
         if needle in text:
             failures.append(f"{label}: {description}: {needle}")

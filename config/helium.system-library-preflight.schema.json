@@ -1,0 +1,72 @@
+{
+  "schema": 1,
+  "required": [
+    "environment_compatibility_id",
+    "package_lock_sha256",
+    "policy_sha256",
+    "unclassified_edges",
+    "glibc_entries",
+    "exception_leaks",
+    "ccache_runtime_classification"
+  ],
+  "proposed_roots": [
+    "libEGL.so",
+    "libGLESv2.so",
+    "libX11.so",
+    "libXext.so",
+    "libasound.so",
+    "libatk-1.0.so",
+    "libavcodec.so",
+    "libavformat.so",
+    "libavutil.so",
+    "libcairo.so",
+    "libdrm.so",
+    "libfontconfig.so",
+    "libfreebl3.so",
+    "libfreetype.so",
+    "libgbm.so",
+    "libgdk-3.so",
+    "libgdk_pixbuf-2.0.so",
+    "libgio-2.0.so",
+    "libglib-2.0.so",
+    "libgmodule-2.0.so",
+    "libgobject-2.0.so",
+    "libgtk-3.so",
+    "libharfbuzz.so",
+    "libnss3.so",
+    "libnssutil3.so",
+    "libpango-1.0.so",
+    "libsmime3.so",
+    "libsoftokn3.so",
+    "libssl3.so",
+    "libwayland-client.so",
+    "libwayland-cursor.so",
+    "libwayland-egl.so",
+    "libwayland-server.so",
+    "libxcb.so",
+    "libxkbcommon-x11.so",
+    "libxkbcommon.so"
+  ],
+  "ffmpeg_roots": [
+    "libavcodec.so",
+    "libavformat.so",
+    "libavutil.so"
+  ],
+  "exception_sonames": [
+    "libstdc++.so.6",
+    "libgcc_s.so.1",
+    "libX11.so.6",
+    "libXext.so.6",
+    "libxcb.so.1",
+    "libva.so.2",
+    "libvdpau.so.1",
+    "libssl.so.3",
+    "libcrypto.so.3"
+  ],
+  "zero_fields": [
+    "unclassified_edges",
+    "glibc_entries",
+    "exception_leaks"
+  ],
+  "ccache_runtime_classification": "builder-only"
+}

@@ -4,17 +4,26 @@ set -euo pipefail
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 PLATFORM=linux
 ARCH=
+PRODUCT=chromium
 PROFILE=
 IMAGE=${CHROMIUM_BUILDER_IMAGE:-}
 WORK_VOLUME=${CHROMIUM_WORK_VOLUME:-}
 CACHE_VOLUME=${CHROMIUM_CACHE_VOLUME:-}
 APP_PATH=
 HEADED_REFERENCE=
+ARCHIVE_PATH=
 INSTALL_PREFIX=${CHROMIUM_INSTALL_PREFIX:-}
 INSTALL_BIN_DIR=${CHROMIUM_INSTALL_BIN_DIR:-}
 JOBS=
 YES=0
 LATEST=0
+ROLLBACK=0
+EXECUTABLE=chrome
+INPUTS_LOCK=
+PACKAGE_LOCK=
+PATCH_INVENTORY=
+PATCH_DISPOSITION=
+SYSTEM_LIBRARY_POLICY=
 
 fail() {
     echo "chromium-build: $*" >&2
@@ -23,10 +32,10 @@ fail() {
 
 usage() {
     printf '%s\n' \
-        'usage: chromium-build [--platform linux|macos] [--arch arm64|amd64] [--profile PROFILE] command' \
-        '       chromium-build image [--arch amd64]' \
-        '       chromium-build ensure-source|fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-e|gate-f|poc|build|cache-stats|stage-runtime|test-fast|test|test-staged|package [--arch amd64] [--profile headless-debug|headless-release] [--jobs N]' \
-        '       chromium-build install [--profile headless-debug|headless-release] [--prefix DIR] [--bin-dir DIR]' \
+        'usage: chromium-build [--product chromium|helium] [--platform linux|macos] [--arch arm64|amd64] [--profile PROFILE] command' \
+        '       chromium-build image [--product chromium|helium] [--arch amd64]' \
+        '       chromium-build ensure-source|fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-e|gate-f|poc|build|cache-stats|stage-runtime|test-fast|test|test-staged|package [--product chromium|helium] [--arch amd64] [--profile PROFILE] [--jobs N]' \
+        '       chromium-build install [--product chromium|helium] [--profile PROFILE] [--prefix DIR] [--bin-dir DIR] [--archive PATH] [--rollback]' \
         '       chromium-build build-target <ninja-output-or-label> [--arch amd64] [--jobs N]' \
         '       chromium-build --platform macos doctor|smoke-preflight|update-lock|fetch|prepare|configure|build|cache-stats|stage-runtime|package|verify-release|test-staged [--arch arm64]' \
         '       chromium-build --platform macos test-staged [--headed-reference OBSERVATIONS.json]'
@@ -39,6 +48,20 @@ while [ "$#" -gt 0 ]; do
             [ "$#" -ge 2 ] || fail '--platform needs a value'
             PLATFORM=$2
             shift 2
+            ;;
+        --product)
+            [ "$#" -ge 2 ] || fail '--product needs a value'
+            PRODUCT=$2
+            shift 2
+            ;;
+        --archive)
+            [ "$#" -ge 2 ] || fail '--archive needs a value'
+            ARCHIVE_PATH=$2
+            shift 2
+            ;;
+        --rollback)
+            ROLLBACK=1
+            shift
             ;;
         --arch)
             [ "$#" -ge 2 ] || fail '--arch needs a value'
@@ -109,6 +132,10 @@ done
 [ -n "$ARCH" ] || {
     if [ "$PLATFORM" = macos ]; then ARCH=arm64; else ARCH=amd64; fi
 }
+case "$PRODUCT" in
+    chromium|helium) ;;
+    *) fail "unknown product $PRODUCT" ;;
+esac
 case "$ARCH" in
     aarch64) ARCH=arm64 ;;
     arm64|amd64) ;;
@@ -116,9 +143,12 @@ case "$ARCH" in
 esac
 case "$PLATFORM" in
     macos)
+        [ "$PRODUCT" = chromium ] || fail "product $PRODUCT is not supported on macOS"
         [ "$ARCH" = arm64 ] || fail 'macOS supports native arm64 only'
         PROFILE=${PROFILE:-macos-release}
-        [ "$PROFILE" = macos-release ] || fail 'macOS supports the macos-release profile only'
+        [ "$PROFILE" = macos-release ] || fail "macOS profile $PROFILE is not supported; expected macos-release"
+        [ -z "$ARCHIVE_PATH" ] || fail '--archive is Linux Helium only'
+        [ "$ROLLBACK" = 0 ] || fail '--rollback is Linux Helium install only'
         native_args=(--repo-root "$ROOT" --platform macos --arch "$ARCH" --profile "$PROFILE" --command "$command_name")
         [ "$YES" = 1 ] && native_args+=(--yes)
         [ "$LATEST" = 1 ] && native_args+=(--latest)
@@ -132,16 +162,31 @@ case "$PLATFORM" in
         ;;
     linux)
         [ -z "$HEADED_REFERENCE" ] || fail '--headed-reference is macOS-only'
-        PROFILE=${PROFILE:-headless-debug}
-        case "$PROFILE" in
-            headless-debug|headless-release) ;;
-            *) fail "Linux supports the headless-debug and headless-release profiles only" ;;
-        esac
+        if [ "$PRODUCT" = helium ]; then
+            [ "$ARCH" = amd64 ] || fail "Helium is not supported on $ARCH"
+            PROFILE=${PROFILE:-helium-wayland-release}
+            [ "$PROFILE" = helium-wayland-release ] || fail "Helium profile $PROFILE is not supported; expected helium-wayland-release"
+        else
+            PROFILE=${PROFILE:-headless-debug}
+            case "$PROFILE" in
+                headless-debug|headless-release) ;;
+                *) fail "Chromium profile $PROFILE is not supported; expected headless-debug or headless-release" ;;
+            esac
+        fi
         ;;
     *)
         fail "unsupported platform $PLATFORM"
         ;;
 esac
+
+if [ -n "$ARCHIVE_PATH" ]; then
+    [ "$PRODUCT" = helium ] && [ "$command_name" = install ] || fail '--archive is only supported by Helium install'
+    [ "$ROLLBACK" = 0 ] || fail '--archive and --rollback are mutually exclusive'
+    case "$ARCHIVE_PATH" in /*) ;; *) fail "--archive must be an absolute path: $ARCHIVE_PATH" ;; esac
+fi
+if [ "$ROLLBACK" = 1 ]; then
+    [ "$PRODUCT" = helium ] && [ "$command_name" = install ] || fail '--rollback is only supported by Helium install'
+fi
 
 case "$ARCH" in
     amd64)
@@ -154,9 +199,61 @@ case "$ARCH" in
     arm64) fail 'Chromium 153 publishes no native Linux arm64 LLVM 24 archive; the Linux backend currently supports amd64 only' ;;
 esac
 
-IMAGE=${IMAGE:-ungoogled-chromium-builder:153.0.8010.52-$ARCH}
-WORK_VOLUME=${WORK_VOLUME:-ungoogled-chromium-153-work-$ARCH}
-CACHE_VOLUME=${CACHE_VOLUME:-ungoogled-chromium-153-ccache-$ARCH}
+if [ "$PRODUCT" = helium ]; then
+    python=${CHROMIUM_PYTHON:-python3}
+    command -v "$python" >/dev/null 2>&1 || fail "Helium requires host Python 3 as $python"
+    resolve_output=$("$python" "$ROOT/scripts/linux_product.py" \
+        --product helium --arch "$ARCH" --profile "$PROFILE" --root "$ROOT") \
+        || fail 'could not resolve Helium product configuration'
+    while IFS=$'\t' read -r key value; do
+        case "$key" in
+            image) IMAGE=$value ;;
+            work_volume) WORK_VOLUME=$value ;;
+            cache_volume) CACHE_VOLUME=$value ;;
+            inputs_lock) INPUTS_LOCK=$value ;;
+            package_lock) PACKAGE_LOCK=$value ;;
+            patch_inventory) PATCH_INVENTORY=$value ;;
+            patch_disposition) PATCH_DISPOSITION=$value ;;
+            policy) SYSTEM_LIBRARY_POLICY=$value ;;
+            executable) EXECUTABLE=$value ;;
+        esac
+    done <<< "$resolve_output"
+else
+    IMAGE=${IMAGE:-ungoogled-chromium-builder:153.0.8010.52-$ARCH}
+    WORK_VOLUME=${WORK_VOLUME:-ungoogled-chromium-153-work-$ARCH}
+    CACHE_VOLUME=${CACHE_VOLUME:-ungoogled-chromium-153-ccache-$ARCH}
+fi
+
+if [ "$PRODUCT" = helium ] && [ "$command_name" = install ]; then
+    install_args=(--arch "$ARCH")
+    staging=
+    if [ -n "$ARCHIVE_PATH" ]; then
+        install_args+=(--archive "$ARCHIVE_PATH")
+    fi
+    [ "$ROLLBACK" = 1 ] && install_args+=(--rollback)
+    [ -z "$INSTALL_PREFIX" ] || install_args+=(--prefix "$INSTALL_PREFIX")
+    [ -z "$INSTALL_BIN_DIR" ] || install_args+=(--bin-dir "$INSTALL_BIN_DIR")
+    if [ -z "$ARCHIVE_PATH" ] && [ "$ROLLBACK" = 0 ]; then
+        version=$("${CHROMIUM_PYTHON:-python3}" -c 'import json, sys; print(json.load(open(sys.argv[1]))["product"]["version"])' "$INPUTS_LOCK")
+        archive_root="helium-$version-linux-x86_64-musl"
+        mkdir -p "$ROOT/.work/tmp"
+        staging=$(mktemp -d "$ROOT/.work/tmp/helium-install.XXXXXX")
+        trap '[ -z "$staging" ] || rm -rf -- "$staging"' EXIT
+        docker run --rm --network=none \
+            -v "$WORK_VOLUME:/work:ro" \
+            -v "$staging:/export" \
+            "$IMAGE" sh -c "cp /work/artifacts/$archive_root.tar.xz /work/artifacts/$archive_root.tar.xz.sha256 /work/artifacts/$archive_root.tar.xz.acceptance.json /export/" \
+            || fail "no qualified $archive_root artifacts; run package and package acceptance first"
+        install_args+=(--archive "$staging/$archive_root.tar.xz")
+    fi
+    set +e
+    "${CHROMIUM_PYTHON:-python3}" "$ROOT/scripts/install-runtime.py" "${install_args[@]}"
+    status=$?
+    set -e
+    [ -z "$staging" ] || rm -rf -- "$staging"
+    trap - EXIT
+    exit "$status"
+fi
 
 native_arch=$(docker info --format '{{.Architecture}}' 2>/dev/null || true)
 case "$native_arch" in
@@ -166,13 +263,29 @@ esac
 [ "$native_arch" = "$ARCH" ] || fail "requested $ARCH is not the native Docker architecture ($native_arch)"
 
 if [ "$command_name" = image ]; then
-    docker build --platform "$platform" \
-        --build-arg TARGET_ARCH="$ARCH" \
-        --build-arg BASE_IMAGE="$base_image" \
-        --build-arg LLVM_URL="$llvm_url" \
-        --build-arg LLVM_SHA256="$llvm_sha256" \
-        --build-arg LLVM_SIZE="$llvm_size" \
-        -t "$IMAGE" "$ROOT"
+    image_args=(
+        --platform "$platform"
+        --build-arg TARGET_ARCH="$ARCH"
+        --build-arg BASE_IMAGE="$base_image"
+        --build-arg LLVM_URL="$llvm_url"
+        --build-arg LLVM_SHA256="$llvm_sha256"
+        --build-arg LLVM_SIZE="$llvm_size"
+        --build-arg PRODUCT="$PRODUCT"
+    )
+    if [ "$PRODUCT" = helium ]; then
+        package_world=$("${CHROMIUM_PYTHON:-python3}" "$ROOT/scripts/linux_product.py" \
+            --product helium --arch "$ARCH" --profile "$PROFILE" --root "$ROOT" --package-world) \
+            || fail 'could not resolve the Helium package world'
+        image_args+=(
+            --build-arg PACKAGE_WORLD="$package_world"
+            --build-arg PACKAGE_LOCK="config/$(basename -- "$PACKAGE_LOCK")"
+            --build-arg INPUTS_LOCK="config/$(basename -- "$INPUTS_LOCK")"
+            --build-arg PATCH_INVENTORY="config/$(basename -- "$PATCH_INVENTORY")"
+            --build-arg PATCH_DISPOSITION="config/$(basename -- "$PATCH_DISPOSITION")"
+            --build-arg SYSTEM_LIBRARY_POLICY="config/$(basename -- "$SYSTEM_LIBRARY_POLICY")"
+        )
+    fi
+    docker build "${image_args[@]}" -t "$IMAGE" "$ROOT"
     docker image inspect "$IMAGE" --format 'image={{.Id}}'
     exit 0
 fi
@@ -182,12 +295,32 @@ docker volume create "$WORK_VOLUME" >/dev/null
 docker volume create "$CACHE_VOLUME" >/dev/null
 image_digest=$(docker image inspect "$IMAGE" --format '{{.Id}}')
 
+image_path() {
+    case "$1" in
+        "$ROOT"/*) printf '/opt/chromium-build/%s' "${1#"$ROOT"/}" ;;
+        *) printf '%s' "$1" ;;
+    esac
+}
+
+product_environment=(-e "CHROMIUM_PRODUCT=$PRODUCT")
+if [ "$PRODUCT" = helium ]; then
+    product_environment+=(
+        -e "INPUTS_LOCK=$(image_path "$INPUTS_LOCK")"
+        -e "PACKAGE_LOCK=$(image_path "$PACKAGE_LOCK")"
+        -e "PATCH_INVENTORY=$(image_path "$PATCH_INVENTORY")"
+        -e "PATCH_DISPOSITION=$(image_path "$PATCH_DISPOSITION")"
+        -e "SYSTEM_LIBRARY_POLICY=$(image_path "$SYSTEM_LIBRARY_POLICY")"
+        -e "GN=/work/src/buildtools/linux64/gn"
+    )
+fi
+
 run_fetch() {
     docker run --rm --network=bridge \
         -e NETWORK_MODE=fetch \
         -e CHROMIUM_ARCH="$ARCH" \
         -e CHROMIUM_PROFILE="$PROFILE" \
         -e CHROMIUM_METADATA_ROOT=/work/metadata \
+        "${product_environment[@]}" \
         -v "$WORK_VOLUME:/work" \
         "$IMAGE" python3 /opt/chromium-build/scripts/fetch-inputs.py
 }
@@ -212,12 +345,13 @@ run_gate() {
     fi
     build_environment+=(-e "GN_OUT=/work/out/$PROFILE")
     if [ "$command_name" = test-staged ]; then
-        test_environment+=(-e "CHROMIUM_TEST_CHROME=/work/stage/$PROFILE/chrome")
+        test_environment+=(-e "CHROMIUM_TEST_CHROME=/work/stage/$PROFILE/$EXECUTABLE")
         test_environment+=(-e "MEDIA_RUNTIME_BASELINE=/work/metadata/media-runtime-baseline.json")
     fi
     docker run --rm --network=none ${browser_resources[@]+"${browser_resources[@]}"} \
         -e CHROMIUM_ARCH="$ARCH" \
         -e CHROMIUM_PROFILE="$PROFILE" \
+        "${product_environment[@]}" \
         -e BUILDER_IMAGE_DIGEST="$image_digest" \
         -e CHROMIUM_METADATA_ROOT=/work/metadata \
         -e APK_MANIFEST="/opt/chromium-build-metadata/packages.$ARCH.txt" \
@@ -333,10 +467,15 @@ case "$command_name" in
     cache-stats)
         docker run --rm --network=none -v "$CACHE_VOLUME:/ccache" "$IMAGE" ccache --show-stats
         ;;
-    stage-runtime) run_gate stage-runtime.py --chrome "/work/out/$PROFILE/chrome" --output "/work/stage/$PROFILE" ;;
+    stage-runtime) run_gate stage-runtime.py --chrome "/work/out/$PROFILE/$EXECUTABLE" --output "/work/stage/$PROFILE" ;;
     package) run_gate package-runtime.py --stage "/work/stage/$PROFILE" --output "/work/package/$PROFILE" ;;
     ensure-source) ensure_source ;;
-    install) install_package ;;
+    install)
+        if [ "$PRODUCT" = helium ]; then
+            fail 'Helium install needs --archive or --rollback; builder-volume installation is not implemented yet'
+        fi
+        install_package
+        ;;
     test-fast) run_gate test-fast-driver.py ;;
     test) run_gate test-functional-driver.py ;;
     test-staged) run_gate test-functional-driver.py ;;

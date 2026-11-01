@@ -28,12 +28,41 @@ def main() -> None:
     timeout = float(os.environ.get("FUNCTIONAL_TEST_TIMEOUT", "180"))
     if os.environ.get("NETWORK_MODE", "none") != "none":
         raise ScriptFailure("functional test requires NETWORK_MODE=none")
+    product = os.environ.get("CHROMIUM_PRODUCT", "chromium")
     require_file(metadata / f"build-{profile}.json", "Chrome build has not passed")
     require_directory(root / "tests/fixtures", "fixtures are missing")
     test_tmp = work / f"test-tmp/{profile}"
     test_tmp.mkdir(parents=True, exist_ok=True)
     test_tmp.chmod(0o777)
     os.environ["CHROMIUM_TEST_TMPDIR"] = str(test_tmp)
+    if product == "helium":
+        run(["python3", "-m", "unittest", "discover", "-s", str(root / "tests"), "-p", "test_helium_*.py"])
+        staged_chrome = os.environ.get("CHROMIUM_TEST_CHROME")
+        if staged_chrome:
+            chrome = staged_chrome
+            require_file(Path(chrome), "staged Helium is missing")
+        else:
+            chrome = run(["python3", str(root / "scripts/resolve-output.py"), str(out), "//chrome:chrome"], capture_output=True).stdout.strip()
+            if not chrome:
+                raise ScriptFailure("cannot resolve Helium")
+        output.mkdir(parents=True, exist_ok=True)
+        output.chmod(0o777)
+        for name in ("test-fast.json", "fast-screenshot.png", "fast-compositor.png", "test-fast-helium.log"):
+            (output / name).unlink(missing_ok=True)
+        command = [
+            "python3",
+            str(root / "scripts/helium_test_fast.py"),
+            "--helium",
+            chrome,
+            "--fixtures",
+            str(root / "tests/fixtures"),
+            "--output",
+            str(output),
+        ]
+        if os.geteuid() == 0 and shutil.which("su"):
+            command = ["su", "chromium", "-s", "/bin/sh", "-c", "exec " + " ".join(subprocess.list2cmdline([item]) for item in command)]
+        run(command, timeout=timeout)
+        return
     run(["python3", "-m", "unittest", "discover", "-s", str(root / "tests"), "-p", "test_*.py"])
     staged_chrome = os.environ.get("CHROMIUM_TEST_CHROME")
     if staged_chrome:

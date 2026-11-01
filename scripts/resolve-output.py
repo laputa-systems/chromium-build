@@ -11,6 +11,15 @@ from pathlib import Path
 from script_support import ScriptFailure, command_path, fail_main
 
 
+def describe(gn: str, out: Path, label: str, source_root: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [gn, "desc", str(out), label, "outputs", f"--root={source_root}"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("out", type=Path)
@@ -18,13 +27,27 @@ def main() -> None:
     args = parser.parse_args()
     gn = os.environ.get("GN", "gn")
     command_path(gn)
+    product = os.environ.get("CHROMIUM_PRODUCT", "chromium")
     source_root = os.environ.get("CHROMIUM_SOURCE_ROOT", "/work/src")
-    result = subprocess.run(
-        [gn, "desc", str(args.out), args.label, "outputs", f"--root={source_root}"],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    if args.label == "//chrome:chrome" and product == "helium":
+        result = describe(gn, args.out, "//chrome:chrome_initial", source_root)
+        if result.returncode:
+            raise ScriptFailure("GN could not describe //chrome:chrome_initial for Helium")
+        candidates = []
+        for raw in result.stdout.splitlines():
+            candidate = raw.strip()
+            if not candidate:
+                continue
+            for path in (Path(candidate), args.out / candidate):
+                if path.is_file() and os.access(path, os.X_OK):
+                    candidates.append(path)
+        if len(candidates) != 1:
+            raise ScriptFailure(f"//chrome:chrome did not resolve to one executable: {candidates}")
+        if candidates[0].name != "helium":
+            raise ScriptFailure(f"Helium graph produced {candidates[0].name}, expected helium")
+        print(candidates[0])
+        return
+    result = describe(gn, args.out, args.label, source_root)
     if result.returncode:
         if args.label == "//chrome:chrome":
             chrome = args.out / "chrome"

@@ -57,7 +57,8 @@ def main() -> None:
     args_file = Path(os.environ.get("GN_ARGS_OUTPUT", metadata / f"{profile_name}.args.gn"))
     probe_file = Path(os.environ.get("GN_ARG_PROBE_OUTPUT", metadata / "gn-arg-probe.json"))
     profile = root / "config/profiles" / f"{profile_name}.gn"
-    lock = json.loads((root / "config/inputs.lock").read_text(encoding="utf-8"))
+    lock_path = Path(os.environ.get("INPUTS_LOCK", root / "config/inputs.lock"))
+    lock = json.loads(lock_path.read_text(encoding="utf-8"))
     arch = os.environ.get("CHROMIUM_ARCH", "arm64")
     target_cpu = {"arm64": "arm64", "amd64": "x64"}.get(arch)
     if target_cpu is None:

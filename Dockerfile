@@ -6,6 +6,11 @@ FROM ${GLIBC_IMAGE} AS compiler-host-runtime
 FROM ${BASE_IMAGE}
 
 ARG TARGET_ARCH=amd64
+ARG PRODUCT=chromium
+ARG PACKAGE_WORLD=
+ARG PACKAGE_LOCK=config/packages.amd64.lock
+ARG INPUTS_LOCK=config/inputs.lock
+ARG SYSTEM_LIBRARY_POLICY=config/system-library-preflight.schema.json
 ARG LLVM_URL=https://commondatastorage.googleapis.com/chromium-browser-clang/Linux_x64/clang-llvmorg-24-init-3796-g20e97c4b-2.tar.xz
 ARG LLVM_SHA256=86d53b33007a35695645e3867589a20f6f8aeedd146331e1a2ec8fd371e05ea2
 ARG LLVM_SIZE=59131228
@@ -17,43 +22,52 @@ COPY --from=compiler-host-runtime /usr/lib/x86_64-linux-gnu/ /usr/lib/x86_64-lin
 RUN mkdir -p /lib64 && \
     ln -s /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 /lib64/ld-linux-x86-64.so.2
 
-RUN apk add --no-cache \
-    bash=5.3.9-r1 \
-    bison=3.8.2-r3 \
-    bsd-compat-headers=0.7.2-r6 \
-    ca-certificates=20260909-r0 \
-    cargo=1.96.1-r0 \
-    ccache=4.13.6-r0 \
-    clang22-libclang=22.1.3-r2 \
-    curl=8.22.0-r0 \
-    expat-dev=2.8.5-r0 \
-    ffmpeg-dev=8.1.2-r0 \
-    file=5.47-r2 \
-    findutils=4.10.0-r1 \
-    flex=2.6.4-r8 \
-    font-noto=2026.06.01-r0 \
-    gn=0_git20260717-r0 \
-    go=1.26.8-r0 \
-    gperf=3.3-r0 \
-    libdrm-dev=2.4.134-r0 \
-    linux-headers=7.0.0-r1 \
-    mesa-dev=26.1.6-r0 \
-    musl-dev=1.2.6-r2 \
-    ninja-build=1.13.2-r1 \
-    nodejs=24.18.1-r0 \
-    nspr-dev=4.38.2-r0 \
-    nss-dev=3.124-r0 \
-    patch=2.8-r0 \
-    perl=5.42.2-r0 \
-    pkgconf=2.5.1-r0 \
-    python3=3.14.7-r1 \
-    rust=1.96.1-r0 \
-    rust-bindgen=0.72.1-r1 \
-    rustfmt=1.96.1-r0 \
-    tar=1.35-r5 \
-    util-linux-dev=2.42.3-r1 \
-    xz=5.8.4-r0 \
-    zstd=1.5.7-r2
+RUN set -eux; \
+    if [ "$PRODUCT" = helium ]; then \
+        test -n "$PACKAGE_WORLD"; \
+        printf '%s\n' "$PACKAGE_WORLD" | tr ' ' '\n' | grep -Eq '^[A-Za-z0-9+._-]+=[A-Za-z0-9._-]+$' || \
+            { echo "invalid Helium package token" >&2; exit 1; }; \
+        apk add --no-cache $PACKAGE_WORLD; \
+    else \
+        test "$PRODUCT" = chromium; \
+        apk add --no-cache \
+            bash=5.3.9-r1 \
+            bison=3.8.2-r3 \
+            bsd-compat-headers=0.7.2-r6 \
+            ca-certificates=20260909-r0 \
+            cargo=1.96.1-r0 \
+            ccache=4.13.6-r0 \
+            clang22-libclang=22.1.3-r2 \
+            curl=8.22.0-r0 \
+            expat-dev=2.8.5-r0 \
+            ffmpeg-dev=8.1.2-r0 \
+            file=5.47-r2 \
+            findutils=4.10.0-r1 \
+            flex=2.6.4-r8 \
+            font-noto=2026.06.01-r0 \
+            gn=0_git20260717-r0 \
+            go=1.26.8-r0 \
+            gperf=3.3-r0 \
+            libdrm-dev=2.4.134-r0 \
+            linux-headers=7.0.0-r1 \
+            mesa-dev=26.1.6-r0 \
+            musl-dev=1.2.6-r2 \
+            ninja-build=1.13.2-r1 \
+            nodejs=24.18.1-r0 \
+            nspr-dev=4.38.2-r0 \
+            nss-dev=3.124-r0 \
+            patch=2.8-r0 \
+            perl=5.42.2-r0 \
+            pkgconf=2.5.1-r0 \
+            python3=3.14.7-r1 \
+            rust=1.96.1-r0 \
+            rust-bindgen=0.72.1-r1 \
+            rustfmt=1.96.1-r0 \
+            tar=1.35-r5 \
+            util-linux-dev=2.42.3-r1 \
+            xz=5.8.4-r0 \
+            zstd=1.5.7-r2; \
+    fi
 RUN set -eux; \
     test "$TARGET_ARCH" = amd64; \
     mkdir -p /opt/chromium-llvm; \
@@ -73,6 +87,39 @@ RUN set -eux; \
     ln -s /usr/lib/ninja-build/bin/ninja /usr/local/bin/ninja; \
     test "$(/usr/local/bin/ninja --version)" = 1.13.2
 
+# The Chromium Rust toolchain and Crubit are glibc host binaries. Their host
+# tools and procedural macros link against the Debian glibc runtime copied
+# above; Chromium outputs still target Alpine musl.
+COPY config/glibc /opt/chromium-glibc-src
+RUN set -eux; \
+    mkdir -p /opt/chromium-glibc/lib; \
+    /opt/chromium-llvm/bin/clang --target=x86_64-unknown-linux-gnu \
+        -c /opt/chromium-glibc-src/crt1.S -o /opt/chromium-glibc/lib/Scrt1.o; \
+    cp /opt/chromium-glibc/lib/Scrt1.o /opt/chromium-glibc/lib/crt1.o; \
+    /opt/chromium-llvm/bin/clang --target=x86_64-unknown-linux-gnu \
+        -c /opt/chromium-glibc-src/crti.S -o /opt/chromium-glibc/lib/crti.o; \
+    /opt/chromium-llvm/bin/clang --target=x86_64-unknown-linux-gnu \
+        -c /opt/chromium-glibc-src/crtn.S -o /opt/chromium-glibc/lib/crtn.o; \
+    cp /opt/chromium-glibc-src/libc.so /opt/chromium-glibc/lib/libc.so; \
+    ln -s /usr/lib/x86_64-linux-gnu/libc.so.6 /opt/chromium-glibc/lib/libc.so.6; \
+    ln -s /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 /opt/chromium-glibc/lib/ld-linux-x86-64.so.2; \
+    for pair in \
+        libm.so.6:libm.so \
+        libdl.so.2:libdl.so \
+        libpthread.so.0:libpthread.so \
+        librt.so.1:librt.so \
+        libutil.so.1:libutil.so \
+        libgcc_s.so.1:libgcc_s.so; do \
+        source=${pair%%:*}; link=${pair##*:}; \
+        ln -s "/usr/lib/x86_64-linux-gnu/$source" "/opt/chromium-glibc/lib/$link"; \
+    done; \
+    for name in crtbegin crtend; do \
+        ln -s "/opt/chromium-llvm/lib/clang/24/lib/x86_64-unknown-linux-gnu/clang_rt.$name.o" \
+            "/opt/chromium-glibc/lib/$name.o"; \
+        ln -s "/opt/chromium-llvm/lib/clang/24/lib/x86_64-unknown-linux-gnu/clang_rt.$name.o" \
+            "/opt/chromium-glibc/lib/${name}S.o"; \
+    done
+
 RUN addgroup -S chromium && adduser -S -D -H -G chromium chromium
 
 COPY config /opt/chromium-build/config
@@ -81,19 +128,24 @@ COPY tests/probes /opt/chromium-build/tests/probes
 COPY tests/fixtures /opt/chromium-build/tests/fixtures
 COPY tests/test_browser_test_support.py /opt/chromium-build/tests/test_browser_test_support.py
 COPY tests/test_fetch_inputs.py /opt/chromium-build/tests/test_fetch_inputs.py
+COPY tests/test_helium_runtime.py /opt/chromium-build/tests/test_helium_runtime.py
 
 RUN set -eux; \
     mkdir -p /opt/chromium-build-metadata; \
     apk info -v | sort > "/opt/chromium-build-metadata/packages.$TARGET_ARCH.txt"
 
 RUN python3 /opt/chromium-build/scripts/write-environment-metadata.py "$TARGET_ARCH" \
-    --inputs-lock /opt/chromium-build/config/inputs.lock \
-    --package-lock "/opt/chromium-build/config/packages.$TARGET_ARCH.lock" \
-    --policy /opt/chromium-build/config/system-library-preflight.schema.json \
+    --inputs-lock "/opt/chromium-build/$INPUTS_LOCK" \
+    --package-lock "/opt/chromium-build/$PACKAGE_LOCK" \
+    --policy "/opt/chromium-build/$SYSTEM_LIBRARY_POLICY" \
     --output /opt/chromium-build-metadata/environment.json
 
-RUN CHROMIUM_ARCH="$TARGET_ARCH" CHROMIUM_METADATA_ROOT=/opt/chromium-build-metadata \
-    python3 /opt/chromium-build/scripts/preflight-system-libraries.py
+RUN CHROMIUM_ARCH="$TARGET_ARCH" CHROMIUM_PRODUCT="$PRODUCT" \
+    SYSTEM_LIBRARY_POLICY="/opt/chromium-build/$SYSTEM_LIBRARY_POLICY" \
+    CHROMIUM_METADATA_ROOT=/opt/chromium-build-metadata \
+    python3 /opt/chromium-build/scripts/preflight-system-libraries.py \
+    --lock "/opt/chromium-build/$PACKAGE_LOCK" \
+    --policy "/opt/chromium-build/$SYSTEM_LIBRARY_POLICY"
 
 ENV PATH="/opt/chromium-llvm/bin:$PATH" \
     CC=/opt/chromium-llvm/bin/clang \
@@ -117,6 +169,7 @@ ENV PATH="/opt/chromium-llvm/bin:$PATH" \
     CCACHE_COMPRESSLEVEL=1 \
     CCACHE_MAXSIZE=10G \
     CCACHE_NAMESPACE=${TARGET_ARCH}-${LLVM_SHA256}-compiler-command-v2 \
+    RUST_HOST_LINKER=/opt/chromium-build/scripts/rust-host-linker \
     CFLAGS=-Wno-unknown-warning-option \
     CXXFLAGS=-Wno-unknown-warning-option \
     NETWORK_MODE=none

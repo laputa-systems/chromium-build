@@ -141,12 +141,15 @@ def pruning_checks(args, lock):
     removed = set(report.get("removed", []))
     already_absent = set(report.get("already_absent", []))
     allowlisted = set(report.get("allowlisted_absent", []))
+    retained = set(report.get("retained_build_dependencies", []))
     require(requested, "pruning report contains no requested targets")
     require(not report.get("unexpected_absent"), "pruning found an unallowlisted missing target")
     require(already_absent <= allowlisted, "pruning accepted an absent target outside the committed allowlist")
-    require(set(requested) == removed | already_absent, "pruning report does not account for every requested target")
+    require(set(requested) == removed | already_absent | retained, "pruning report does not account for every requested target")
     for path in removed | already_absent:
         require(not (args.source_root / path).exists(), f"pruned target remains in source: {path}")
+    for path in retained:
+        require((args.source_root / path).exists(), f"retained build dependency is missing: {path}")
 
 
 def domain_checks(args, lock):
@@ -167,7 +170,10 @@ def toolchain_checks(args):
     for key in ("compiler", "cxx", "linker", "ar", "rust_linker"):
         value = selection.get(key, "")
         require(value.startswith("/opt/chromium-llvm/"), f"toolchain selection {key} is outside Chromium LLVM")
-    require(selection.get("rust_target_triple") in {"aarch64-alpine-linux-musl", "x86_64-alpine-linux-musl"}, "Rust target triple is not an approved Alpine musl target")
+    require(
+        selection.get("rust_target_triple") in {"aarch64-unknown-linux-musl", "x86_64-unknown-linux-musl"},
+        "Rust target triple is not an approved musl target",
+    )
 
 
 def unbundle_checks(args):
@@ -199,10 +205,10 @@ def main():
     work = Path(os.environ.get("CHROMIUM_WORK_ROOT", "/work"))
     metadata = Path(os.environ.get("CHROMIUM_METADATA_ROOT", work / "metadata"))
     parser.add_argument("--source-root", type=Path, default=Path(os.environ.get("CHROMIUM_SOURCE_ROOT", work / "src")))
-    parser.add_argument("--inputs-lock", type=Path, default=root / "config/inputs.lock")
+    parser.add_argument("--inputs-lock", type=Path, default=Path(os.environ.get("INPUTS_LOCK", root / "config/inputs.lock")))
     parser.add_argument("--source-inputs", type=Path, default=metadata / "source-inputs.json")
-    parser.add_argument("--patch-inventory", type=Path, default=root / "config/patch-inventory.json")
-    parser.add_argument("--patch-disposition", type=Path, default=root / "config/patch-disposition.json")
+    parser.add_argument("--patch-inventory", type=Path, default=Path(os.environ.get("PATCH_INVENTORY", root / "config/patch-inventory.json")))
+    parser.add_argument("--patch-disposition", type=Path, default=Path(os.environ.get("PATCH_DISPOSITION", root / "config/patch-disposition.json")))
     parser.add_argument("--patch-provenance", type=Path, default=metadata / "patches.json")
     parser.add_argument("--pruning-report", type=Path, default=metadata / "pruning.json")
     parser.add_argument("--domain-report", type=Path, default=metadata / "domain-substitution.json")

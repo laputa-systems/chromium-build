@@ -1,0 +1,11 @@
+--- a/build/config/BUILDCONFIG.gn
++++ b/build/config/BUILDCONFIG.gn
+@@ -133,6 +133,8 @@
+   is_clang = current_os != "linux" ||
+              (current_cpu != "mips" && current_cpu != "mips64")
+ 
++  is_musl = false
++
+   # Allows the path to a custom target toolchain to be injected as a single
+   # argument, and set as the default toolchain.
+   custom_toolchain = ""

@@ -1,0 +1,169 @@
+{
+  "schema": 1,
+  "product": {
+    "name": "helium",
+    "version": "0.20.3.1",
+    "platform_version": "1",
+    "source_revision": "83027a19267e526f08e25a3af1a30b45ee7e3e2e",
+    "core_revision": "2f81b9cafa38a95071e20de3f9cd6b0aca6d3c65"
+  },
+  "chromium": {
+    "version": "156.0.8078.79",
+    "devtools_revision": "8c62f844ad8e0664ff41a633bfc17c472f1c5fd6",
+    "archive_filename": "chromium-156.0.8078.79-base.tar.zst",
+    "archive_url": "https://tarballs.imput.net/chromium-156.0.8078.79/chromium-156.0.8078.79-base.tar.zst",
+    "archive_size": 1983333568,
+    "archive_sha512": "da9336d2e161f9133bdf120136e855a0e4fa0a2bd5d3f236b30187f18731c5d6803aa3f2b78f1510fa9dfc88c779e4f10bf9123b826b28c18ceef97e83cf3c30",
+    "upstream_sha256": "114d5110f0ac4248434e23cd97c50380dc49c438e6d9657d6b4e6542576c81af"
+  },
+  "source_inputs": {
+    "linux_overlay": {
+      "revision": "156.0.8078.79",
+      "filename": "chromium-156.0.8078.79-linux-x64.tar.zst",
+      "url": "https://tarballs.imput.net/chromium-156.0.8078.79/chromium-156.0.8078.79-linux-x64.tar.zst",
+      "size": 1198388088,
+      "sha512": "47141b7d106929b0e02051bd11ec6327aa819a0995732b4401ba8d2e9f13f8fc99fd4b139b93c4937317e0567838f9fbd383eafc06fd1a51fef57f68a5086d22",
+      "upstream_sha256": "372a08accf4fef2717959b5f06e1da4f6ca991033ce6848cab63c4ebab37e459",
+      "extract_after": "chromium"
+    },
+    "helium_core": {
+      "revision": "2f81b9cafa38a95071e20de3f9cd6b0aca6d3c65",
+      "filename": "helium-core-2f81b9cafa38a95071e20de3f9cd6b0aca6d3c65.tar.gz",
+      "url": "https://github.com/imputnet/helium/archive/2f81b9cafa38a95071e20de3f9cd6b0aca6d3c65.tar.gz",
+      "size": 2750899,
+      "sha512": "b207dbe614f8afb1ba9241c4e29ad882ec07b218b5f03271fc02fc971335d02d1d99d783c65845dd04140fb85476c4bbfbe5d74354d270d3492c11852f6a1e68"
+    },
+    "helium_linux": {
+      "revision": "83027a19267e526f08e25a3af1a30b45ee7e3e2e",
+      "filename": "helium-linux-83027a19267e526f08e25a3af1a30b45ee7e3e2e.tar.gz",
+      "url": "https://github.com/imputnet/helium-linux/archive/83027a19267e526f08e25a3af1a30b45ee7e3e2e.tar.gz",
+      "size": 2015138,
+      "sha512": "b7b67d8e5d1c0a10f17e2d2419303c1ad2d7eeef89b18af6978dbda84ce7294d7aa76e0acc43c1f53cd351c35042fa240f48fc0b34e38e3d3fa8e76eaced61bd"
+    },
+    "onboarding": {
+      "version": "202610161403",
+      "filename": "onboarding-page-202610161403.tar.gz",
+      "url": "https://github.com/imputnet/helium-onboarding/releases/download/202610161403/onboarding-page-202610161403.tar.gz",
+      "size": 135976237,
+      "sha512": "3da405d57f6679ca9ccab97aea82f2e294ab7a363ea96e2423e7b6cd37a562d32a69204f074adedb14f40898369daeed388ab8182caf86dbd46206c2bac1f111",
+      "upstream_sha256": "b35de6deb79e0864f53a0a70ea8819cecd46843a3b0518a20dd6a6b7d26900ac",
+      "destination": "components/helium_onboarding"
+    },
+    "search_engines_data": {
+      "version": "202609082320",
+      "filename": "nonfree-search-engines-data-202609082320.tar.gz",
+      "url": "https://github.com/imputnet/helium-nonfree-assets/releases/download/202609082320/nonfree-search-engines-data-202609082320.tar.gz",
+      "size": 43698,
+      "sha512": "860bcd73508c4e52d54f995de3cc7b18ea51edc45cd46329f845c3fde0a7d41aa8057d1d2f8824974783f675ba27131f7e3d89e2d8a40884a41b9ba417368640",
+      "upstream_sha256": "2a8d63af41454446d64bb5f19786d908419265f152adaff087132d8e0cda51a7",
+      "destination": "third_party/search_engines_data/resources_internal"
+    },
+    "ublock_origin": {
+      "version": "1.75.0",
+      "filename": "ublock-origin-1.75.0.zip",
+      "url": "https://github.com/imputnet/uBlock/releases/download/1.75.0/uBlock0_1.75.0.chromium.zip",
+      "size": 4653769,
+      "sha512": "a58338c4b6dcecbe02e461f4d082a3b6846e5b7d931c5e0a6855ef14f2026fdb33cf8b089569b1861af33020324fcd2479e48791fb98d714b28fe0a559b8fc17",
+      "upstream_sha256": "49214674f7c6c474e60da647c05bd28463b1f7a55b2a2b0a53e9d297ef7bf3c6",
+      "destination": "third_party/ublock",
+      "strip_leading_dirs": "uBlock0.chromium"
+    },
+    "alpine": {
+      "revision": "0a7d119de30703ac470c1a0b2935c0136e5b3c5e",
+      "filename": "aports-0a7d119de30703ac470c1a0b2935c0136e5b3c5e.tar.gz",
+      "url": "https://gitlab.alpinelinux.org/alpine/aports/-/archive/0a7d119de30703ac470c1a0b2935c0136e5b3c5e/aports-0a7d119de30703ac470c1a0b2935c0136e5b3c5e.tar.gz",
+      "size": 14270402,
+      "sha512": "6477d59c46e7ac8a3c9a87effa2a2126813de2271a6eb61c10fcc03cd221964a1d6755663d8612e6c41746c340627955e8a3057f1af926545ff57cde0d05986f"
+    },
+    "copium": {
+      "revision": "a887c5e7de6a9c768c5875625d1af814d60dc378",
+      "filename": "copium-a887c5e7de6a9c768c5875625d1af814d60dc378.tar.gz",
+      "url": "https://codeberg.org/selfisekai/copium/archive/a887c5e7de6a9c768c5875625d1af814d60dc378.tar.gz",
+      "size": 24220,
+      "sha512": "76c47baee157744ed78242b8cf9991dcd51383cb7a2e5274acd9e2c4d373839f70f8879c0c8c0ee9e6acd0a46810780c3200ec599dbf81ff84fbe3f45c48bf9b"
+    }
+  },
+  "source_identity": {
+    "schema": 1,
+    "product": "helium",
+    "chromium_version": "156.0.8078.79",
+    "product_version": "0.20.3.1",
+    "devtools_revision": "8c62f844ad8e0664ff41a633bfc17c472f1c5fd6",
+    "core_revision": "2f81b9cafa38a95071e20de3f9cd6b0aca6d3c65",
+    "linux_revision": "83027a19267e526f08e25a3af1a30b45ee7e3e2e"
+  },
+  "build_tools": {
+    "ninja": {
+      "package": "ninja-build=1.13.2-r1",
+      "path": "/usr/local/bin/ninja"
+    }
+  },
+  "base": {
+    "release": "3.24.1",
+    "digests": {
+      "arm64": "sha256:e7a1a92a5bfeee40966aea60f0796b0e7917cc35591542701834f03a68fa3d18",
+      "amd64": "sha256:79ff19e9084a00eece421b2523fb93e22d730e2c0e525905de047e848e56d95f"
+    }
+  },
+  "toolchain": {
+    "distribution": "chromium-clang",
+    "version": "24.0.0git",
+    "revision": "llvmorg-24-init-3796-g20e97c4b-2",
+    "lld_version": "24.0.0",
+    "root": "/opt/chromium-llvm",
+    "clang_cfg_sha256": "234bdd941720eee7c052191816d7fa1ec0dd44e6f97f8119ab3f577fbf3eddc2",
+    "clangxx_cfg_sha256": "234bdd941720eee7c052191816d7fa1ec0dd44e6f97f8119ab3f577fbf3eddc2",
+    "host_runtime": {
+      "image": "debian@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251",
+      "purpose": "build-only glibc loader and libraries for Chromium's Linux_x64 compiler"
+    },
+    "architectures": {
+      "amd64": {
+        "linux_arch": "x86_64",
+        "chromium_cpu": "x64",
+        "target_triple": "x86_64-unknown-linux-musl",
+        "archive_filename": "clang-llvmorg-24-init-3796-g20e97c4b-2.tar.xz",
+        "archive_size": 59131228,
+        "archive_url": "https://commondatastorage.googleapis.com/chromium-browser-clang/Linux_x64/clang-llvmorg-24-init-3796-g20e97c4b-2.tar.xz",
+        "archive_sha256": "86d53b33007a35695645e3867589a20f6f8aeedd146331e1a2ec8fd371e05ea2"
+      }
+    }
+  },
+  "ccache": {
+    "path": "/usr/bin/ccache",
+    "package": "ccache=4.13.6-r0",
+    "license": "GPL-3.0-or-later",
+    "cache_root": "/ccache",
+    "temp_root": "/ccache/tmp",
+    "max_size": "10G",
+    "compiler_check": "content",
+    "compress": true,
+    "compress_level": 1,
+    "sloppiness": null,
+    "base_dir": null,
+    "namespace": "{architecture}-{toolchain_sha256}"
+  },
+  "system_library_policy": {
+    "schema": 1,
+    "ffmpeg_roots": [
+      "libavcodec.so",
+      "libavformat.so",
+      "libavutil.so"
+    ],
+    "forbidden_sonames": [
+      "libc.so.6",
+      "libstdc++.so.6",
+      "libgcc_s.so.1"
+    ],
+    "builder_only_sonames": [
+      "libstdc++.so.6",
+      "libgcc_s.so.1"
+    ],
+    "exception_descendants": [
+      "libavcodec.so",
+      "libavformat.so",
+      "libavutil.so"
+    ]
+  },
+  "architecture": "amd64"
+}

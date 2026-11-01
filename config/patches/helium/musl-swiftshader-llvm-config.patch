@@ -1,0 +1,34 @@
+--- a/third_party/swiftshader/third_party/llvm-subzero/build/Linux/include/llvm/Config/config.h
++++ b/third_party/swiftshader/third_party/llvm-subzero/build/Linux/include/llvm/Config/config.h
+@@ -58,7 +58,9 @@
+ #define HAVE_ERRNO_H 1
+ 
+ /* Define to 1 if you have the <execinfo.h> header file. */
++#if defined(__GLIBC__)
+ #define HAVE_EXECINFO_H 1
++#endif
+ 
+ /* Define to 1 if you have the <fcntl.h> header file. */
+ #define HAVE_FCNTL_H 1
+@@ -133,7 +135,9 @@
+ /* #undef HAVE_MALLCTL */
+ 
+ /* Define to 1 if you have the `mallinfo' function. */
++#if defined(__GLIBC__)
+ #define HAVE_MALLINFO 1
++#endif
+ 
+ /* Some projects using SwiftShader bypass cmake (eg Chromium via gn) */
+ /* so we need to check glibc version for the new API to be safe */
+--- a/third_party/swiftshader/third_party/llvm-10.0/configs/linux/include/llvm/Config/config.h
++++ b/third_party/swiftshader/third_party/llvm-10.0/configs/linux/include/llvm/Config/config.h
+@@ -125,7 +125,9 @@
+ /* #undef HAVE_MALLCTL */
+ 
+ /* Define to 1 if you have the `mallinfo' function. */
++#if defined(__GLIBC__)
+ #define HAVE_MALLINFO 1
++#endif
+ 
+ /* Define to 1 if you have the <malloc/malloc.h> header file. */
+ /* #undef HAVE_MALLOC_MALLOC_H */

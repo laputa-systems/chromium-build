@@ -1,21 +1,33 @@
 PLATFORM ?= linux
+PRODUCT ?= chromium
 ifeq ($(PLATFORM),macos)
 ARCH ?= arm64
 PROFILE ?= macos-release
-else
-ARCH ?= amd64
-PROFILE ?= headless-debug
-endif
 IMAGE ?= ungoogled-chromium-builder:153.0.8010.52-$(ARCH)
 WORK_VOLUME ?= ungoogled-chromium-153-work-$(ARCH)
 CACHE_VOLUME ?= ungoogled-chromium-153-ccache-$(ARCH)
+else ifeq ($(PRODUCT),helium)
+ARCH ?= amd64
+PROFILE ?= helium-wayland-release
+# Helium image, work, and cache defaults come from config/helium.inputs.lock
+# through scripts/linux_product.py; leave them unset unless explicitly chosen.
+IMAGE ?=
+WORK_VOLUME ?=
+CACHE_VOLUME ?=
+else
+ARCH ?= amd64
+PROFILE ?= headless-debug
+IMAGE ?= ungoogled-chromium-builder:153.0.8010.52-$(ARCH)
+WORK_VOLUME ?= ungoogled-chromium-153-work-$(ARCH)
+CACHE_VOLUME ?= ungoogled-chromium-153-ccache-$(ARCH)
+endif
 # Ninja parallelism for build steps; empty keeps build.py's default of min(CPUs, 8).
 JOBS ?=
 
 CHROMIUM_BUILD = CHROMIUM_BUILDER_IMAGE=$(IMAGE) \
     CHROMIUM_WORK_VOLUME=$(WORK_VOLUME) \
     CHROMIUM_CACHE_VOLUME=$(CACHE_VOLUME) \
-    ./chromium-build --platform $(PLATFORM) --arch $(ARCH) --profile $(PROFILE) $(if $(JOBS),--jobs $(JOBS))
+    ./chromium-build --product $(PRODUCT) --platform $(PLATFORM) --arch $(ARCH) --profile $(PROFILE) $(if $(JOBS),--jobs $(JOBS))
 DOCKER ?= docker
 
 .NOTPARALLEL:

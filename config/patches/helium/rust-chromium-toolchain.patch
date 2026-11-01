@@ -1,0 +1,98 @@
+--- a/build/config/rust.gni
++++ b/build/config/rust.gni
+@@ -206,7 +206,7 @@
+   } else if (current_cpu == "x86") {
+     rust_abi_target = "i686-unknown-linux-gnu"
+   } else if (current_cpu == "x64") {
+-    rust_abi_target = "x86_64-alpine-linux-musl"
++    rust_abi_target = "x86_64-unknown-linux-musl"
+   } else if (current_cpu == "arm") {
+     if (arm_float_abi == "hard") {
+       float_suffix = "hf"
+@@ -344,6 +344,11 @@
+   }
+ }
+ 
++if (toolchain_for_rust_host_build_tools && is_linux && is_musl &&
++    current_cpu == "x64") {
++  rust_abi_target = "x86_64-unknown-linux-gnu"
++}
++
+ if (toolchain_has_rust) {
+   assert(rust_abi_target != "")
+ 
+--- a/build/toolchain/gcc_toolchain.gni
++++ b/build/toolchain/gcc_toolchain.gni
+@@ -738,6 +738,10 @@
+     }
+ 
+     if (toolchain_has_rust) {
++      rust_linker = invoker.cxx
++      if (defined(invoker.rust_host_linker)) {
++        rust_linker = invoker.rust_host_linker
++      }
+       rustc_wrapper_path =
+           rebase_path("//build/rust/gni_impl/rustc_wrapper.py", root_build_dir)
+       rustc_wrapper = "\"$python_path\" \"$rustc_wrapper_path\""
+@@ -779,7 +783,7 @@
+ 
+         rspfile_content =
+             "$rustc_common_args {{rustdeps}} {{externs}} SOURCES {{sources}}"
+-        command = "$rustc_wrapper --depfile=$depfile --emit=dep-info=$depfile,link -o $libname -- -Clinker=\"${invoker.cxx}\" {{source}} LDFLAGS RUSTENV {{rustenv}}"
++        command = "$rustc_wrapper --depfile=$depfile --emit=dep-info=$depfile,link -o $libname -- -Clinker=\"$rust_linker\" {{source}} LDFLAGS RUSTENV {{rustenv}}"
+         rust_sysroot = rust_sysroot_relative
+         inputs = rustc_wrapper_inputs
+       }
+@@ -812,7 +816,7 @@
+ 
+         rspfile_content =
+             "$rustc_common_args {{rustdeps}} {{externs}} SOURCES {{sources}}"
+-        command = "$rustc_wrapper --depfile=$depfile --emit=dep-info=$depfile,link,metadata=$rmetaname -o $rlibname -- -Clinker=\"${invoker.cxx}\" {{source}} LDFLAGS RUSTENV {{rustenv}}"
++        command = "$rustc_wrapper --depfile=$depfile --emit=dep-info=$depfile,link,metadata=$rmetaname -o $rlibname -- -Clinker=\"$rust_linker\" {{source}} LDFLAGS RUSTENV {{rustenv}}"
+         rust_sysroot = rust_sysroot_relative
+         inputs = rustc_wrapper_inputs
+       }
+@@ -834,7 +838,7 @@
+ 
+         rspfile_content =
+             "$rustc_common_args {{rustdeps}} {{externs}} SOURCES {{sources}}"
+-        command = "$rustc_wrapper --depfile=$depfile --emit=dep-info=$depfile,link -o $exename -- -Clinker=\"${invoker.cxx}\" {{source}} LDFLAGS {{ldflags}} ${extra_ldflags} RUSTENV {{rustenv}}"
++        command = "$rustc_wrapper --depfile=$depfile --emit=dep-info=$depfile,link -o $exename -- -Clinker=\"$rust_linker\" {{source}} LDFLAGS {{ldflags}} ${extra_ldflags} RUSTENV {{rustenv}}"
+         rust_sysroot = rust_sysroot_relative
+         inputs = rustc_wrapper_inputs
+       }
+@@ -857,7 +861,7 @@
+ 
+         rspfile_content =
+             "$rustc_common_args {{rustdeps}} {{externs}} SOURCES {{sources}}"
+-        command = "$rustc_wrapper --depfile=$depfile --emit=dep-info=$depfile,link -o $dllname -- -Clinker=\"${invoker.cxx}\" {{source}} LDFLAGS {{ldflags}} ${extra_ldflags} RUSTENV {{rustenv}}"
++        command = "$rustc_wrapper --depfile=$depfile --emit=dep-info=$depfile,link -o $dllname -- -Clinker=\"$rust_linker\" {{source}} LDFLAGS {{ldflags}} ${extra_ldflags} RUSTENV {{rustenv}}"
+         rust_sysroot = rust_sysroot_relative
+         inputs = rustc_wrapper_inputs
+       }
+@@ -882,7 +886,7 @@
+ 
+         rspfile_content =
+             "$rustc_common_args {{rustdeps}} {{externs}} SOURCES {{sources}}"
+-        command = "$rustc_wrapper --depfile=$depfile --emit=dep-info=$depfile,link,metadata=$rmetaname -o $dllname -- -Clinker=\"${invoker.cxx}\" {{source}} LDFLAGS {{ldflags}} ${extra_ldflags} RUSTENV {{rustenv}}"
++        command = "$rustc_wrapper --depfile=$depfile --emit=dep-info=$depfile,link,metadata=$rmetaname -o $dllname -- -Clinker=\"$rust_linker\" {{source}} LDFLAGS {{ldflags}} ${extra_ldflags} RUSTENV {{rustenv}}"
+         rust_sysroot = rust_sysroot_relative
+         inputs = rustc_wrapper_inputs
+       }
+@@ -905,7 +909,7 @@
+ 
+         rspfile_content =
+             "$rustc_common_args {{rustdeps}} {{externs}} SOURCES {{sources}}"
+-        command = "$rustc_wrapper --depfile=$depfile --emit=dep-info=$depfile,link -o $dllname -- -Clinker=\"${invoker.cxx}\" {{source}} LDFLAGS {{ldflags}} ${extra_ldflags} RUSTENV {{rustenv}}"
++        command = "$rustc_wrapper --depfile=$depfile --emit=dep-info=$depfile,link -o $dllname -- -Clinker=\"$rust_linker\" {{source}} LDFLAGS {{ldflags}} ${extra_ldflags} RUSTENV {{rustenv}}"
+         rust_sysroot = rust_sysroot_relative
+         inputs = rustc_wrapper_inputs
+       }
+@@ -1003,6 +1007,7 @@
+     assert(defined(invoker.toolchain_args),
+            "Toolchains must declare toolchain_args")
+     forward_variables_from(invoker, "*", TESTONLY_AND_VISIBILITY)
++    rust_host_linker = getenv("RUST_HOST_LINKER")
+   }
+ 
+   gcc_system_allocator_toolchain("${target_name}_host_with_system_allocator") {

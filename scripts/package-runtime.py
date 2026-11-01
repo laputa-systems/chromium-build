@@ -1,12 +1,5 @@
 #!/usr/bin/env python3
-"""Package a staged headless runtime as a self-contained, relocatable bundle.
-
-The staged runtime links against the image's NSS, NSPR, FFmpeg, and their
-transitive closure, and needs a fontconfig configuration with at least one
-font. A bundle carries all of that so the host needs only the musl loader and
-libc: shared libraries go in ``lib/``, the pinned Noto fonts in ``fonts/``, and
-``chromium`` is a launcher that points the loader and fontconfig at them.
-"""
+"""Package a staged runtime as a self-contained, relocatable bundle."""
 
 from __future__ import annotations
 
@@ -17,26 +10,20 @@ import os
 import re
 import shutil
 import subprocess
+import tarfile
 import tempfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
-# musl's libc is also its loader; the host must provide it.
-HOST_LIBRARIES = {"libc.musl-x86_64.so.1", "libc.musl-aarch64.so.1", "ld-musl-x86_64.so.1", "ld-musl-aarch64.so.1"}
-# stage-runtime keeps libstdc++/libgcc_s out of chrome's own requirements, but
-# the audited FFmpeg closure reaches Alpine's musl builds of them, so they are
-# bundled. glibc itself can never load under musl.
-GLIBC = {"libc.so.6", "ld-linux-x86-64.so.2", "ld-linux-aarch64.so.1"}
+import linux_runtime
+
+
+HOST_LIBRARIES = linux_runtime.MUSL_LIBRARIES
+GLIBC = linux_runtime.GLIBC_LIBRARIES
 LIBRARY_DIRECTORIES = (Path("/usr/lib"), Path("/lib"))
-# NSS opens its PKCS#11 soft token, freebl, and the built-in roots with dlopen,
-# relative to libnss3's own directory, so they never appear as DT_NEEDED.
 NSS_MODULES = ("libsoftokn3.so", "libfreeblpriv3.so", "libfreebl3.so", "libnssckbi.so")
 FONT_ROOT = Path("/usr/share/fonts/noto")
 FONTCONFIG_CONFD = Path("/etc/fonts/conf.d")
 
-# Chromium's bundled fontconfig honours prefix="relative" on <dir> but not on
-# <include>; a plain relative include resolves against FONTCONFIG_PATH, which
-# the launcher sets. Without conf.d there are no generic-family aliases and
-# every family falls back to one sans face.
 FONTS_CONF = """<?xml version="1.0"?>
 <!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
 <fontconfig>
@@ -47,8 +34,6 @@ FONTS_CONF = """<?xml version="1.0"?>
 """
 
 LAUNCHER = """#!/bin/sh
-# Launch the bundled Chromium with its own libraries and fonts. Child
-# processes re-execute chrome and inherit this environment.
 set -eu
 self=$(readlink -f -- "$0")
 root=${self%/*}
@@ -57,6 +42,17 @@ FONTCONFIG_FILE="$root/fontconfig/fonts.conf"
 FONTCONFIG_PATH="$root/fontconfig"
 export LD_LIBRARY_PATH FONTCONFIG_FILE FONTCONFIG_PATH
 exec "$root/chrome" "$@"
+"""
+
+HELIUM_LAUNCHER = """#!/bin/sh
+set -eu
+self=$(readlink -f -- "$0")
+root=${self%/*}
+LD_LIBRARY_PATH="$root/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+FONTCONFIG_FILE="$root/fontconfig/fonts.conf"
+FONTCONFIG_PATH="$root/fontconfig"
+export LD_LIBRARY_PATH FONTCONFIG_FILE FONTCONFIG_PATH
+exec "$root/helium" "$@"
 """
 
 
@@ -87,7 +83,6 @@ def find_library(name: str) -> Path:
 
 
 def bundle_libraries(root: Path) -> list[str]:
-    """Copy the transitive DT_NEEDED closure of chrome and the NSS modules."""
     lib = root / "lib"
     lib.mkdir()
     pending = [root / "chrome"]
@@ -108,7 +103,6 @@ def bundle_libraries(root: Path) -> list[str]:
 
 
 def audit_closure(root: Path) -> None:
-    """Every ELF in the bundle must resolve inside it, except musl itself."""
     present = {path.name for path in (root / "lib").iterdir()}
     for path in [root / "chrome", *sorted((root / "lib").iterdir())]:
         missing = [name for name in needed(path) if name not in present and name not in HOST_LIBRARIES]
@@ -127,24 +121,33 @@ def bundle_fonts(root: Path) -> None:
     (root / "fontconfig" / "fonts.conf").write_text(FONTS_CONF, encoding="utf-8")
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--stage", type=Path, required=True)
-    parser.add_argument("--output", type=Path, required=True)
-    args = parser.parse_args()
-    staged = json.loads((args.stage / "runtime-manifest.json").read_text(encoding="utf-8"))
-    if staged.get("status") != "complete":
+def stage_manifest(stage: Path, product: str) -> dict:
+    manifest = json.loads((stage / "runtime-manifest.json").read_text(encoding="utf-8"))
+    if manifest.get("status") != "complete":
         raise RuntimeError("staged runtime is incomplete; run stage-runtime first")
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    temporary = Path(tempfile.mkdtemp(prefix=f".{args.output.name}.", dir=args.output.parent))
+    if product == "helium" and manifest.get("product") != "helium":
+        raise RuntimeError("staged runtime is not a Helium runtime")
+    return manifest
+
+
+def copy_staged(stage: Path, destination: Path, manifest: dict) -> None:
+    for entry in manifest["files"]:
+        relative = PurePosixPath(entry["path"])
+        source = stage / relative
+        target = destination / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+        if digest(target) != entry["sha256"]:
+            raise RuntimeError(f"staged file changed after staging: {relative}")
+
+
+def package_chromium(stage: Path, output: Path) -> None:
+    manifest = stage_manifest(stage, "chromium")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    temporary = Path(tempfile.mkdtemp(prefix=f".{output.name}.", dir=output.parent))
     try:
         temporary.chmod(0o755)
-        for entry in staged["files"]:
-            destination = temporary / entry["path"]
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(args.stage / entry["path"], destination)
-            if digest(destination) != entry["sha256"]:
-                raise RuntimeError(f"staged file changed after staging: {entry['path']}")
+        copy_staged(stage, temporary, manifest)
         libraries = bundle_libraries(temporary)
         audit_closure(temporary)
         bundle_fonts(temporary)
@@ -156,12 +159,12 @@ def main() -> None:
             else:
                 path.chmod(0o644)
         files = sorted(path for path in temporary.rglob("*") if path.is_file())
-        manifest = {
+        packaged = {
             "schema": 1,
             "status": "complete",
             "launcher": "chromium",
             "chrome": "chrome",
-            "stage": str(args.stage),
+            "stage": str(stage),
             "host_requirements": sorted(HOST_LIBRARIES & {name for name in needed(temporary / "chrome")}),
             "bundled_libraries": libraries,
             "files": [
@@ -169,14 +172,165 @@ def main() -> None:
                 for path in files
             ],
         }
-        (temporary / "package-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-        if args.output.exists():
-            shutil.rmtree(args.output)
-        os.replace(temporary, args.output)
+        (temporary / "package-manifest.json").write_text(json.dumps(packaged, indent=2) + "\n", encoding="utf-8")
+        if output.exists():
+            shutil.rmtree(output)
+        os.replace(temporary, output)
     except BaseException:
         shutil.rmtree(temporary, ignore_errors=True)
         raise
-    print(f"package: {len(libraries)} libraries and {len(files)} files bundled at {args.output}")
+    print(f"package: {len(libraries)} libraries and {len(files)} files bundled at {output}")
+
+
+def product_identity() -> tuple[str, str]:
+    import linux_product
+
+    product = linux_product.resolve(
+        "helium",
+        os.environ.get("CHROMIUM_ARCH", "amd64"),
+        os.environ.get("CHROMIUM_PROFILE", "helium-wayland-release"),
+    )
+    if not product.product_version:
+        raise RuntimeError("Helium product version is missing from the inputs lock")
+    return product.product_version, product.arch
+
+
+def archive_name(version: str) -> str:
+    return f"helium-{version}-linux-x86_64-musl"
+
+
+def archive_package(
+    package: Path,
+    archive_root: str,
+    artifacts: Path,
+    verify,
+) -> tuple[Path, Path]:
+    artifacts.mkdir(parents=True, exist_ok=True)
+    archive = artifacts / f"{archive_root}.tar.xz"
+    checksum = artifacts / f"{archive.name}.sha256"
+    temporary = artifacts / f".{archive.name}.tmp-{os.getpid()}"
+    try:
+        with tarfile.open(temporary, "w:xz", preset=6) as bundle:
+            bundle.add(package, arcname=archive_root, recursive=True)
+        temporary.chmod(0o644)
+        verify(temporary)
+        os.replace(temporary, archive)
+        checksum_temporary = checksum.with_name(f".{checksum.name}.tmp-{os.getpid()}")
+        checksum_temporary.write_text(f"{digest(archive)}  {archive.name}\n", encoding="utf-8")
+        os.replace(checksum_temporary, checksum)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+    return archive, checksum
+
+
+def verify_archive(archive: Path, archive_root: str, expected: dict) -> None:
+    with tempfile.TemporaryDirectory(prefix="helium package verification ") as directory:
+        root = Path(directory)
+        with tarfile.open(archive, "r:xz") as bundle:
+            for member in bundle.getmembers():
+                relative = PurePosixPath(member.name)
+                if member.name == archive_root and member.isdir():
+                    continue
+                if relative.is_absolute() or ".." in relative.parts or not member.name.startswith(f"{archive_root}/"):
+                    raise RuntimeError(f"archive entry escapes its root: {member.name}")
+                if member.isdev():
+                    raise RuntimeError(f"archive contains a device: {member.name}")
+            bundle.extractall(root, filter="data")
+        extracted = root / archive_root
+        for entry in expected["files"]:
+            path = extracted / entry["path"]
+            if not path.is_file() or digest(path) != entry["sha256"]:
+                raise RuntimeError(f"archive verification failed for {entry['path']}")
+        linux_runtime.audit_tree(
+            extracted,
+            expected["architecture"],
+            gnu_runtime_allowed=linux_runtime.graphics_gnu_allowlist(extracted),
+        )
+
+
+def package_helium(stage: Path, output: Path, artifacts: Path) -> None:
+    version, architecture = product_identity()
+    manifest = stage_manifest(stage, "helium")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    temporary = Path(tempfile.mkdtemp(prefix=f".{output.name}.", dir=output.parent))
+    try:
+        temporary.chmod(0o755)
+        copy_staged(stage, temporary, manifest)
+        bundle_fonts(temporary)
+        launcher = temporary / "helium-wrapper"
+        launcher.write_text(HELIUM_LAUNCHER, encoding="utf-8")
+        for path in temporary.rglob("*"):
+            if path.is_dir():
+                path.chmod(0o755)
+            elif path.name == "chrome_sandbox":
+                path.chmod(0o4755)
+            elif path.name == "helium-wrapper" or path.name == "helium":
+                path.chmod(0o755)
+            elif is_elf(path):
+                path.chmod(0o755)
+            else:
+                path.chmod(0o644)
+        audit = linux_runtime.audit_tree(
+            temporary,
+            architecture,
+            gnu_runtime_allowed=linux_runtime.graphics_gnu_allowlist(temporary),
+        )
+        browser = linux_runtime.inspect_elf(temporary / "helium", temporary)
+        files = sorted(path for path in temporary.rglob("*") if path.is_file())
+        packaged = {
+            "schema": 1,
+            "status": "complete",
+            "product": "helium",
+            "product_version": version,
+            "architecture": architecture,
+            "launcher": "helium-wrapper",
+            "executable": "helium",
+            "stage": str(stage),
+            "host_requirements": sorted(HOST_LIBRARIES & set(browser.needed)),
+            "bundled_libraries": sorted(
+                path.name for path in (temporary / "lib").iterdir() if is_elf(path)
+            ) if (temporary / "lib").is_dir() else [],
+            "audit": audit,
+            "files": [
+                {
+                    "path": path.relative_to(temporary).as_posix(),
+                    "size": path.stat().st_size,
+                    "sha256": digest(path),
+                    "mode": oct(path.stat().st_mode & 0o7777),
+                }
+                for path in files
+            ],
+        }
+        (temporary / "package-manifest.json").write_text(json.dumps(packaged, indent=2) + "\n", encoding="utf-8")
+        archive_root = archive_name(version)
+        archive, checksum = archive_package(
+            temporary,
+            archive_root,
+            artifacts,
+            lambda path: verify_archive(path, archive_root, packaged),
+        )
+        if output.exists():
+            shutil.rmtree(output)
+        os.replace(temporary, output)
+    except BaseException:
+        shutil.rmtree(temporary, ignore_errors=True)
+        raise
+    print(f"package: {len(packaged['bundled_libraries'])} libraries and {len(files)} files at {output}")
+    print(f"package: {archive} ({checksum})")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--stage", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--product", choices=("chromium", "helium"), default=os.environ.get("CHROMIUM_PRODUCT", "chromium"))
+    parser.add_argument("--artifacts", type=Path, default=Path(os.environ.get("CHROMIUM_ARTIFACTS_ROOT", "/work/artifacts")))
+    args = parser.parse_args()
+    if args.product == "helium":
+        package_helium(args.stage, args.output, args.artifacts)
+    else:
+        package_chromium(args.stage, args.output)
 
 
 if __name__ == "__main__":

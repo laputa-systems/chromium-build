@@ -32,18 +32,33 @@ def main() -> None:
     test_tmp.mkdir(parents=True, exist_ok=True)
     test_tmp.chmod(0o777)
     os.environ["CHROMIUM_TEST_TMPDIR"] = str(test_tmp)
-    run(["python3", "-m", "unittest", "discover", "-s", str(root / "tests"), "-p", "test_*.py"])
+    product = os.environ.get("CHROMIUM_PRODUCT", "chromium")
+    if product == "helium":
+        run(
+            [
+                "python3",
+                "-m",
+                "unittest",
+                "discover",
+                "-s",
+                str(root / "tests"),
+                "-p",
+                "test_helium_*.py",
+            ]
+        )
+    else:
+        run(["python3", "-m", "unittest", "discover", "-s", str(root / "tests"), "-p", "test_*.py"])
     chrome = run(["python3", str(root / "scripts/resolve-output.py"), str(out), "//chrome:chrome"], capture_output=True).stdout.strip()
     if not chrome:
         raise ScriptFailure("cannot resolve Chrome")
     output.mkdir(parents=True, exist_ok=True)
     output.chmod(0o777)
-    for name in ("test-fast.json", "fast-screenshot.png"):
+    for name in ("test-fast.json", "fast-screenshot.png", "fast-compositor.png", "test-fast-helium.log"):
         (output / name).unlink(missing_ok=True)
     command = [
         "python3",
-        str(root / "scripts/test-fast.py"),
-        "--chrome",
+        str(root / ("scripts/helium_test_fast.py" if product == "helium" else "scripts/test-fast.py")),
+        "--helium" if product == "helium" else "--chrome",
         chrome,
         "--fixtures",
         str(root / "tests/fixtures"),

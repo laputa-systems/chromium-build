@@ -1,0 +1,231 @@
+{
+  "schema": 1,
+  "patch_application": {
+    "max_fuzz": 0
+  },
+  "layers": [
+    {
+      "project": "alpine",
+      "revision": "0a7d119de30703ac470c1a0b2935c0136e5b3c5e",
+      "patches": [
+        {
+          "name": "fstatat-32bit.patch",
+          "state": "not-applicable",
+          "affected_paths": [
+            "third_party/abseil-cpp/absl/base/internal/raw_logging.cc"
+          ]
+        },
+        {
+          "name": "musl-conditional-tkill.patch",
+          "state": "apply",
+          "affected_paths": []
+        },
+        {
+          "name": "no-res-ninit-nclose.patch",
+          "state": "apply",
+          "affected_paths": []
+        },
+        {
+          "name": "fix-ffmpeg-codec-list.patch",
+          "state": "apply",
+          "affected_paths": []
+        },
+        {
+          "name": "no-sandbox-settls.patch",
+          "state": "apply",
+          "affected_paths": []
+        },
+        {
+          "name": "musl-tid-caching.patch",
+          "state": "apply",
+          "affected_paths": []
+        },
+        {
+          "name": "0001-hotfix-ignore-a-new-warning-in-rust-1.89.patch",
+          "state": "apply",
+          "affected_paths": []
+        },
+        {
+          "name": "disable-failing-tests.patch",
+          "state": "not-applicable",
+          "affected_paths": [
+            "chrome/test"
+          ]
+        },
+        {
+          "name": "net-test-pyws3-py3.12.patch",
+          "state": "not-applicable",
+          "affected_paths": [
+            "net/test"
+          ]
+        }
+      ]
+    },
+    {
+      "project": "copium",
+      "revision": "a887c5e7de6a9c768c5875625d1af814d60dc378",
+      "patches": [
+        {
+          "name": "cr156-v8-no-san-trap.patch",
+          "state": "apply",
+          "affected_paths": []
+        },
+        {
+          "name": "cr133-ffmpeg-no-noh264parse.patch",
+          "state": "apply",
+          "affected_paths": []
+        },
+        {
+          "name": "cr149-musl-alloc-shim-dispatch.patch",
+          "state": "apply",
+          "affected_paths": []
+        },
+        {
+          "name": "cr142-rust-pre1.90.patch",
+          "state": "apply",
+          "affected_paths": []
+        },
+        {
+          "name": "cr146-rust-pre1.95-bytemuck.patch",
+          "state": "apply",
+          "affected_paths": []
+        },
+        {
+          "name": "cr148-rust-1.95-bytemuck.patch",
+          "state": "apply",
+          "affected_paths": []
+        },
+        {
+          "name": "cr149-rust-toolchain-var.patch",
+          "state": "apply",
+          "affected_paths": []
+        },
+        {
+          "name": "cr147-simdutf-8.0-base-char.patch",
+          "state": "apply",
+          "affected_paths": []
+        },
+        {
+          "name": "cr152-unbundle-opus-devtools.patch",
+          "state": "apply",
+          "affected_paths": []
+        },
+        {
+          "name": "cr153-unbundle-opus-iamf.patch",
+          "state": "apply",
+          "affected_paths": []
+        },
+        {
+          "name": "cr156-ffmpeg-no-agtm.patch",
+          "state": "apply",
+          "affected_paths": []
+        },
+        {
+          "name": "cr145-musl-unfortify-SkDescriptor.patch",
+          "state": "apply",
+          "affected_paths": []
+        },
+        {
+          "name": "cr145-iwyu-dev_t.patch",
+          "state": "apply",
+          "affected_paths": []
+        },
+        {
+          "name": "cr146-swiftshader-unfortify-memset-memcpy.patch",
+          "state": "apply",
+          "affected_paths": []
+        },
+        {
+          "name": "cr146-unfortify-blink-display_item_list.patch",
+          "state": "apply",
+          "affected_paths": []
+        },
+        {
+          "name": "cr151-dawn-cgo_enabled.patch",
+          "state": "apply",
+          "affected_paths": []
+        },
+        {
+          "name": "cr154-dawn-armv7-is-real.patch",
+          "state": "apply",
+          "affected_paths": []
+        },
+        {
+          "name": "cr152-unbundle-minizip-undo-unicode.patch",
+          "state": "apply",
+          "affected_paths": []
+        },
+        {
+          "name": "cr156-unbundle-icu-remoting.patch",
+          "state": "apply",
+          "affected_paths": []
+        },
+        {
+          "name": "cr153-typescript-break-definitions.patch",
+          "state": "apply",
+          "affected_paths": []
+        },
+        {
+          "name": "cr138-node-version-check.patch",
+          "state": "apply",
+          "affected_paths": []
+        },
+        {
+          "name": "cr140-musl-prctl.patch",
+          "state": "apply",
+          "affected_paths": []
+        }
+      ]
+    }
+  ],
+  "local_patches": [
+    "gate-e-hermetic-smoke.patch",
+    "alpine-node-version.patch",
+    "alpine-rust-bootstrap.patch",
+    "musl-sched-param-initializer.patch",
+    "musl-allocator-cdefs.patch",
+    "musl-allocator-cpp-noexcept.patch",
+    "musl-allocator-libc-noexcept.patch",
+    "musl-perfetto-cmsg-sign-compare.patch",
+    "musl-unix-domain-socket-types.patch",
+    "musl-stack-trace-noexecinfo.patch",
+    "musl-cookie-string-view-iterator.patch",
+    "musl-udp-cmsg-sign-compare.patch",
+    "musl-mojo-cmsg-sign-compare.patch",
+    "musl-mojo-vector-bool-clone.patch",
+    "musl-raw-ref-transparent-const.patch",
+    "musl-private-key-find-iterator.patch",
+    "musl-webrtc-physical-socket.patch",
+    "musl-sandbox-cmsg-sign-compare.patch",
+    "musl-sys-poll-compat-overlay.patch",
+    "musl-v8-sanitizer-header.patch",
+    "musl-fontconfig-no-nls.patch",
+    "musl-fontconfig-random.patch",
+    "musl-expat-hash-salt-2-8.patch",
+    "musl-libsync-no-cdefs.patch",
+    "musl-bindgen-clang22.patch",
+    "musl-crashpad-cmsg.patch",
+    "musl-native-egl-share-group.patch",
+    "musl-native-egl-semaphore-share-group.patch",
+    "musl-gpu-sandbox-tsync.patch",
+    "musl-gpu-sched-affinity-errno.patch",
+    "musl-gpu-sandbox-broker-tsync.patch",
+    "musl-gpu-pwritev2-sandbox.patch",
+    "musl-clang23-function-view-pointer-bool.patch",
+    "musl-clang23-omnibox-nodiscard.patch",
+    "headless-link-dawn-drm-and-variations.patch",
+    "headless-no-web-app-dbus-portal.patch",
+    "headless-global-accelerator-no-dbus-return.patch",
+    "declare-is-musl.patch",
+    "libcxx-musl-rune-table.patch",
+    "musl-target-triple.patch",
+    "rust-chromium-toolchain.patch",
+    "musl-bindgen-libclang-flags.patch",
+    "musl-mallinfo-guard.patch",
+    "musl-fontconfig-strerror-r.patch",
+    "musl-libsync-cdefs-include.patch",
+    "musl-swiftshader-llvm-config.patch",
+    "rust-bytemuck-simd.patch",
+    "musl-v8-no-execinfo.patch"
+  ]
+}

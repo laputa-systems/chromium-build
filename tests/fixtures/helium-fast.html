@@ -1,0 +1,13 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Helium Wayland fixture</title>
+<style>
+  html, body { margin: 0; width: 100%; height: 100%; background: #0b1020; }
+  #content { width: 100%; height: 100%; background: rgb(51, 204, 102); display: flex; align-items: center; justify-content: center; }
+  #status { font: 32px sans-serif; color: #08140c; }
+</style>
+<div id="content"><main id="status">not-ready</main></div>
+<script>
+document.querySelector("#status").textContent = "ready";
+window.fixture = { layout: document.querySelector("#content").getBoundingClientRect().width > 0 };
+</script>

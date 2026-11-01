@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "layers": [
+    {
+      "project": "alpine",
+      "revision": "0a7d119de30703ac470c1a0b2935c0136e5b3c5e",
+      "patches": [
+        "fstatat-32bit.patch",
+        "musl-conditional-tkill.patch",
+        "no-res-ninit-nclose.patch",
+        "fix-ffmpeg-codec-list.patch",
+        "no-sandbox-settls.patch",
+        "musl-tid-caching.patch",
+        "0001-hotfix-ignore-a-new-warning-in-rust-1.89.patch",
+        "disable-failing-tests.patch",
+        "net-test-pyws3-py3.12.patch"
+      ]
+    },
+    {
+      "project": "copium",
+      "revision": "a887c5e7de6a9c768c5875625d1af814d60dc378",
+      "patches": [
+        "cr156-v8-no-san-trap.patch",
+        "cr133-ffmpeg-no-noh264parse.patch",
+        "cr149-musl-alloc-shim-dispatch.patch",
+        "cr142-rust-pre1.90.patch",
+        "cr146-rust-pre1.95-bytemuck.patch",
+        "cr148-rust-1.95-bytemuck.patch",
+        "cr149-rust-toolchain-var.patch",
+        "cr147-simdutf-8.0-base-char.patch",
+        "cr152-unbundle-opus-devtools.patch",
+        "cr153-unbundle-opus-iamf.patch",
+        "cr156-ffmpeg-no-agtm.patch",
+        "cr145-musl-unfortify-SkDescriptor.patch",
+        "cr145-iwyu-dev_t.patch",
+        "cr146-swiftshader-unfortify-memset-memcpy.patch",
+        "cr146-unfortify-blink-display_item_list.patch",
+        "cr151-dawn-cgo_enabled.patch",
+        "cr154-dawn-armv7-is-real.patch",
+        "cr152-unbundle-minizip-undo-unicode.patch",
+        "cr156-unbundle-icu-remoting.patch",
+        "cr153-typescript-break-definitions.patch",
+        "cr138-node-version-check.patch",
+        "cr140-musl-prctl.patch"
+      ]
+    }
+  ]
+}

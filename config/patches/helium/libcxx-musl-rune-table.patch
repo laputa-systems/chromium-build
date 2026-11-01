@@ -1,0 +1,24 @@
+--- a/build/config/c++/BUILD.gn
++++ b/build/config/c++/BUILD.gn
+@@ -53,6 +53,10 @@
+   }
+ 
+   defines += [ "CR_LIBCXX_REVISION=$libcxx_revision" ]
++
++  if (is_musl) {
++    defines += [ "_LIBCPP_HAS_MUSL_LIBC=1" ]
++  }
+ 
+   if (is_win) {
+     # Intentionally not using libc++abi on Windows because libc++abi only
+--- a/buildtools/third_party/libc++/__config_site
++++ b/buildtools/third_party/libc++/__config_site
+@@ -28,8 +28,6 @@
+ 
+ #ifdef ANDROID_HOST_MUSL
+ #define _LIBCPP_HAS_MUSL_LIBC 1
+-#else
+-#define _LIBCPP_HAS_MUSL_LIBC 0
+ #endif
+ 
+ #ifdef _WIN32

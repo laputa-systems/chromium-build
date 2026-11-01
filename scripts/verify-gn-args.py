@@ -8,11 +8,23 @@ from pathlib import Path
 
 
 def parse_args(path):
-    values = {}
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.split("#", 1)[0].strip()
-        if not line or "=" not in line:
+    logical = []
+    pending = ""
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if not line:
             continue
+        if pending:
+            line = f"{pending} {line}"
+            pending = ""
+        if "=" not in line:
+            continue
+        if not line.split("=", 1)[1].strip():
+            pending = line
+            continue
+        logical.append(line)
+    values = {}
+    for line in logical:
         name, value = (part.strip() for part in line.split("=", 1))
         if value == "true":
             parsed = True
@@ -38,25 +50,15 @@ def parse_value(value):
         return value
 
 
-# The two Linux profiles differ only in the debug switch; everything else in
+# The two headless profiles differ only in the debug switch; everything else in
 # `expected` is the shared headless musl contract.
 DEBUG_BY_PROFILE = {"headless-debug": True, "headless-release": False}
+HEADLESS_PROFILES = tuple(sorted(DEBUG_BY_PROFILE))
+HELIUM_PROFILE = "helium-wayland-release"
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--args", type=Path, required=True)
-    parser.add_argument("--canonical", type=Path, required=True)
-    parser.add_argument("--effective-json", type=Path, required=True)
-    parser.add_argument("--probe", type=Path, required=True)
-    parser.add_argument("--target-cpu", required=True)
-    parser.add_argument("--clang-major", required=True)
-    parser.add_argument("--profile", choices=sorted(DEBUG_BY_PROFILE), required=True)
-    parser.add_argument("--output", type=Path, required=True)
-    args = parser.parse_args()
-
-    values = parse_args(args.args)
-    expected = {
+def helium_expected(args):
+    return {
         "target_os": "linux",
         "target_cpu": args.target_cpu,
         "host_cpu": args.target_cpu,
@@ -64,17 +66,17 @@ def main():
         "is_clang": True,
         "is_musl": True,
         "use_sysroot": False,
-        "rust_sysroot_absolute": "/usr",
-        "rust_bindgen_root": "/usr",
         "use_lld": True,
+        "use_mold": False,
         "clang_base_path": "/opt/chromium-llvm",
         "clang_version": args.clang_major,
         "custom_toolchain": "//build/toolchain/linux/unbundle:default",
         "host_toolchain": "//build/toolchain/linux/unbundle:default",
         "cc_wrapper": "/usr/bin/ccache",
         "is_component_build": False,
-        "is_debug": DEBUG_BY_PROFILE[args.profile],
+        "is_debug": False,
         "is_official_build": False,
+        "dcheck_always_on": False,
         "safe_browsing_mode": 0,
         "symbol_level": 0,
         "blink_symbol_level": 0,
@@ -85,14 +87,21 @@ def main():
         "use_custom_libcxx": True,
         "use_custom_libunwind": True,
         "use_safe_libstdcxx": False,
+        "use_system_libffi": True,
+        "use_siso": False,
+        "use_remoteexec": False,
         "use_ozone": True,
-        "ozone_platform": "headless",
-        "ozone_platform_headless": True,
-        "use_xkbcommon": False,
-        "ozone_platform_wayland": False,
-        "use_gtk": False,
+        "ozone_auto_platforms": False,
+        "ozone_platform": "wayland",
+        "ozone_platform_wayland": True,
+        "ozone_platform_headless": False,
+        "ozone_platform_x11": False,
+        "use_xkbcommon": True,
+        "use_gtk": True,
         "use_qt6": False,
-        "use_alsa": False,
+        "use_dbus": True,
+        "use_libpci": False,
+        "use_alsa": True,
         "use_pulseaudio": False,
         "rtc_use_pipewire": False,
         "rtc_link_pipewire": False,
@@ -104,10 +113,81 @@ def main():
         "ffmpeg_branding": "Chrome",
         "proprietary_codecs": True,
         "enable_widevine": False,
+        "enable_openxr": False,
+        "enable_vr": False,
         "optimize_webui": False,
+        "v8_use_metagen_instance_types": False,
     }
-    if not DEBUG_BY_PROFILE[args.profile]:
-        expected["dcheck_always_on"] = False
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--args", type=Path, required=True)
+    parser.add_argument("--canonical", type=Path, required=True)
+    parser.add_argument("--effective-json", type=Path, required=True)
+    parser.add_argument("--probe", type=Path, required=True)
+    parser.add_argument("--target-cpu", required=True)
+    parser.add_argument("--clang-major", required=True)
+    parser.add_argument("--profile", choices=[*HEADLESS_PROFILES, HELIUM_PROFILE], required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args()
+
+    values = parse_args(args.args)
+    if args.profile == HELIUM_PROFILE:
+        expected = helium_expected(args)
+    else:
+        expected = {
+            "target_os": "linux",
+            "target_cpu": args.target_cpu,
+            "host_cpu": args.target_cpu,
+            "root_extra_deps": ["//tools/hermetic_smoke"],
+            "is_clang": True,
+            "is_musl": True,
+            "use_sysroot": False,
+            "rust_sysroot_absolute": "/usr",
+            "rust_bindgen_root": "/usr",
+            "use_lld": True,
+            "clang_base_path": "/opt/chromium-llvm",
+            "clang_version": args.clang_major,
+            "custom_toolchain": "//build/toolchain/linux/unbundle:default",
+            "host_toolchain": "//build/toolchain/linux/unbundle:default",
+            "cc_wrapper": "/usr/bin/ccache",
+            "is_component_build": False,
+            "is_debug": DEBUG_BY_PROFILE[args.profile],
+            "is_official_build": False,
+            "safe_browsing_mode": 0,
+            "symbol_level": 0,
+            "blink_symbol_level": 0,
+            "v8_symbol_level": 0,
+            "chrome_pgo_phase": 0,
+            "is_cfi": False,
+            "use_thin_lto": False,
+            "use_custom_libcxx": True,
+            "use_custom_libunwind": True,
+            "use_safe_libstdcxx": False,
+            "use_ozone": True,
+            "ozone_platform": "headless",
+            "ozone_platform_headless": True,
+            "use_xkbcommon": False,
+            "ozone_platform_wayland": False,
+            "use_gtk": False,
+            "use_qt6": False,
+            "use_alsa": False,
+            "use_pulseaudio": False,
+            "rtc_use_pipewire": False,
+            "rtc_link_pipewire": False,
+            "use_vaapi": False,
+            "enable_vulkan": False,
+            "enable_swiftshader": False,
+            "enable_printing": True,
+            "use_cups": False,
+            "ffmpeg_branding": "Chrome",
+            "proprietary_codecs": True,
+            "enable_widevine": False,
+            "optimize_webui": False,
+        }
+        if not DEBUG_BY_PROFILE[args.profile]:
+            expected["dcheck_always_on"] = False
     for name, value in expected.items():
         if values.get(name) != value:
             raise SystemExit(f"GN arg {name}: expected {value!r}, got {values.get(name)!r}")

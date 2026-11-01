@@ -44,6 +44,17 @@ def locked_inputs(lock):
     ]
 
 
+def lock_identity(lock, lock_path):
+    product = lock.get("product", {})
+    return {
+        "product": product.get("name", "chromium"),
+        "chromium_version": lock["chromium"]["version"],
+        "product_version": product.get("version"),
+        "architecture": lock.get("architecture"),
+        "inputs_lock_sha256": hashlib.sha256(lock_path.read_bytes()).hexdigest(),
+    }
+
+
 def verify(path, item):
     digest = hashlib.sha512()
     size = 0
@@ -64,7 +75,10 @@ def write_atomic(path, text):
 
 
 def fetch_one(item, inputs_root):
-    destination = inputs_root / item["filename"]
+    filename = item["filename"]
+    if not filename or Path(filename).name != filename:
+        raise RuntimeError(f'{item["name"]}: unsafe input filename {filename!r}')
+    destination = inputs_root / filename
     if destination.is_file():
         verify(destination, item)
         final_url = item["url"]
@@ -106,7 +120,14 @@ def main():
     parser = argparse.ArgumentParser()
     root = Path(os.environ.get("CHROMIUM_BUILD_ROOT", "/opt/chromium-build"))
     work = Path(os.environ.get("CHROMIUM_WORK_ROOT", "/work"))
-    parser.add_argument("--lock", type=Path, default=root / "config/inputs.lock")
+    product = os.environ.get("CHROMIUM_PRODUCT", "chromium")
+    lock_default = {
+        "chromium": root / "config/inputs.lock",
+        "helium": root / "config/helium.inputs.lock",
+    }.get(product)
+    if lock_default is None:
+        raise SystemExit(f"unknown product {product}")
+    parser.add_argument("--lock", type=Path, default=Path(os.environ.get("INPUTS_LOCK", lock_default)))
     parser.add_argument("--inputs-root", type=Path, default=work / "inputs")
     parser.add_argument(
         "--metadata",
@@ -119,6 +140,9 @@ def main():
     require_file(args.lock, f"missing {args.lock}")
 
     lock = json.loads(args.lock.read_text(encoding="utf-8"))
+    identity = lock_identity(lock, args.lock)
+    if identity["product"] != product:
+        raise SystemExit(f"{args.lock} belongs to product {identity['product']}, not {product}")
     args.inputs_root.mkdir(parents=True, exist_ok=True)
     items = locked_inputs(lock)
     with ThreadPoolExecutor(max_workers=min(4, len(items))) as executor:
@@ -129,11 +153,16 @@ def main():
         "status": "complete",
         "network": "fetch-only",
         "chromium_version": lock["chromium"]["version"],
+        **identity,
         "entries": entries,
     }
     args.metadata.mkdir(parents=True, exist_ok=True)
-    write_atomic(args.metadata / "fetch-inputs.json", json.dumps(report, indent=2) + "\n")
-    write_atomic(args.metadata / "fetch-complete.stamp", "status=complete\nnetwork=fetch-only\n")
+    write_atomic(args.metadata / "fetch-inputs.json", json.dumps(report, indent=2, sort_keys=True) + "\n")
+    write_atomic(
+        args.metadata / "fetch-complete.stamp",
+        f"status=complete\nnetwork=fetch-only\nproduct={product}\n"
+        f"inputs_lock_sha256={identity['inputs_lock_sha256']}\n",
+    )
     print(f"Fetched and verified {len(entries)} locked inputs")
 
 

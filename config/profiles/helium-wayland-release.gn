@@ -1,0 +1,83 @@
+target_os = "linux"
+target_cpu = "@TARGET_CPU@"
+host_cpu = "@TARGET_CPU@"
+root_extra_deps = [ "//tools/hermetic_smoke" ]
+
+is_clang = true
+is_musl = true
+use_sysroot = false
+use_lld = true
+use_mold = false
+clang_base_path = "/opt/chromium-llvm"
+clang_version = "@CLANG_MAJOR@"
+clang_use_chrome_plugins = false
+custom_toolchain = "//build/toolchain/linux/unbundle:default"
+host_toolchain = "//build/toolchain/linux/unbundle:default"
+cc_wrapper = "/usr/bin/ccache"
+
+is_component_build = false
+is_debug = false
+is_official_build = false
+dcheck_always_on = false
+symbol_level = 0
+blink_symbol_level = 0
+v8_symbol_level = 0
+chrome_pgo_phase = 0
+is_cfi = false
+use_thin_lto = false
+use_custom_libcxx = true
+use_custom_libunwind = true
+use_safe_libstdcxx = false
+use_system_libffi = true
+use_siso = false
+use_remoteexec = false
+crashpad_http_transport_impl = "socket"
+
+use_ozone = true
+ozone_auto_platforms = false
+ozone_platform = "wayland"
+ozone_platform_wayland = true
+ozone_platform_headless = false
+ozone_platform_x11 = false
+use_xkbcommon = true
+use_gtk = true
+use_qt6 = false
+use_dbus = true
+use_libpci = false
+
+use_kerberos = false
+use_alsa = true
+use_pulseaudio = false
+rtc_use_pipewire = false
+rtc_link_pipewire = false
+use_vaapi = false
+enable_vulkan = false
+enable_swiftshader = false
+enable_printing = true
+use_cups = false
+
+ffmpeg_branding = "Chrome"
+proprietary_codecs = true
+enable_widevine = false
+enable_openxr = false
+enable_vr = false
+
+safe_browsing_mode = 0
+disable_fieldtrial_testing_config = true
+blink_enable_generated_code_formatting = false
+enable_hangout_services_extension = false
+enable_mdns = false
+enable_remoting = false
+enable_reporting = false
+enable_service_discovery = false
+exclude_unwind_tables = true
+fatal_linker_warnings = false
+google_api_key = ""
+google_default_client_id = ""
+google_default_client_secret = ""
+treat_warnings_as_errors = false
+use_official_google_api_keys = false
+use_unofficial_version_number = false
+optimize_webui = false
+
+v8_use_metagen_instance_types = false

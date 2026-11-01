@@ -81,6 +81,11 @@ def main() -> None:
         require_file(stamp, f"missing {stamp}")
     source_report = json.loads(require_file(metadata / "source-inputs.json").read_text(encoding="utf-8"))
     fetch_report = json.loads(require_file(metadata / "fetch-inputs.json").read_text(encoding="utf-8"))
+    product = os.environ.get("CHROMIUM_PRODUCT", "chromium")
+    if fetch_report.get("product", "chromium") != product:
+        raise ScriptFailure(f"fetch-inputs.json belongs to product {fetch_report.get('product')}, not {product}")
+    if source_report.get("product", "chromium") != product:
+        raise ScriptFailure(f"source-inputs.json belongs to product {source_report.get('product')}, not {product}")
     expected_identity = lock["source_identity"]
     if source_report.get("status") != "complete" or any(source_report.get(key) != expected_identity[key] for key in ("schema", "chromium_version", "devtools_revision")):
         raise ScriptFailure("source-inputs.json does not match the source lock")
@@ -158,11 +163,11 @@ def main() -> None:
             raise ScriptFailure(f"ccache config does not report {text}")
     verify_ccache_hit(ccache, cc, os.environ["CXX"])
     run([str(ccache), "-z"])
-    package_lock = root / f"config/packages.{arch}.lock"
+    package_lock = Path(os.environ.get("PACKAGE_LOCK", root / f"config/packages.{arch}.lock"))
     package_manifest = Path(os.environ.get("APK_MANIFEST", metadata / f"packages.{arch}.txt"))
     run(["python3", str(root / "scripts/lockcheck.py"), "packages", str(package_lock), str(package_manifest)])
     run(["python3", str(root / "scripts/lockcheck.py"), "environment", str(lock_path), os.environ.get("ENVIRONMENT_METADATA", str(metadata / "environment.json")), arch])
-    policy = root / "config/system-library-preflight.schema.json"
+    policy = Path(os.environ.get("SYSTEM_LIBRARY_POLICY", root / "config/system-library-preflight.schema.json"))
     preflight = Path(os.environ.get("SYSTEM_LIBRARY_PREFLIGHT", metadata / "system-library-preflight.json"))
     run(["python3", str(root / "scripts/lockcheck.py"), "preflight", str(policy), str(preflight), str(policy), str(package_lock)])
     if stage.exists() and any("ccache" in path.parts for path in stage.rglob("*")):

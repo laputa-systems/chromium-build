@@ -58,7 +58,8 @@ def main():
         "arguments": {},
     }
     optional_lines = []
-    for name in OPTIONAL_ARGS:
+    optional_args = OPTIONAL_ARGS if os.environ.get("CHROMIUM_PRODUCT", "chromium") == "chromium" else ()
+    for name in optional_args:
         locations = declarations(args.source_root, name)
         probe["arguments"][name] = {
             "supported": bool(locations),

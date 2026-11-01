@@ -1,0 +1,17 @@
+--- a/build/rust/gni_impl/filter_clang_args.py
++++ b/build/rust/gni_impl/filter_clang_args.py
+@@ -58,6 +58,14 @@
+                 i += 1
+                 continue
+ 
++            # Flags accepted by the pinned Clang but not by the host libclang.
++            if arg in (
++                '-fdiagnostics-show-inlining-chain',
++                '-fno-lifetime-dse',
++            ) or arg.startswith('-fsanitize-ignore-for-ubsan-feature='):
++                i += 1
++                continue
++
+             # Filter all warning flags (Clang/GCC -W*, clang-cl /W*, /wd*,
+             # /clang:-W*) and warning-as-error flags (-Werror, /WX).
+             if (
