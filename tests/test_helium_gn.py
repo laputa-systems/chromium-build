@@ -1,5 +1,7 @@
 """Helium GN contracts: product-branded resolution and profile authorization."""
 
+import importlib.util
+import json
 import os
 import subprocess
 import sys
@@ -10,6 +12,24 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 RESOLVE = ROOT / "scripts/resolve-output.py"
 VERIFY_ARGS = ROOT / "scripts/verify-gn-args.py"
+HELIUM_PROFILE = ROOT / "config/profiles/helium-wayland-release.gn"
+
+
+def load_verify_args():
+    spec = importlib.util.spec_from_file_location("verify_gn_args", VERIFY_ARGS)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def gn_value(value):
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, list):
+        return "[ " + ", ".join(json.dumps(item) for item in value) + " ]"
+    if isinstance(value, str):
+        return json.dumps(value)
+    return str(value)
 
 
 def write_executable(path: Path, body: str) -> None:
@@ -49,6 +69,17 @@ class ResolveOutputTest(unittest.TestCase):
     def test_helium_resolves_the_branded_graph_output(self):
         result = self.run_resolver("helium", 'print("helium")', {"helium": "elf"})
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(Path(result.stdout.strip()).name, "helium")
+
+    def test_helium_resolves_an_absolute_graph_output_once(self):
+        result = self.run_resolver(
+            "helium",
+            'import os, sys\nprint(os.path.join(sys.argv[2], "helium"))\nprint(os.path.join(sys.argv[2], "helium"))',
+            {"helium": "elf"},
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(len(result.stdout.splitlines()), 1)
+        self.assertTrue(Path(result.stdout.strip()).is_absolute())
         self.assertEqual(Path(result.stdout.strip()).name, "helium")
 
     def test_helium_rejects_unbranded_graph_output(self):
@@ -92,6 +123,52 @@ class VerifyArgsTest(unittest.TestCase):
             )
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("GN arg", result.stderr)
+
+    def test_helium_profile_matches_the_effective_contract(self):
+        verify_args = load_verify_args()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            profile = root / "profile.gn"
+            profile.write_text(
+                HELIUM_PROFILE.read_text(encoding="utf-8")
+                .replace("@TARGET_CPU@", "x64")
+                .replace("@CLANG_MAJOR@", "24"),
+                encoding="utf-8",
+            )
+            values = verify_args.parse_args(profile)
+            canonical = root / "canonical.gn"
+            canonical.write_text(
+                "\n".join(f"{name} = {gn_value(value)}" for name, value in values.items()) + "\n",
+                encoding="utf-8",
+            )
+            effective = root / "effective.json"
+            effective.write_text(
+                json.dumps([
+                    {"name": name, "current": {"value": gn_value(value)}}
+                    for name, value in values.items()
+                ]) + "\n",
+                encoding="utf-8",
+            )
+            probe = root / "probe.json"
+            probe.write_text('{"arguments": {}}\n', encoding="utf-8")
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(VERIFY_ARGS),
+                    "--args", str(profile),
+                    "--canonical", str(canonical),
+                    "--effective-json", str(effective),
+                    "--probe", str(probe),
+                    "--target-cpu", "x64",
+                    "--clang-major", "24",
+                    "--profile", "helium-wayland-release",
+                    "--output", str(root / "verify.json"),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
 
 
 if __name__ == "__main__":

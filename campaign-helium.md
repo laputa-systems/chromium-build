@@ -6,14 +6,15 @@ Goal: deliver a relocatable Helium desktop browser for native Linux amd64 musl,
 usable through the owner's `~/usr/bin/helium` in the Alpine dwl setup.
 Preserve Chromium Linux and native macOS behavior.
 
-Readiness: the bounded execution procedure is specified. Full unattended release
-completion is **unproven**, pending real image, musl compile, desktop, package,
-dwl, and installation milestones. No implementation item is accepted.
-The implementation baseline is `506fbac`. The existing plan was committed by
-the owner as `5b0ff53`; this revision changes documentation only.
+Readiness: the bounded execution procedure is specified. The automated image,
+musl compile, stage, package, and package-acceptance milestones are **complete**
+for the current archive. The target dwl session and live installation remain
+unproven. The implementation baseline is `506fbac`. The existing plan was
+committed by the owner as `5b0ff53`; this revision changes documentation only.
 
-Next: S00, then S01. No technical decision is deferred to an owner question.
-Execution and live installation still require their respective owner requests.
+Next: S14 and S15 on the owner's desktop. No technical decision is deferred to
+an owner question for the automated path. Execution and live installation still
+require their respective owner requests.
 Resume prompt: `Execute campaign-helium.md from S00. Follow each acceptance and
 recovery rule. Do not push or install into my real home.`
 First command: `git status --short`.
@@ -81,6 +82,11 @@ when it prevents verification. Leave unrelated baseline failures alone.
   Pinned glibc for the build-time upstream compiler remains permitted.
 - On 2026-10-31, the owner excluded Shadowdriver from Helium builds.
   Extend the Linux CDP harness. Leave macOS acceptance unchanged.
+- On 2026-11-01, the owner chose a lean, performance-oriented first package:
+  omit the DevTools frontend (tracked by `CHB-2`), disable D-Bus, enable
+  ThinLTO, and use Chromium's bundled Linux PGO profile. Keep GTK3 and the
+  native file chooser. Sway is only the automated builder fixture; dwl is the
+  target desktop.
 - The owner requires eventual use in the Alpine setup maintained under `~/usr`.
   Include target dwl qualification and an installer that needs no Docker on
   the target. Preserve the existing Chromium launcher and personal profiles.
@@ -125,14 +131,17 @@ when it prevents verification. Leave unrelated baseline failures alone.
   Record and review offsets. Never silently skip a failed patch. Classify every
   inherited patch as integrated, required, superseded, incompatible, or
   headless-only, with source evidence. A clean dry run does not prove need.
-- Keep browser UI, DevTools resources, and functioning desktop backends.
-  Do not inherit headless stubs or Crashpad removals by default. Build the
-  `//chrome:chrome` target and resolve its real `helium` output from GN.
-  Retain the upstream Crashpad helper when the selected graph requires it.
-- Start with native Wayland, ALSA, and Mesa software rendering. Prefer no
-  PulseAudio, PipeWire, systemd, or D-Bus dependency. Allow a necessary desktop
-  library when source and a functional test demonstrate need. Do not require
-  an X server, Vulkan, VA-API, hardware GPU, or remote build service.
+- Keep browser UI, raw CDP, and functioning desktop backends. The first lean
+  package omits the DevTools frontend resources. Do not inherit headless stubs
+  or Crashpad removals. Build the `//chrome:chrome` target and resolve its real
+  `helium` output from GN. Retain the upstream Crashpad helper when the selected
+  graph requires it.
+- Start with native Wayland, ALSA, Mesa GPU rendering, and Intel VA-API decode.
+  Prefer no PulseAudio, PipeWire, systemd, or D-Bus dependency. Allow a
+  necessary desktop library when source and a functional test demonstrate need.
+  Do not require an X server, Vulkan, a hardware GPU, a VA-API device, or a
+  remote build service; VA-API is optional at runtime and falls back to
+  software.
 - Disable upstream sysroot and Siso use in favor of the existing musl toolchain
   and Ninja. Validate every override against Chromium 156 declarations using
   `gn gen --fail-on-unused-args`. Preserve meaningful diagnostics. No global
@@ -629,15 +638,17 @@ Use this order and default policy:
 | Crashpad | local cdefs/CMSG plus relevant upstream 156 fixes | keep functioning handler and child execution; no headless Crashpad-removal series |
 | graphics | musl native EGL/GLES share-group and GPU syscall patches | Wayland renderer and llvmpipe evidence; headless Ozone EGL patch is not a Wayland implementation |
 | system FFmpeg | actual 156 FFmpeg compatibility patches | retain existing media fixture and scoped runtime exception |
-| UI/WebUI | full Helium upstream resources and TypeScript pipeline | no desktop stubs or DevTools-resource removal |
+| UI/WebUI | full Helium upstream resources and TypeScript pipeline | no headless desktop stubs; DevTools frontend resources are omitted by the Helium no-devtools patch |
 | hermetic gate target | `gate-e-hermetic-smoke.patch` | retain/port so Gate E still builds exceptions, threads, and in-tree libc++ |
 
 Start with every `headless-*` patch excluded from the Helium recipe. This
-includes no-desktop/no-D-Bus stubs, Crashpad removals, DevTools stubs, printing
-removals, webcam removals, and headless native EGL. If a generically necessary
-fix hides in such a patch, extract the smallest correct desktop fix into a
-Helium patch and name its source in the disposition. Do not enable the whole
-headless patch to fix one link error.
+includes headless no-desktop/no-D-Bus stubs, Crashpad removals, DevTools stubs,
+printing removals, webcam removals, and headless native EGL. The current Helium
+profile instead uses repository-owned `helium-no-devtools-frontend.patch` and
+`helium-no-dbus.patch` for its explicit lean and no-D-Bus contract. If a
+generically necessary fix hides in a headless patch, extract the smallest
+correct desktop fix into a Helium patch and name its source in the disposition.
+Do not enable the whole headless patch to fix one link error.
 
 For a failing or fuzzy required patch, regenerate only its changed context
 against the exact preimage. Compare the resulting postimage to the original
@@ -688,12 +699,19 @@ the exact source before rendering and require strict GN generation.
 | --- | --- |
 | identity/toolchain | Linux/x64 host and target, `is_musl=true`, `use_sysroot=false`, existing unbundle host/custom toolchain, locked Clang path/version, `cc_wrapper="/usr/bin/ccache"` |
 | C++/Rust | in-tree libc++/libunwind, no safe libstdc++, `/usr` Rust sysroot/bindgen, actual pinned musl Rust triple |
-| build loop | `is_debug=false`, `is_component_build=false`, `is_official_build=false`, PGO=0, CFI=false, thin-LTO=false, symbol levels=0, Siso=false |
+| build loop | `is_debug=false`, `is_component_build=false`, `is_official_build=true`, `dcheck_always_on=false`, PGO=2, CFI=false, thin-LTO=true, thin-LTO optimizations=true, symbol levels=0, Siso=false |
 | Wayland | `use_ozone=true`, `ozone_auto_platforms=false`, `ozone_platform="wayland"`, Wayland=true, X11=false, headless=false, `use_xkbcommon=true` |
-| desktop toolkit | `use_gtk=true`, Qt disabled, D-Bus integration disabled initially, printing retained without requiring CUPS |
-| audio/media | ALSA=true, PulseAudio=false, PipeWire capture/link=false, VA-API=false, proprietary codecs and Chrome FFmpeg branding retained |
-| rendering | software Mesa/EGL path retained; no required Vulkan; do not disable GPU globally; SwiftShader optional only when its real runtime is built and audited |
-| Helium behavior | retain UI, extensions, onboarding, bundled uBlock, privacy flags, DevTools frontend, WebUI build pipeline, and upstream version/branding |
+| desktop toolkit | `use_gtk=true`, Qt disabled, D-Bus disabled, printing retained without requiring CUPS |
+| audio/media | ALSA=true, PulseAudio=false, PipeWire capture/link=false, VA-API=true, proprietary codecs and Chrome FFmpeg branding retained |
+| rendering | Mesa/EGL GPU path retained with software fallback; Intel VA-API decode enabled but optional at runtime; no required Vulkan; do not disable GPU globally; SwiftShader optional only when its real runtime is built and audited |
+| Helium behavior | retain UI, extensions, onboarding, bundled uBlock, privacy flags, raw CDP, WebUI build pipeline, and upstream version/branding; omit the DevTools frontend for the first lean package |
+
+The lean build uses Chromium's bundled Linux PGO profile at
+`chrome/build/pgo_profiles/`, selected by `chrome/build/linux.pgo.txt`; no
+network fetch is required. `chrome_pgo_phase=2` and `is_official_build=true`
+also enable the official ThinLTO optimization level. This is a deliberate
+change from the initial PGO=0/ThinLTO-off baseline and requires a fresh build
+after Gate D.
 
 Keep upstream values outside the explicit overrides. Retain inherited diagnostic
 policy only when it comes from pinned upstream flags. Do not add new global
@@ -706,11 +724,12 @@ XWayland or session bus. GTK's linked X libraries do not by themselves imply
 an X server requirement. Bundle their real closure if required. Never broaden
 the GNU runtime exception because a desktop library has a normal dependency.
 
-If disabled D-Bus causes a concrete unresolved symbol or feature failure,
-first port the smallest correct feature guard without no-op desktop stubs.
-After three evidence-producing attempts, park that desktop item rather than
-requiring a D-Bus daemon in the owner's dwl session. Optional missing-bus errors
-are acceptable only when every required browser feature still passes.
+If disabled D-Bus causes a concrete unresolved symbol or feature failure, port
+the smallest correct feature guard and provide a minimal non-D-Bus fallback.
+Do not require a D-Bus daemon in the owner's dwl session. Record any fallback
+limitation, such as native notifications or external URI launch, as a TODO
+rather than silently disabling the feature. Optional missing-bus errors are
+acceptable only when every required browser feature still passes.
 
 The current shared renderer appends `devtools_skip_typecheck=false` and
 `devtools_bundle=false` when supported. Keep its Chromium behavior but do not
@@ -1312,6 +1331,7 @@ may be complete only if every mandatory row for that artifact passed.
 | clipboard | copy a unique sentinel with `wl-copy`, paste with native keyboard into fixture input; copy selected browser text and require `wl-paste` to return it | permission errors, empty text, or setting clipboard only through a CDP override fails |
 | fonts | render existing serif/sans/monospace samples and verify distinct measured widths/families plus visible glyphs; inspect bundled fontconfig aliases | a single fallback face for every family fails |
 | software-graphics | CDP GPU information identifies Mesa llvmpipe/software rendering; browser renders the fixture without a passed-through GPU device | `--disable-gpu` or the compositor's pixman setting alone cannot pass |
+| hardware-graphics (S14 only) | on the Broadwell desktop, GPU information identifies Mesa iris, `vainfo` lists H.264/VP8 profiles, and `chrome://media-internals` selects `VaapiVideoDecoder` for an H.264 or VP8 fixture | llvmpipe, missing VA-API profiles, or a software decoder for the fixture fails; VP9/HEVC software fallback is expected |
 | media | existing pinned local media reaches the required playback state and decoded frames/audio-track observations; retain its dynamic-library audit | renaming the codec fixture or disabling media checks fails |
 | tls-trust | the normal verifier accepts the local chain after importing its CA into a disposable NSS store; rejects the same chain without that CA, a wrong hostname, and an expired leaf | no ignore-certificate switch, SPKI exception, CDP security override, or navigation through an interstitial may authorize success |
 | sandbox-renderer | observe a live page renderer, enabled Chromium namespace/seccomp sandbox status, and process evidence meeting the rules below | a container-provided seccomp filter or absence of `--no-sandbox` alone cannot pass |
@@ -1463,6 +1483,41 @@ failure halfway through mutation. If this safe operation is not implemented,
 preserve state and park the fix rather than editing source and fabricating
 new preparation evidence.
 
+## Current status
+
+- S00–S09 are complete for the current source and profile. Source preparation
+  includes `helium-no-devtools-frontend.patch`, `helium-no-dbus.patch`,
+  `helium-dawn-vulkan-headers.patch`, and the musl seccomp compatibility
+  patches. Gate A, Gate C, Gate D, and Gate F pass for the final builder image
+  `sha256:160899ccbfcd29483806ae6a5787b2e29b7ef2aaa8c6f2c10bdc41ba6972a91b`.
+- S10 is complete. The profile built with `is_official_build=true`,
+  `chrome_pgo_phase=2`, ThinLTO with optimizations, `use_dbus=false`,
+  `use_vaapi=true`, and no DevTools frontend resources. The final build report
+  records a 319-second gate-triggered relink after the source was already
+  compiled; the initial full graph build is the long pole and is not claimed as
+  a clean-build benchmark. `chrome_sandbox` is built separately with
+  `build-target chrome_sandbox` because `ninja //chrome:chrome` does not build
+  that data dependency.
+- S12 and S13 are complete for this archive. `stage-runtime` collected 320
+  files and 147 libraries. `package` produced
+  `helium-0.20.3.1-linux-x86_64-musl.tar.xz` (223.3 MB, 521 files, SHA-256
+  `6853af22b60345c92e0cbe69181aebd8af3fa79842c7f0135d20c9656c5918c6`).
+  `test-fast` and `test-staged` passed 29 unit tests plus the headed Wayland
+  browser matrix. A fresh extraction of that archive passed product identity,
+  Wayland window, page rendering, three sandboxed renderers, and clean
+  shutdown; `.acceptance.json` binds the tested archive digest.
+- The raw-CDP path exposed three profile-specific runtime defects, each fixed
+  at its source rather than with a launch flag: musl's `pthread_create`
+  membarrier registration (`musl-seccomp-membarrier.patch`), musl's
+  `CLONE_DETACHED` thread flags (`musl-seccomp-clone-detached.patch`), and the
+  DevTools policy allowlist pref that raw CDP reads even without the frontend
+  (`helium-devtools-policy-prefs.patch`). The system FFmpeg closure carries the
+  scoped GNU C++ runtime exception for `libstdc++.so.6`/`libgcc_s.so.1`; the
+  audit allows those edges only below the FFmpeg roots.
+- S14 and S15 remain parked on the owner's dwl session and an explicit
+  live-install request. The automated Sway fixture is only a builder check.
+  Real Broadwell VA-API decode is `CHB-6`.
+
 ## Performance qualification
 
 No speedup target is imposed before feature parity. Measure memory and binary
@@ -1473,6 +1528,9 @@ and do not call release qualification complete. Use interleaved baseline and
 candidate runs, CPU time for compute cost, and medians for typical durations.
 Treat only differences larger than observed spread as regressions. Do not compare
 full Helium desktop size directly with headless Chromium as an optimization gate.
+The lean profile enables PGO and ThinLTO; measure its package size and runtime
+behavior after S13, and do not attribute a speedup to either mechanism without
+a matched baseline from the same source and acceptance setup.
 
 ## Needs environment
 
@@ -1542,8 +1600,9 @@ commands, report readers, and macOS behavior. Do not add compatibility shims
 without a demonstrated current consumer.
 
 No Linux arm64, new macOS product, static browser, AppImage, Debian/RPM/Flatpak,
-hardware-acceleration tuning, distribution service, CI work, or Shadowdriver
-integration for Helium. Retain upstream-required helpers; building chromedriver
+GPU performance tuning beyond enabling Chromium's VA-API decode path,
+distribution service, CI work, or Shadowdriver integration for Helium. Retain
+upstream-required helpers; building chromedriver
 is not a requirement unless the chosen runtime graph or a concrete consumer
 requires it. Any manifest difference from upstream must have a source or graph
 reason.

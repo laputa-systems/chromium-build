@@ -34,6 +34,7 @@ def main() -> None:
     test_tmp = work / f"test-tmp/{profile}"
     test_tmp.mkdir(parents=True, exist_ok=True)
     test_tmp.chmod(0o777)
+    os.environ["TMPDIR"] = str(test_tmp)
     os.environ["CHROMIUM_TEST_TMPDIR"] = str(test_tmp)
     if product == "helium":
         run(["python3", "-m", "unittest", "discover", "-s", str(root / "tests"), "-p", "test_helium_*.py"])

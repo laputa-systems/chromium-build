@@ -1,0 +1,212 @@
+--- a/content/browser/devtools/features.gni
++++ b/content/browser/devtools/features.gni
+@@ -5,4 +5,5 @@
+ import("//build/config/chrome_build.gni")
+ 
+ # iOS and Fuchsia don't support DevTools front-end.
+-enable_devtools_frontend = !is_ios && !is_fuchsia
++enable_devtools_frontend = false
++enable_devtools_browser = true
+--- /dev/null
++++ b/content/browser/devtools/devtools_frontend_host_stub.cc
+@@ -0,0 +1,27 @@
++// Copyright 2026 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#include "content/public/browser/devtools_frontend_host.h"
++
++namespace content {
++
++std::unique_ptr<DevToolsFrontendHost> DevToolsFrontendHost::Create(
++    RenderFrameHost*,
++    const HandleMessageCallback&) {
++  return nullptr;
++}
++
++void DevToolsFrontendHost::SetupExtensionsAPI(RenderFrameHost*,
++                                              const std::string&) {}
++
++scoped_refptr<base::RefCountedMemory>
++DevToolsFrontendHost::GetFrontendResourceBytes(std::string_view) {
++  return nullptr;
++}
++
++std::string DevToolsFrontendHost::GetFrontendResource(std::string_view) {
++  return {};
++}
++
++}  // namespace content
+--- a/chrome/browser/devtools/BUILD.gn
++++ b/chrome/browser/devtools/BUILD.gn
+@@ -22,9 +22,7 @@
+   "protocol/target.cc",
+   "protocol/target.h",
+ ]
+-
+-if (enable_devtools_frontend) {
+-  _protocol_generated += [
++_protocol_generated += [
+     "protocol/ads.cc",
+     "protocol/ads.h",
+     "protocol/autofill.cc",
+@@ -55,7 +53,6 @@
+       "protocol/window_manager.h",
+     ]
+   }
+-}
+ 
+ _concatenated_protocol_path =
+     "$root_gen_dir/chrome/browser/devtools/protocol.json"
+@@ -185,7 +182,7 @@
+     "//ui/events:dom_keycode_converter",
+   ]
+ 
+-  if (enable_devtools_frontend) {
++  if (enable_devtools_frontend || enable_devtools_browser) {
+     sources += [
+       "aida_client.cc",
+       "aida_client.h",
+@@ -406,7 +403,7 @@
+       "serialize_host_descriptions.cc",
+       "serialize_host_descriptions.h",
+     ]
+-    if (enable_service_discovery) {
++    if (defined(enable_service_discovery) && enable_service_discovery) {
+       sources += [
+         "device/cast_device_provider.cc",
+         "device/cast_device_provider.h",
+@@ -625,7 +622,7 @@
+       "//crypto:test_support",
+     ]
+ 
+-    if (enable_service_discovery) {
++    if (defined(enable_service_discovery) && enable_service_discovery) {
+       sources += [ "device/cast_device_provider_unittest.cc" ]
+     }
+   }
+--- a/chrome/browser/ui/webui/devtools/BUILD.gn
++++ b/chrome/browser/ui/webui/devtools/BUILD.gn
+@@ -4,7 +4,7 @@
+ 
+ import("//content/browser/devtools/features.gni")
+ 
+-if (enable_devtools_frontend) {
++if (enable_devtools_frontend || enable_devtools_browser) {
+   source_set("devtools") {
+     sources = [
+       "devtools_ui.cc",
+--- a/content/browser/BUILD.gn
++++ b/content/browser/BUILD.gn
+@@ -3477,6 +3477,8 @@
+       "//content/browser/devtools:devtools_resources",
+       "//content/browser/devtools:devtools_resources_extern",
+     ]
++  } else if (enable_devtools_browser) {
++    sources += [ "devtools/devtools_frontend_host_stub.cc" ]
+   }
+ 
+   if (!is_android && !is_ios && !is_fuchsia) {
+--- a/chrome/browser/extensions/BUILD.gn
++++ b/chrome/browser/extensions/BUILD.gn
+@@ -1559,7 +1559,7 @@
+     ]
+   }
+ 
+-  if (enable_devtools_frontend) {
++  if (enable_devtools_frontend || enable_devtools_browser) {
+     deps += [ "//chrome/browser/ui/webui/devtools" ]
+   }
+ 
+--- a/chrome/BUILD.gn
++++ b/chrome/BUILD.gn
+@@ -20,6 +20,7 @@
+ import("//chrome/common/features.gni")
+ import("//chrome/process_version_rc_template.gni")
+ import("//components/optimization_guide/features.gni")
++import("//content/browser/devtools/features.gni")
+ import("//content/public/common/features.gni")
+ import("//extensions/buildflags/buildflags.gni")
+ import("//media/media_options.gni")
+@@ -1654,11 +1655,15 @@
+     "//content/public/child",
+     "//pdf",
+     "//services/tracing/public/cpp",
+-    "//third_party/blink/public:blink_devtools_frontend_resources",
+     "//third_party/blink/public:blink_devtools_inspector_resources",
+     "//v8:v8_headers",
+   ]
+ 
++  if (enable_devtools_frontend) {
++    public_deps +=
++        [ "//third_party/blink/public:blink_devtools_frontend_resources" ]
++  }
++
+   if (enable_printing) {
+     public_deps += [ "//printing" ]
+   }
+--- a/extensions/BUILD.gn
++++ b/extensions/BUILD.gn
+@@ -257,15 +257,14 @@
+ 
+   # The following resources are not used by desktop-android build.
+   if (enable_extensions) {
+-    sources += [
+-      "$root_gen_dir/content/browser/devtools/devtools_resources.pak",
+-      "$root_gen_dir/device/bluetooth/strings/bluetooth_strings_en-US.pak",
+-    ]
++    sources += [ "$root_gen_dir/device/bluetooth/strings/bluetooth_strings_en-US.pak" ]
++    deps += [ "//device/bluetooth/strings" ]
+ 
+-    deps += [
+-      "//content/browser/devtools:devtools_resources",
+-      "//device/bluetooth/strings",
+-    ]
++    if (defined(enable_devtools_frontend) && enable_devtools_frontend) {
++      sources +=
++          [ "$root_gen_dir/content/browser/devtools/devtools_resources.pak" ]
++      deps += [ "//content/browser/devtools:devtools_resources" ]
++    }
+   }
+ }
+ 
+--- a/content/shell/BUILD.gn
++++ b/content/shell/BUILD.gn
+@@ -609,7 +609,7 @@
+     sources +=
+         [ "$root_gen_dir/ui/views/resources/views_resources_100_percent.pak" ]
+   }
+-  if (!is_android && !is_fuchsia && !is_ios) {
++  if (!is_android && !is_fuchsia && !is_ios && defined(enable_devtools_frontend) && enable_devtools_frontend) {
+     sources +=
+         [ "$root_gen_dir/content/browser/devtools/devtools_resources.pak" ]
+     deps += [ "//content/browser/devtools:devtools_resources" ]
+--- a/headless/BUILD.gn
++++ b/headless/BUILD.gn
+@@ -101,7 +101,7 @@
+     "//ui/strings",
+   ]
+ 
+-  if (!is_fuchsia) {
++  if (!is_fuchsia && defined(enable_devtools_frontend) && enable_devtools_frontend) {
+     sources +=
+         [ "$root_gen_dir/content/browser/devtools/devtools_resources.pak" ]
+     deps += [ "//content/browser/devtools:devtools_resources" ]
+--- a/ui/webui/examples/BUILD.gn
++++ b/ui/webui/examples/BUILD.gn
+@@ -125,7 +125,6 @@
+   testonly = true
+   sources = [
+     "$root_gen_dir/chrome/webui_gallery_resources.pak",
+-    "$root_gen_dir/content/browser/devtools/devtools_resources.pak",
+     "$root_gen_dir/mojo/public/js/mojo_bindings_resources.pak",
+     "$root_gen_dir/third_party/blink/public/resources/blink_resources.pak",
+     "$root_gen_dir/third_party/blink/public/resources/blink_scaled_resources_100_percent.pak",
+@@ -141,7 +140,6 @@
+     ":resources",
+     "resources/browser:resources",
+     "//chrome/browser/resources/webui_gallery:resources",
+-    "//content/browser/devtools:devtools_resources",
+     "//mojo/public/js:resources",
+     "//third_party/blink/public:devtools_inspector_resources",
+     "//third_party/blink/public:resources",

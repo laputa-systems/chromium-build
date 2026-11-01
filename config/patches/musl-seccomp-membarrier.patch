@@ -1,0 +1,32 @@
+--- a/sandbox/linux/seccomp-bpf-helpers/baseline_policy.cc
++++ b/sandbox/linux/seccomp-bpf-helpers/baseline_policy.cc
+@@ -5,6 +5,7 @@
+ #include "sandbox/linux/seccomp-bpf-helpers/baseline_policy.h"
+ 
+ #include <errno.h>
++#include <linux/membarrier.h>
+ #include <sys/mman.h>
+ #include <sys/socket.h>
+ #include <sys/syscall.h>
+@@ -160,6 +161,21 @@
+     return Allow();
+ #endif
+ 
++#if defined(__NR_membarrier)
++  // musl registers a private expedited membarrier on its first thread
++  // creation, which can happen after the seccomp policy is installed in a
++  // Chromium child process.
++  if (sysno == __NR_membarrier) {
++    const Arg<int> command(0);
++    const Arg<int> flags(1);
++    return If(AllOf(AnyOf(command == MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED,
++                          command == MEMBARRIER_CMD_PRIVATE_EXPEDITED),
++                    flags == 0),
++              Allow())
++        .Else(Error(EPERM));
++  }
++#endif
++
+   // V8 uses PKU (a.k.a. MPK / PKEY) for protecting code spaces.
+   if (sysno == __NR_pkey_alloc) {
+     return RestrictPkeyAllocFlags();

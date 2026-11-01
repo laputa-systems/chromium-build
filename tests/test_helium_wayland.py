@@ -89,6 +89,7 @@ class FixtureTest(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.root = Path(self.directory.name)
+        self.root.chmod(0o755)
         self.bin = self.root / "bin"
         self.bin.mkdir()
         self.output = self.root / "output"

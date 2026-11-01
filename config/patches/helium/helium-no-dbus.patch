@@ -1,0 +1,249 @@
+--- a/chrome/browser/chrome_browser_main_linux.cc
++++ b/chrome/browser/chrome_browser_main_linux.cc
+@@ -19,7 +19,9 @@
+ #include "chrome/common/chrome_features.h"
+ #include "components/password_manager/core/browser/password_manager_switches.h"
+ #include "content/public/browser/browser_thread.h"
++#if BUILDFLAG(USE_DBUS) && !BUILDFLAG(IS_CHROMEOS)
+ #include "device/bluetooth/dbus/bluez_dbus_manager.h"
++#endif
+ #include "ui/base/l10n/l10n_util.h"
+ 
+ #if BUILDFLAG(IS_LINUX)
+@@ -111,7 +113,7 @@
+ void ChromeBrowserMainPartsLinux::PostDestroyThreads() {
+ #if BUILDFLAG(IS_CHROMEOS)
+   // No-op; per PostBrowserStart() comment, this is done elsewhere.
+-#else
++#elif BUILDFLAG(USE_DBUS)
+ #if BUILDFLAG(USE_DBUS)
+   session_end_listener_.reset();
+ #endif
+--- a/chrome/browser/BUILD.gn
++++ b/chrome/browser/BUILD.gn
+@@ -1665,6 +1665,8 @@
+         "//components/os_crypt/browser:secret_portal_key_provider",
+         "//dbus",
+       ]
++    } else {
++      sources += [ "platform_util_linux_no_dbus.cc" ]
+     }
+   }
+ 
+--- /dev/null
++++ b/chrome/browser/platform_util_linux_no_dbus.cc
+@@ -0,0 +1,51 @@
++// Copyright 2026 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#include "chrome/browser/platform_util.h"
++
++#include <string>
++
++#include "base/files/file_path.h"
++#include "base/process/kill.h"
++#include "base/process/launch.h"
++#include "base/process/process.h"
++#include "chrome/browser/platform_util_internal.h"
++#include "url/gurl.h"
++
++namespace {
++
++void Launch(const std::string& program, const std::string& argument) {
++  base::LaunchOptions options;
++  options.allow_new_privs = true;
++  base::Process process = base::LaunchProcess({program, argument}, options);
++  if (process.IsValid()) {
++    base::EnsureProcessGetsReaped(std::move(process));
++  }
++}
++
++}  // namespace
++
++namespace platform_util {
++
++namespace internal {
++
++void PlatformOpenVerifiedItem(const base::FilePath& path, OpenItemType) {
++  Launch("xdg-open", path.value());
++}
++
++}  // namespace internal
++
++void ShowItemInFolder(Profile*, const base::FilePath& full_path) {
++  Launch("xdg-open", full_path.DirName().value());
++}
++
++void OpenExternal(const GURL& url) {
++  if (url.SchemeIs("mailto")) {
++    Launch("xdg-email", url.spec());
++  } else {
++    Launch("xdg-open", url.spec());
++  }
++}
++
++}  // namespace platform_util
+--- a/chrome/browser/metrics/BUILD.gn
++++ b/chrome/browser/metrics/BUILD.gn
+@@ -493,7 +493,7 @@
+     sources += [ "structured/chrome_structured_metrics_delegate.cc" ]
+   }
+ 
+-  if (is_linux || is_chromeos) {
++  if (is_chromeos || (is_linux && defined(use_dbus) && use_dbus)) {
+     sources += [ "bluetooth_metrics_provider.cc" ]
+   }
+ 
+--- a/chrome/browser/metrics/chrome_metrics_service_client.cc
++++ b/chrome/browser/metrics/chrome_metrics_service_client.cc
+@@ -888,7 +888,7 @@
+       metrics::MetricsLogUploader::MetricServiceType::UMA));
+ 
+ 
+-#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
++#if BUILDFLAG(IS_CHROMEOS)
+   metrics_service_->RegisterMetricsProvider(
+       std::make_unique<metrics::BluetoothMetricsProvider>());
+ #endif
+--- a/chrome/browser/notifications/BUILD.gn
++++ b/chrome/browser/notifications/BUILD.gn
+@@ -336,6 +336,8 @@
+         "//chrome/app/theme:chrome_unscaled_resources_grit",
+         "//chrome/browser/themes",
+       ]
++    } else {
++      sources += [ "notification_platform_bridge_no_dbus.cc" ]
+     }
+   }
+ 
+--- /dev/null
++++ b/chrome/browser/notifications/notification_platform_bridge_no_dbus.cc
+@@ -0,0 +1,16 @@
++// Copyright 2026 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#include "chrome/browser/notifications/notification_platform_bridge.h"
++
++std::unique_ptr<NotificationPlatformBridge>
++NotificationPlatformBridge::Create() {
++  return nullptr;
++}
++
++// static
++bool NotificationPlatformBridge::CanHandleType(
++    NotificationHandler::Type) {
++  return false;
++}
+--- a/extensions/browser/api/networking_private/BUILD.gn
++++ b/extensions/browser/api/networking_private/BUILD.gn
+@@ -76,6 +76,9 @@
+     ]
+   } else {
+     not_needed([ "default_sources" ])
+-    sources = [ "networking_private_stubs.cc" ]
++    sources = [
++      "networking_private_delegate_factory_no_dbus.cc",
++      "networking_private_stubs.cc",
++    ]
+   }
+ }
+--- /dev/null
++++ b/extensions/browser/api/networking_private/networking_private_delegate_factory_no_dbus.cc
+@@ -0,0 +1,15 @@
++// Copyright 2026 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#include "extensions/browser/api/networking_private/networking_private_delegate_factory.h"
++
++namespace extensions {
++
++NetworkingPrivateDelegateFactory::UIDelegateFactory::UIDelegateFactory() =
++    default;
++
++NetworkingPrivateDelegateFactory::UIDelegateFactory::~UIDelegateFactory() =
++    default;
++
++}  // namespace extensions
+--- a/ui/base/clipboard/BUILD.gn
++++ b/ui/base/clipboard/BUILD.gn
+@@ -65,7 +65,7 @@
+   }
+ }
+ 
+-if (is_linux && use_dbus) {
++if (is_linux) {
+   source_set("clipboard_util_linux") {
+     sources = [
+       "clipboard_util_linux.cc",
+@@ -75,10 +75,14 @@
+     deps = [
+       ":file_info",
+       "//base",
+-      "//components/dbus",
++      "//build/config/linux/dbus:buildflags",
+       "//net",
+       "//url",
+     ]
++
++    if (use_dbus) {
++      deps += [ "//components/dbus" ]
++    }
+   }
+ }
+ 
+--- a/ui/base/clipboard/clipboard_util_linux.cc
++++ b/ui/base/clipboard/clipboard_util_linux.cc
+@@ -5,9 +5,14 @@
+ #include "ui/base/clipboard/clipboard_util_linux.h"
+ 
+ #include "base/files/file_path.h"
++#include "base/functional/callback.h"
+ #include "base/strings/string_split.h"
+ #include "base/strings/string_util.h"
++#include "build/build_config.h"
++#include "build/config/linux/dbus/buildflags.h"
++#if BUILDFLAG(USE_DBUS)
+ #include "components/dbus/xdg/file_transfer_portal.h"
++#endif
+ #include "net/base/filename_util.h"
+ #include "url/gurl.h"
+ 
+@@ -62,6 +67,7 @@
+     return;
+   }
+ 
++#if BUILDFLAG(USE_DBUS)
+   dbus_xdg::FileTransferPortal::IsAvailable(base::BindOnce(
+       [](std::vector<std::string> paths,
+          base::OnceCallback<void(std::string)> callback, bool available) {
+@@ -73,6 +79,9 @@
+                                                     std::move(callback));
+       },
+       std::move(paths), std::move(callback)));
++#else
++  std::move(callback).Run("");
++#endif
+ }
+ 
+ void ExtractPathsFromPortalKey(
+@@ -84,6 +93,7 @@
+   }
+ 
+   std::string key(key_data.begin(), key_data.end());
++#if BUILDFLAG(USE_DBUS)
+   dbus_xdg::FileTransferPortal::IsAvailable(base::BindOnce(
+       [](std::string key,
+          base::OnceCallback<void(std::vector<std::string>)> callback,
+@@ -95,6 +105,9 @@
+         dbus_xdg::FileTransferPortal::RetrieveFiles(key, std::move(callback));
+       },
+       std::move(key), std::move(callback)));
++#else
++  std::move(callback).Run({});
++#endif
+ }
+ 
+ }  // namespace ui::clipboard_util

@@ -241,6 +241,22 @@ def ensure_runtime_deps(chrome: Path, runtime_deps: Path) -> None:
     if result.returncode:
         detail = (result.stderr or result.stdout).strip()
         raise RuntimeError(f"gn runtime dependency generation failed: {detail}")
+    restored = subprocess.run(
+        [
+            gn,
+            "gen",
+            str(out),
+            f"--root={source_root}",
+            "--fail-on-unused-args",
+            f"--args={arguments}",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if restored.returncode:
+        detail = (restored.stderr or restored.stdout).strip()
+        raise RuntimeError(f"gn regeneration after runtime deps failed: {detail}")
     for candidate in runtime_deps_candidates(out):
         if candidate.is_file():
             if candidate.resolve() != runtime_deps.resolve():
@@ -270,6 +286,13 @@ def copy_system_closure(stage: Path) -> list[str]:
     dri_root = Path("/usr/lib/dri")
     if dri_root.is_dir():
         seeds.extend(sorted(dri_root.rglob("*_dri.so")))
+    browser = linux_runtime.inspect_elf(stage / "helium", stage)
+    for needed in browser.needed:
+        if needed in linux_runtime.MUSL_LIBRARIES:
+            continue
+        found = system_library(needed, directories)
+        if found is not None:
+            seeds.append(found)
     if not seeds:
         raise RuntimeError("no system graphics or NSS libraries were found for the desktop runtime")
 

@@ -1,0 +1,13 @@
+--- a/chrome/browser/policy/developer_tools_policy_checker_factory.cc
++++ b/chrome/browser/policy/developer_tools_policy_checker_factory.cc
+@@ -56,10 +56,8 @@
+       prefs::kDevToolsAvailability,
+       static_cast<int>(DeveloperToolsAvailability::
+                            kDisallowedForForceInstalledExtensions));
+-#if BUILDFLAG(ENABLE_DEVTOOLS_FRONTEND)
+   registry->RegisterListPref(prefs::kDeveloperToolsAvailabilityAllowlist);
+   registry->RegisterListPref(prefs::kDeveloperToolsAvailabilityBlocklist);
+-#endif
+ }
+ 
+ }  // namespace policy

@@ -1,0 +1,23 @@
+--- a/gpu/command_buffer/service/BUILD.gn
++++ b/gpu/command_buffer/service/BUILD.gn
+@@ -518,6 +518,10 @@
+         "shared_image/dawn_ozone_image_representation.cc",
+         "shared_image/dawn_ozone_image_representation.h",
+       ]
++      deps += [ "//third_party/vulkan-headers/src:vulkan_headers" ]
++      if (is_linux || is_chromeos) {
++        deps += [ "//third_party/libsync" ]
++      }
+       deps += [ "//ui/gfx/linux:drm" ]
+     }
+   }
+--- a/media/gpu/vaapi/BUILD.gn
++++ b/media/gpu/vaapi/BUILD.gn
+@@ -94,6 +94,7 @@
+     "//third_party/libyuv",
+     "//ui/gfx",
+     "//ui/gfx/geometry",
++    "//third_party/vulkan-headers/src:vulkan_headers",
+   ]
+ 
+   public_deps = [

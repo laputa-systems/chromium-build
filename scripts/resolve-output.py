@@ -39,6 +39,8 @@ def main() -> None:
             if not candidate:
                 continue
             for path in (Path(candidate), args.out / candidate):
+                if path in candidates:
+                    continue
                 if path.is_file() and os.access(path, os.X_OK):
                     candidates.append(path)
         if len(candidates) != 1:

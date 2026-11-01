@@ -39,6 +39,7 @@ GLIBC_LIBRARIES = {
     "libanl.so.1",
 }
 GNU_RUNTIME_LIBRARIES = {"libstdc++.so.6", "libgcc_s.so.1"}
+FFMPEG_ROOTS = ("libavcodec.so", "libavformat.so", "libavutil.so")
 GRAPHICS_GNU_PREFIXES = (
     "libEGL.so.1",
     "libgbm.so.1",
@@ -286,13 +287,26 @@ def audit_tree(
             if previous is not None and previous != info.path:
                 failures.append(f"{info.relative}: SONAME {info.soname} is also provided by {previous.relative_to(root)}")
             by_soname[info.soname] = info.path
+    by_path = {info.path: info for info in infos}
+    ffmpeg_closure: set[PurePosixPath] = set()
+    pending = [info for info in infos if info.relative.name.startswith(FFMPEG_ROOTS)]
+    while pending:
+        info = pending.pop()
+        if info.relative in ffmpeg_closure:
+            continue
+        ffmpeg_closure.add(info.relative)
+        for name in info.needed:
+            child = by_path.get(by_soname.get(name, Path()))
+            if child is not None:
+                pending.append(child)
+    for info in infos:
         for name in info.needed:
             if name in GLIBC_LIBRARIES or name.startswith("ld-linux"):
                 failures.append(f"{info.relative}: requires glibc library {name}")
                 continue
             if name in MUSL_LIBRARIES:
                 continue
-            if name in GNU_RUNTIME_LIBRARIES and info.relative not in allowed_gnu:
+            if name in GNU_RUNTIME_LIBRARIES and info.relative not in allowed_gnu and info.relative not in ffmpeg_closure:
                 failures.append(f"{info.relative}: requires GNU C++ runtime {name} outside the allowed closure")
                 continue
             try:
@@ -325,6 +339,7 @@ def audit_tree(
             for info in infos
             if any(name in GNU_RUNTIME_LIBRARIES for name in info.needed)
         ],
+        "ffmpeg_gnu_closure": sorted(str(path) for path in ffmpeg_closure),
         "failures": failures,
     }
     if failures:

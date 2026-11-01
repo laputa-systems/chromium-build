@@ -211,6 +211,8 @@
     "musl-gpu-sched-affinity-errno.patch",
     "musl-gpu-sandbox-broker-tsync.patch",
     "musl-gpu-pwritev2-sandbox.patch",
+    "musl-seccomp-membarrier.patch",
+    "musl-seccomp-clone-detached.patch",
     "musl-clang23-function-view-pointer-bool.patch",
     "musl-clang23-omnibox-nodiscard.patch",
     "headless-link-dawn-drm-and-variations.patch",
@@ -226,6 +228,10 @@
     "musl-libsync-cdefs-include.patch",
     "musl-swiftshader-llvm-config.patch",
     "rust-bytemuck-simd.patch",
-    "musl-v8-no-execinfo.patch"
+    "musl-v8-no-execinfo.patch",
+    "helium-no-devtools-frontend.patch",
+    "helium-no-dbus.patch",
+    "helium-dawn-vulkan-headers.patch",
+    "helium-devtools-policy-prefs.patch"
   ]
 }

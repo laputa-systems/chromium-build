@@ -351,6 +351,28 @@ class ElfAuditTests(unittest.TestCase):
             with self.assertRaisesRegex(linux_runtime.RuntimeAuditError, "GNU C\\+\\+ runtime"):
                 linux_runtime.audit_tree(root, "amd64")
 
+    def test_ffmpeg_closure_gnu_runtime_is_allowed(self):
+        libstdcxx = Path("/usr/lib/libstdc++.so.6")
+        libgcc = Path("/usr/lib/libgcc_s.so.1")
+        if not libstdcxx.is_file() or not libgcc.is_file():
+            self.skipTest("the local C++ runtime is unavailable")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            lib = root / "lib"
+            lib.mkdir()
+            shutil.copy2(libstdcxx, lib / "libstdc++.so.6")
+            shutil.copy2(libgcc, lib / "libgcc_s.so.1")
+            shared = compile_shared(
+                lib,
+                "avcodec",
+                "int avcodec(void){return 1;}\n",
+                ["-Wl,--no-as-needed", "-l:libstdc++.so.6", "-Wl,-soname,libavcodec.so.62"],
+            )
+            shutil.move(str(shared), lib / "libavcodec.so.62")
+            report = linux_runtime.audit_tree(root, "amd64")
+        self.assertEqual(report["status"], "complete")
+        self.assertIn("lib/libavcodec.so.62", report["ffmpeg_gnu_closure"])
+
     def test_escaping_file_symlink_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -369,6 +391,9 @@ class PackageTests(unittest.TestCase):
         launcher = PACKAGE["HELIUM_LAUNCHER"]
         self.assertIn('exec "$root/helium" "$@"', launcher)
         self.assertIn('LD_LIBRARY_PATH="$root/lib', launcher)
+        self.assertIn("GDK_BACKEND=wayland", launcher)
+        self.assertIn("GTK_USE_PORTAL=0", launcher)
+        self.assertIn("NO_AT_BRIDGE=1", launcher)
         self.assertNotIn("--disable-gpu", launcher)
         self.assertNotIn("--no-sandbox", launcher)
 

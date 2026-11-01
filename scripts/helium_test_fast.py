@@ -188,6 +188,7 @@ def run(args: argparse.Namespace) -> int:
     fixture = None
     process = None
     connection = None
+    browser_connection = None
     cleanup = None
     started = time.monotonic()
     try:
@@ -244,7 +245,8 @@ def run(args: argparse.Namespace) -> int:
             "--no-first-run",
             "--no-default-browser-check",
             "--enable-logging=stderr",
-            "--use-gl=egl",
+            "--use-gl=angle",
+            "--use-angle=gl",
             "--remote-debugging-address=127.0.0.1",
             f"--remote-debugging-port={debug_port}",
             "about:blank",
@@ -264,6 +266,7 @@ def run(args: argparse.Namespace) -> int:
         browser = version_info.get("Browser", "")
         if "Helium" not in browser and browser_version not in browser:
             raise RuntimeError(f"DevTools browser identity is not Helium: {browser!r}")
+        browser_connection = CdpConnection(WebSocket(version_info["webSocketDebuggerUrl"]))
         server = urllib.request.Request(
             f"http://127.0.0.1:{debug_port}/json/new?{urllib.parse.quote(args.fixture.as_uri(), safe=':/?=&')}",
             method="PUT",
@@ -277,8 +280,8 @@ def run(args: argparse.Namespace) -> int:
         color = evaluate(connection, "getComputedStyle(document.querySelector('#content')).backgroundColor")
         if color != "rgb(51, 204, 102)":
             raise RuntimeError(f"fixture content style is not applied: {color}")
-        dimensions = tuple(evaluate(connection, "[window.innerWidth, window.innerHeight]"))
-        screenshot = base64.b64decode(connection.call("Page.captureScreenshot", {"format": "png"})["data"])
+        dimensions = tuple(evaluate(connection, "[Math.round(window.visualViewport.width * window.devicePixelRatio), Math.round(window.visualViewport.height * window.devicePixelRatio)]"))
+        screenshot = base64.b64decode(connection.call("Page.captureScreenshot", {"format": "png", "clip": {"x": 0, "y": 0, "width": dimensions[0], "height": dimensions[1], "scale": 1}})["data"])
         screenshot_path = output / "fast-screenshot.png"
         screenshot_path.write_bytes(screenshot)
         if png_dimensions(screenshot_path) != dimensions:
@@ -289,7 +292,7 @@ def run(args: argparse.Namespace) -> int:
         fixture.run([str(fixture.grim), "-o", window_data["name"], str(compositor_path)], 10, environment)
         verify_png(compositor_path)
         pixels = sample_pixels(compositor_path, window)
-        sandbox = sandbox_observations(connection)
+        sandbox = sandbox_observations(browser_connection)
         report.update(
             {
                 "status": "complete",
@@ -303,6 +306,8 @@ def run(args: argparse.Namespace) -> int:
         connection.call("Browser.close")
         connection.close()
         connection = None
+        browser_connection.close()
+        browser_connection = None
     except BaseException as error:
         report["status"] = "failed"
         report["error"] = str(error)
@@ -315,6 +320,8 @@ def run(args: argparse.Namespace) -> int:
     finally:
         if connection is not None:
             connection.close()
+        if browser_connection is not None:
+            browser_connection.close()
         if process is not None:
             cleanup = terminate_process(process)
             report["cleanup"] = cleanup
