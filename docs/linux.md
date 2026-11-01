@@ -1,9 +1,10 @@
 # Linux musl builds
 
-The Linux backend builds headless Chromium in an Alpine container on native
-amd64. Linux/arm64 is out of scope: the locked toolchain has no native Linux
-arm64 LLVM archive. Chromium source and Ninja output use Docker named
-volumes. Only `fetch` needs network access; later phases run offline.
+The Linux backend builds headless Chromium and the Helium desktop browser in
+an Alpine container on native amd64. Linux/arm64 is out of scope: the locked
+toolchain has no native Linux arm64 LLVM archive. Chromium source and Ninja
+output use Docker named volumes. Only `fetch` needs network access; later
+phases run offline.
 
 ## Inputs and profiles
 
@@ -66,7 +67,10 @@ headless-release path through installation.
 The Helium product is a Linux amd64 musl desktop build. The image, source
 inputs, package world, patch inventory, and executable name come from
 `config/helium.inputs.lock`; the only supported profile is
-`helium-wayland-release`.
+`helium-wayland-release`. Browser acceptance uses the Linux CDP and Sway
+harness; Shadowdriver remains macOS-only. The package ships no glibc, gcompat,
+static browser, or sandbox bypass, and needs no X server, session bus, or
+hardware GPU; VA-API is optional at runtime.
 
 The profile uses an official-style optimized build:
 `is_official_build=true`, `dcheck_always_on=false`, `chrome_pgo_phase=2`,
@@ -151,3 +155,26 @@ The default installation prefix is `${HOME}/.local/opt/helium-wayland-release`;
 the launcher is `${HOME}/.local/bin/helium`. The installer keeps versioned
 slots and a `<prefix>.previous` symlink for rollback. It refuses unmanaged
 prefixes, launchers, and archive links, and does not write through symlinks.
+
+### Release evidence
+
+The current archive is published as the prerelease
+`https://github.com/laputa-systems/chromium-build/releases/tag/helium-0.20.3.1`
+with its `.sha256` and `.acceptance.json`. The archive is
+`helium-0.20.3.1-linux-x86_64-musl.tar.xz` (223.3 MB, 521 files, 147 bundled
+libraries, SHA-256
+`6853af22b60345c92e0cbe69181aebd8af3fa79842c7f0135d20c9656c5918c6`). It was
+built from builder image
+`sha256:160899ccbfcd29483806ae6a5787b2e29b7ef2aaa8c6f2c10bdc41ba6972a91b`,
+and the acceptance sidecar binds that digest to the product-identity,
+Wayland-window, page-rendering, sandbox-renderer, and clean-shutdown checks
+under the isolated Sway fixture. The `~/usr` desktop provisioner later installed
+the published archive in a disposable `alpine:edge` container: checksum and
+sidecar validation, manifest digests, the setuid `chrome_sandbox`, the
+`--version` probe, and a second idempotent run all passed.
+
+That is automated fixture and container evidence, not target evidence. The
+package has not run in the owner's dwl session, has not been installed live, and
+has not been exercised against Broadwell VA-API hardware.
+[Helium acceptance](helium-acceptance.md) defines the remaining observations
+and the target qualification procedure.
