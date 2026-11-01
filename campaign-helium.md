@@ -1514,6 +1514,13 @@ new preparation evidence.
   (`helium-devtools-policy-prefs.patch`). The system FFmpeg closure carries the
   scoped GNU C++ runtime exception for `libstdc++.so.6`/`libgcc_s.so.1`; the
   audit allows those edges only below the FFmpeg roots.
+- The archive is published as prerelease
+  `https://github.com/laputa-systems/chromium-build/releases/tag/helium-0.20.3.1`
+  with the archive, `.sha256`, and `.acceptance.json`. The `~/usr` desktop
+  provisioner downloaded and installed that release in a disposable
+  `alpine:edge` container: checksum and sidecar validation, manifest digests,
+  the setuid `chrome_sandbox`, the `--version` probe, and a second idempotent
+  run all passed.
 - S14 and S15 remain parked on the owner's dwl session and an explicit
   live-install request. The automated Sway fixture is only a builder check.
   Real Broadwell VA-API decode is `CHB-6`.
