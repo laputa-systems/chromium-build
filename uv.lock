@@ -26,37 +26,40 @@ dev = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "ruff", specifier = "==0.17.2" },
-    { name = "ty", specifier = "==0.0.91" },
-    { name = "uv", specifier = "==0.13.5" },
+    { name = "ruff", specifier = "==0.17.4" },
+    { name = "ty", specifier = "==0.0.99" },
+    { name = "uv", specifier = "==0.13.7" },
 ]
 
 [[package]]
 name = "ruff"
-version = "0.17.2"
+version = "0.17.4"
 source = { registry = "https://pypi.17166969.xyz/current/simple/" }
 wheels = [
-    { url = "https://pypi.17166969.xyz/current/wheels/ruff-0.17.2-py3-none-macosx_11_0_arm64.whl", hash = "sha256:92a80d2f44584dabb0189b3a6c393e37e525e04942838482010575cb81945be7" },
-    { url = "https://pypi.17166969.xyz/current/wheels/ruff-0.17.2-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:b7d0906677d89bbf3cf73cde64b5bbe2ab35df3ae43e49ee2627301e91265bac" },
-    { url = "https://pypi.17166969.xyz/current/wheels/ruff-0.17.2-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:c60f93fec7142dba5b8f487f94bf2f6231dae24dc11e4c48648347c8b0720004" },
+    { url = "https://pypi.17166969.xyz/current/wheels/ruff-0.17.4-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:13e781c3c5f663e7fba737eaaeb70dd943dd55171daf316afb25cd5268cfe0c7" },
+    { url = "https://pypi.17166969.xyz/current/wheels/ruff-0.17.4-py3-none-macosx_11_0_arm64.whl", hash = "sha256:7ed2f416349944f908f9574215994602242b0836844eba48eec61473033afca0" },
+    { url = "https://pypi.17166969.xyz/current/wheels/ruff-0.17.4-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:8ea6e0017c785f7282092b11e46338e4ebed1b9e575ebf2e55a8a1eda968241a" },
+    { url = "https://pypi.17166969.xyz/current/wheels/ruff-0.17.4-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:2cd025509b2e15721b426fc70fd946d71f43b3db3b08e946dfec2d696d911690" },
 ]
 
 [[package]]
 name = "ty"
-version = "0.0.91"
+version = "0.0.99"
 source = { registry = "https://pypi.17166969.xyz/current/simple/" }
 wheels = [
-    { url = "https://pypi.17166969.xyz/current/wheels/ty-0.0.91-py3-none-macosx_11_0_arm64.whl", hash = "sha256:78e3e66e88a9ae903afe0981ff9bd225d452ade2aeb070715842510dfcbf6de4" },
-    { url = "https://pypi.17166969.xyz/current/wheels/ty-0.0.91-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:89ecaf87b3d7b508f9ea1ef8715d4cf47942719659028c92fad819d82a82ccfa" },
-    { url = "https://pypi.17166969.xyz/current/wheels/ty-0.0.91-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:f68bb6bfc8171910335a47c7e84070f28bbbc0326bcd6ef08fe3690d0509556b" },
+    { url = "https://pypi.17166969.xyz/current/wheels/ty-0.0.99-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:ff6957baa91b0da526c43d43fa9802526c94b168e412db0d2ca7ee1a19c0a9b1" },
+    { url = "https://pypi.17166969.xyz/current/wheels/ty-0.0.99-py3-none-macosx_11_0_arm64.whl", hash = "sha256:7cb88d3e7513dbf9d68c1e212999b7deb867fa3ac90efa8647c626e987f4cc26" },
+    { url = "https://pypi.17166969.xyz/current/wheels/ty-0.0.99-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:8480617183adff4381c63d5fcfa9318aa9adc39ba3dd5d243374f2ae1e5534e1" },
+    { url = "https://pypi.17166969.xyz/current/wheels/ty-0.0.99-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a95383fa343765ddbb1a2bc79038d89c9cfb12fdf3b829b69f7d95d47d8d9f1c" },
 ]
 
 [[package]]
 name = "uv"
-version = "0.13.5"
+version = "0.13.7"
 source = { registry = "https://pypi.17166969.xyz/current/simple/" }
 wheels = [
-    { url = "https://pypi.17166969.xyz/current/wheels/uv-0.13.5-py3-none-macosx_11_0_arm64.whl", hash = "sha256:a42c85fa8156e1e5e2cecdbc77bb818ea1dcf5f78b8e2a8f84c7fe4f16f0702e" },
-    { url = "https://pypi.17166969.xyz/current/wheels/uv-0.13.5-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:fa8d26e08e34c29c0c4e820cf3181757086d547240b4f4d31ff1d8bd810ca946" },
-    { url = "https://pypi.17166969.xyz/current/wheels/uv-0.13.5-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:91e58e304b63b6c91bac5561459ab0c3ea24f17bc01ea9359d69fed72142978f" },
+    { url = "https://pypi.17166969.xyz/current/wheels/uv-0.13.7-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:fd04bf01ba5f2829f4f94ca8f0c24a743f21e73d75045613ed6fc2fd66fc7bda" },
+    { url = "https://pypi.17166969.xyz/current/wheels/uv-0.13.7-py3-none-macosx_11_0_arm64.whl", hash = "sha256:f91a229093163eefca89ea1b220a221d64c3beade05d03519a6584d1797a5a5f" },
+    { url = "https://pypi.17166969.xyz/current/wheels/uv-0.13.7-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:2c9bdc4a872b60a93c5f26c0791089ea11585a4f9d3b3c017d78eb8487505e25" },
+    { url = "https://pypi.17166969.xyz/current/wheels/uv-0.13.7-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:08f16fd463926786b702b497473511deae4b3e17a2fa6d22180950d6059a120d" },
 ]
