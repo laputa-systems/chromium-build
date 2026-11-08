@@ -103,7 +103,11 @@ def extract(archive: Path, destination: Path) -> None:
     destination.mkdir(parents=True, exist_ok=True)
     if archive.suffix == ".zst":
         with subprocess.Popen(["zstd", "-dc", str(archive)], stdout=subprocess.PIPE) as decompressor:
-            result = subprocess.run(["tar", "-xf", "-", "-C", str(destination)], stdin=decompressor.stdout)
+            result = subprocess.run(
+                ["tar", "-xf", "-", "-C", str(destination)],
+                stdin=decompressor.stdout,
+                check=False,
+            )
             decompressor.wait()
         if result.returncode or decompressor.returncode:
             raise ScriptFailure(f"could not extract {archive}")
@@ -292,7 +296,7 @@ def update_integration(root: Path, work: Path, metadata: Path, source: Path, arc
     if product != "helium":
         raise ScriptFailure("--update-integration is Helium-only")
     selected_lock = lock_path(root, "helium")
-    lock = json.loads(require_file(selected_lock, f"missing {selected_lock}").read_text(encoding="utf-8"))
+    json.loads(require_file(selected_lock, f"missing {selected_lock}").read_text(encoding="utf-8"))
     receipt = metadata / "source-complete.stamp"
     recorded = dict(
         line.split("=", 1)

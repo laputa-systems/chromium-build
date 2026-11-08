@@ -472,29 +472,24 @@ class InstallTests(unittest.TestCase):
     def test_missing_manifest_and_wrong_product_are_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            with self.assertRaisesRegex(INSTALL["InstallError"], "manifest"):
-                with INSTALL["verified_archive"](make_archive(root / "missing", include_manifest=False)):
-                    pass
-            with self.assertRaisesRegex(INSTALL["InstallError"], "not helium"):
-                with INSTALL["verified_archive"](make_archive(root / "wrong", acceptance_product="chromium")):
-                    pass
+            with self.assertRaisesRegex(INSTALL["InstallError"], "manifest"), INSTALL["verified_archive"](make_archive(root / "missing", include_manifest=False)):
+                pass
+            with self.assertRaisesRegex(INSTALL["InstallError"], "not helium"), INSTALL["verified_archive"](make_archive(root / "wrong", acceptance_product="chromium")):
+                pass
 
     def test_unsupported_schema_and_digest_mismatch_are_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            with self.assertRaisesRegex(INSTALL["InstallError"], "schema"):
-                with INSTALL["verified_archive"](make_archive(root / "schema", manifest_schema=2)):
-                    pass
-            with self.assertRaisesRegex(INSTALL["InstallError"], "digest"):
-                with INSTALL["verified_archive"](make_archive(root / "digest", corrupt_file=True)):
-                    pass
+            with self.assertRaisesRegex(INSTALL["InstallError"], "schema"), INSTALL["verified_archive"](make_archive(root / "schema", manifest_schema=2)):
+                pass
+            with self.assertRaisesRegex(INSTALL["InstallError"], "digest"), INSTALL["verified_archive"](make_archive(root / "digest", corrupt_file=True)):
+                pass
 
     def test_archive_symlink_escape_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            with self.assertRaisesRegex(INSTALL["InstallError"], "link escapes"):
-                with INSTALL["verified_archive"](make_archive(root, symlink="escape")):
-                    pass
+            with self.assertRaisesRegex(INSTALL["InstallError"], "link escapes"), INSTALL["verified_archive"](make_archive(root, symlink="escape")):
+                pass
 
     def test_foreign_prefix_and_launcher_are_rejected(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -8,12 +8,10 @@ import hashlib
 import json
 import os
 import shutil
-import stat
 import subprocess
 import sys
 import tarfile
 import tempfile
-import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -367,9 +365,8 @@ def rollback(prefix: Path, bin_dir: Path, home: Path, probe_command: Path | None
 def verify_extract(archive: Path, destination: Path) -> None:
     if not destination.is_absolute():
         raise InstallError(f"destination must be absolute: {destination}")
-    if destination.exists():
-        if not destination.is_dir() or not owned(destination, os.geteuid()) or any(destination.iterdir()):
-            raise InstallError(f"destination is not an owned empty directory: {destination}")
+    if destination.exists() and (not destination.is_dir() or not owned(destination, os.geteuid()) or any(destination.iterdir())):
+        raise InstallError(f"destination is not an owned empty directory: {destination}")
     validate_parent(destination, "destination")
     with verified_archive(archive) as (_, source):
         if destination.exists():

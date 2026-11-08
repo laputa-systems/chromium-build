@@ -20,7 +20,7 @@ import urllib.request
 from pathlib import Path
 
 from browser_test_support import CdpConnection, WebSocket, terminate_process
-from helium_wayland import FIXTURE_SIZE, FixtureError, HeadlessSway, verify_png
+from helium_wayland import FIXTURE_SIZE, HeadlessSway, verify_png
 
 CONTENT_COLOR = (51, 204, 102)
 
@@ -351,7 +351,7 @@ def main() -> int:
         parser.error("test-fast refuses root; run the browser as the build/test user")
     try:
         return run(args)
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001
         print(f"helium-test-fast: {error}", file=sys.stderr)
         return 1
 

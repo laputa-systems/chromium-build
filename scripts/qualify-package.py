@@ -10,7 +10,7 @@ import os
 import sys
 import tarfile
 import tempfile
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 import runtime_install
 
