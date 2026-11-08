@@ -61,7 +61,7 @@ def main() -> None:
     arch = os.environ.get("CHROMIUM_ARCH", "arm64")
     lock_path = Path(os.environ.get("INPUTS_LOCK", root / "config/inputs.lock"))
     stage = Path(os.environ.get("STAGE_ROOT", work / "stage"))
-    if arch not in {"amd64"}:
+    if arch not in {"amd64", "arm64"}:
         raise ScriptFailure(f"unsupported architecture {arch}")
     lock = json.loads(require_file(lock_path).read_text(encoding="utf-8"))
     expected_linux = lock["toolchain"]["architectures"][arch]["linux_arch"]
@@ -98,8 +98,8 @@ def main() -> None:
     toolchain = lock["toolchain"]
     arch_toolchain = toolchain["architectures"][arch]
     llvm_root = Path(toolchain["root"])
-    if toolchain.get("distribution") != "chromium-clang" or llvm_root != Path("/opt/chromium-llvm"):
-        raise ScriptFailure("toolchain is not the locked Chromium Clang distribution")
+    if toolchain.get("distribution") not in {"chromium-clang", "laputa-llvm-musl"} or llvm_root != Path("/opt/chromium-llvm"):
+        raise ScriptFailure("toolchain is not the locked Clang distribution")
     for variable in ("CC", "CXX", "AR", "RANLIB", "NM", "STRIP", "OBJCOPY", "BUILD_CC", "BUILD_CXX", "BUILD_AR", "BUILD_RANLIB", "BUILD_NM", "BUILD_STRIP", "BUILD_OBJCOPY"):
         value = os.environ.get(variable, "")
         if not value or not Path(value).is_file() or not str(Path(value)).startswith(f"{llvm_root}/"):
@@ -131,18 +131,19 @@ def main() -> None:
     atomic_write(metadata / "toolchain-config-sha256", "\n".join(config_hashes) + "\n")
     atomic_write(metadata / "toolchain-configs", "".join((llvm_root / "bin" / name).read_text(encoding="utf-8") for name in ("clang.cfg", "clang++.cfg")))
     if (llvm_root / "cr_build_revision").read_text(encoding="utf-8").strip() != toolchain["revision"]:
-        raise ScriptFailure("Chromium Clang revision stamp differs from the lock")
+        raise ScriptFailure("Clang revision stamp differs from the lock")
     if not (work / "src/buildtools/third_party/libc++/__config_site").is_file():
         raise ScriptFailure("prepared Chromium libc++ configuration is missing")
     resource_dir = Path(run([cc, "-print-resource-dir"], capture_output=True).stdout.strip())
     if not str(resource_dir).startswith(f"{llvm_root}/lib/clang/") or not (resource_dir / "include").is_dir():
         raise ScriptFailure("Clang resource directory is outside the locked toolchain")
-    if not (resource_dir / "lib/x86_64-unknown-linux-musl/libclang_rt.builtins.a").is_file():
+    if not (resource_dir / f"lib/{arch_toolchain['target_triple']}/libclang_rt.builtins.a").is_file():
         raise ScriptFailure("missing compiler-rt builtins for the musl target")
-    if not (resource_dir / "lib/linux/libclang_rt.builtins-x86_64.a").is_file():
+    if not (resource_dir / f"lib/linux/libclang_rt.builtins-{expected_linux}.a").is_file():
         raise ScriptFailure("missing Chromium GN compiler-rt builtins path")
-    if not Path("/lib64/ld-linux-x86-64.so.2").is_file():
-        raise ScriptFailure("Chromium Clang's build-only glibc loader is missing")
+    expected_loader = "/lib/ld-linux-aarch64.so.1" if arch == "arm64" else "/lib64/ld-linux-x86-64.so.2"
+    if not Path(expected_loader).is_file():
+        raise ScriptFailure("build-only glibc loader is missing")
     ccache = Path(os.environ.get("CCACHE_BIN", "/usr/bin/ccache"))
     require_file(ccache, "missing ccache")
     if os.environ.get("CCACHE_DIR") != "/ccache" or os.environ.get("CCACHE_TEMPDIR") != "/ccache/tmp" or os.environ.get("CCACHE_MAXSIZE") != "10G":

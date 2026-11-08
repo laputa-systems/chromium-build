@@ -33,8 +33,8 @@ fail() {
 usage() {
     printf '%s\n' \
         'usage: chromium-build [--product chromium|helium] [--platform linux|macos] [--arch arm64|amd64] [--profile PROFILE] command' \
-        '       chromium-build image [--product chromium|helium] [--arch amd64]' \
-        '       chromium-build ensure-source|fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-e|gate-f|poc|build|cache-stats|stage-runtime|test-fast|test|test-staged|package [--product chromium|helium] [--arch amd64] [--profile PROFILE] [--jobs N]' \
+        '       chromium-build image [--product chromium|helium] [--arch amd64|arm64]' \
+        '       chromium-build ensure-source|fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-e|gate-f|poc|build|cache-stats|stage-runtime|test-fast|test|test-staged|package [--product chromium|helium] [--arch amd64|arm64] [--profile PROFILE] [--jobs N]' \
         '       chromium-build install [--product chromium|helium] [--profile PROFILE] [--prefix DIR] [--bin-dir DIR] [--archive PATH] [--rollback]' \
         '       chromium-build build-target <ninja-output-or-label> [--arch amd64] [--jobs N]' \
         '       chromium-build --platform macos doctor|smoke-preflight|update-lock|fetch|prepare|configure|build|cache-stats|stage-runtime|package|verify-release|test-staged [--arch arm64]' \
@@ -163,7 +163,6 @@ case "$PLATFORM" in
     linux)
         [ -z "$HEADED_REFERENCE" ] || fail '--headed-reference is macOS-only'
         if [ "$PRODUCT" = helium ]; then
-            [ "$ARCH" = amd64 ] || fail "Helium is not supported on $ARCH"
             PROFILE=${PROFILE:-helium-wayland-release}
             [ "$PROFILE" = helium-wayland-release ] || fail "Helium profile $PROFILE is not supported; expected helium-wayland-release"
         else
@@ -192,11 +191,34 @@ case "$ARCH" in
     amd64)
         platform=linux/amd64
         base_image=alpine@sha256:d56c381f961d307a21b3ca004cf1e3910f106644aefb1f43e654c8a56c4fd395
-        llvm_url=https://commondatastorage.googleapis.com/chromium-browser-clang/Linux_x64/clang-llvmorg-24-init-3796-g20e97c4b-2.tar.xz
-        llvm_sha256=86d53b33007a35695645e3867589a20f6f8aeedd146331e1a2ec8fd371e05ea2
-        llvm_size=59131228
+        glibc_triplet=x86_64-linux-gnu
+        ld_linux=ld-linux-x86-64.so.2
+        if [ "$PRODUCT" = helium ]; then
+            llvm_url=https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-23.1.5-c4f9b08/clang%2Bllvm-23.1.5-x86_64-linux-musl.tar.xz
+            llvm_sha256=8039dfa9e5b2ee53b04c1dcf94d65bd76c27842b0d4128c5a7bc6ba21d345fec
+            llvm_size=101884956
+            llvm_revision=llvm-musl-23.1.5-c4f9b08
+        else
+            llvm_url=https://commondatastorage.googleapis.com/chromium-browser-clang/Linux_x64/clang-llvmorg-24-init-3796-g20e97c4b-2.tar.xz
+            llvm_sha256=86d53b33007a35695645e3867589a20f6f8aeedd146331e1a2ec8fd371e05ea2
+            llvm_size=59131228
+            llvm_revision=llvmorg-24-init-3796-g20e97c4b-2
+        fi
         ;;
-    arm64) fail 'Chromium 153 publishes no native Linux arm64 LLVM 24 archive; the Linux backend currently supports amd64 only' ;;
+    arm64)
+        platform=linux/arm64
+        base_image=alpine@sha256:e7a1a92a5bfeee40966aea60f0796b0e7917cc35591542701834f03a68fa3d18
+        glibc_triplet=aarch64-linux-gnu
+        ld_linux=ld-linux-aarch64.so.1
+        if [ "$PRODUCT" = helium ]; then
+            llvm_url=https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-23.1.5-c4f9b08/clang%2Bllvm-23.1.5-aarch64-linux-musl.tar.xz
+            llvm_sha256=7055513530fc60361e29d01d5c849d356b25e9e38124811a420970941dd32979
+            llvm_size=95146512
+            llvm_revision=llvm-musl-23.1.5-c4f9b08
+        else
+            fail 'Chromium 153 publishes no native Linux arm64 LLVM 24 archive; the Chromium backend currently supports amd64 only (Helium uses the laputa LLVM 23 musl toolchain for arm64)'
+        fi
+        ;;
 esac
 
 if [ "$PRODUCT" = helium ]; then
@@ -235,7 +257,11 @@ if [ "$PRODUCT" = helium ] && [ "$command_name" = install ]; then
     [ -z "$INSTALL_BIN_DIR" ] || install_args+=(--bin-dir "$INSTALL_BIN_DIR")
     if [ -z "$ARCHIVE_PATH" ] && [ "$ROLLBACK" = 0 ]; then
         version=$("${CHROMIUM_PYTHON:-python3}" -c 'import json, sys; print(json.load(open(sys.argv[1]))["product"]["version"])' "$INPUTS_LOCK")
-        archive_root="helium-$version-linux-x86_64-musl"
+        case "$ARCH" in
+            amd64) linux_triple=x86_64 ;;
+            arm64) linux_triple=aarch64 ;;
+        esac
+        archive_root="helium-$version-linux-$linux_triple-musl"
         mkdir -p "$ROOT/.work/tmp"
         staging=$(mktemp -d "$ROOT/.work/tmp/helium-install.XXXXXX")
         trap '[ -z "$staging" ] || rm -rf -- "$staging"' EXIT
@@ -270,6 +296,9 @@ if [ "$command_name" = image ]; then
         --build-arg LLVM_URL="$llvm_url"
         --build-arg LLVM_SHA256="$llvm_sha256"
         --build-arg LLVM_SIZE="$llvm_size"
+        --build-arg LLVM_REVISION="$llvm_revision"
+        --build-arg GLIBC_TRIPLET="$glibc_triplet"
+        --build-arg LD_LINUX="$ld_linux"
         --build-arg PRODUCT="$PRODUCT"
     )
     if [ "$PRODUCT" = helium ]; then
@@ -304,13 +333,18 @@ image_path() {
 
 product_environment=(-e "CHROMIUM_PRODUCT=$PRODUCT")
 if [ "$PRODUCT" = helium ]; then
+    if [ "$ARCH" = arm64 ]; then
+        gn_path=/usr/bin/gn
+    else
+        gn_path=/work/src/buildtools/linux64/gn
+    fi
     product_environment+=(
         -e "INPUTS_LOCK=$(image_path "$INPUTS_LOCK")"
         -e "PACKAGE_LOCK=$(image_path "$PACKAGE_LOCK")"
         -e "PATCH_INVENTORY=$(image_path "$PATCH_INVENTORY")"
         -e "PATCH_DISPOSITION=$(image_path "$PATCH_DISPOSITION")"
         -e "SYSTEM_LIBRARY_POLICY=$(image_path "$SYSTEM_LIBRARY_POLICY")"
-        -e "GN=/work/src/buildtools/linux64/gn"
+        -e "GN=$gn_path"
     )
 fi
 

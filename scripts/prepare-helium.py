@@ -314,11 +314,17 @@ def main() -> None:
     if rust_target not in target_lines:
         target_file.write_text("\n".join(target_lines + [rust_target]) + "\n", encoding="utf-8")
 
+    if args.arch == "arm64":
+        node_path = "third_party/node/linux/node-linux-arm64/bin/node"
+        go_path = "third_party/dawn/tools/golang/linux-arm64/bin/go"
+    else:
+        node_path = "third_party/node/linux/node-linux-x64/bin/node"
+        go_path = "third_party/dawn/tools/golang/linux-amd64/bin/go"
     builder_links = []
     for relative, target in (
-        ("third_party/node/linux/node-linux-x64/bin/node", "/usr/bin/node"),
+        (node_path, "/usr/bin/node"),
         ("third_party/gperf/cipd/bin/gperf", "/usr/bin/gperf"),
-        ("third_party/dawn/tools/golang/linux-amd64/bin/go", "/usr/bin/go"),
+        (go_path, "/usr/bin/go"),
     ):
         path = args.source / relative
         path.parent.mkdir(parents=True, exist_ok=True)

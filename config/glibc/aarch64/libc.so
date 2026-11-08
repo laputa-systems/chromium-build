@@ -1,0 +1,1 @@
+GROUP ( libc.so.6 AS_NEEDED ( ld-linux-aarch64.so.1 ) )

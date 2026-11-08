@@ -197,8 +197,9 @@ def product_identity() -> tuple[str, str]:
     return product.product_version, product.arch
 
 
-def archive_name(version: str) -> str:
-    return f"helium-{version}-linux-x86_64-musl"
+def archive_name(version: str, architecture: str = "amd64") -> str:
+    linux_arch = {"amd64": "x86_64", "arm64": "aarch64"}.get(architecture, architecture)
+    return f"helium-{version}-linux-{linux_arch}-musl"
 
 
 def archive_package(
@@ -303,7 +304,7 @@ def package_helium(stage: Path, output: Path, artifacts: Path) -> None:
             ],
         }
         (temporary / "package-manifest.json").write_text(json.dumps(packaged, indent=2) + "\n", encoding="utf-8")
-        archive_root = archive_name(version)
+        archive_root = archive_name(version, architecture)
         archive, checksum = archive_package(
             temporary,
             archive_root,

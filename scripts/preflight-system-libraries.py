@@ -77,7 +77,7 @@ def main() -> None:
             child_is_ffmpeg = ffmpeg_descendant or any(
                 Path(parent).name.startswith(root_name) for root_name in policy["ffmpeg_roots"]
             )
-            if soname in ("libc.so.6", "ld-linux.so.2", "ld-linux-x86-64.so.2"):
+            if soname in ("libc.so.6", "ld-linux.so.2", "ld-linux-x86-64.so.2", "ld-linux-aarch64.so.1"):
                 classification = "forbidden-glibc"
                 glibc_entries.append({"path": parent, "soname": soname})
             elif child is None:

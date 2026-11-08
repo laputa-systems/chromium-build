@@ -14,13 +14,18 @@ ARG SYSTEM_LIBRARY_POLICY=config/system-library-preflight.schema.json
 ARG LLVM_URL=https://commondatastorage.googleapis.com/chromium-browser-clang/Linux_x64/clang-llvmorg-24-init-3796-g20e97c4b-2.tar.xz
 ARG LLVM_SHA256=86d53b33007a35695645e3867589a20f6f8aeedd146331e1a2ec8fd371e05ea2
 ARG LLVM_SIZE=59131228
+ARG LLVM_REVISION=llvmorg-24-init-3796-g20e97c4b-2
+ARG GLIBC_TRIPLET=x86_64-linux-gnu
+ARG LD_LINUX=ld-linux-x86-64.so.2
 
-# Chromium publishes only a Linux_x64 compiler. Its host process needs glibc;
-# Chromium outputs still target Alpine musl and may not load this build-only
-# runtime. The Debian image digest and compiler archive are pinned in inputs.lock.
-COPY --from=compiler-host-runtime /usr/lib/x86_64-linux-gnu/ /usr/lib/x86_64-linux-gnu/
-RUN mkdir -p /lib64 && \
-    ln -s /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 /lib64/ld-linux-x86-64.so.2
+COPY --from=compiler-host-runtime /usr/lib/${GLIBC_TRIPLET}/ /usr/lib/${GLIBC_TRIPLET}/
+RUN if [ "$TARGET_ARCH" = "arm64" ]; then \
+        mkdir -p /lib; \
+        ln -s "/usr/lib/${GLIBC_TRIPLET}/${LD_LINUX}" "/lib/${LD_LINUX}"; \
+    else \
+        mkdir -p /lib64; \
+        ln -s "/usr/lib/${GLIBC_TRIPLET}/${LD_LINUX}" "/lib64/${LD_LINUX}"; \
+    fi
 
 RUN set -eux; \
     if [ "$PRODUCT" = helium ]; then \
@@ -69,56 +74,113 @@ RUN set -eux; \
             zstd=1.5.7-r2; \
     fi
 RUN set -eux; \
-    test "$TARGET_ARCH" = amd64; \
-    mkdir -p /opt/chromium-llvm; \
-    curl -fsSL "$LLVM_URL" -o /tmp/llvm.tar.xz; \
-    test "$(stat -c %s /tmp/llvm.tar.xz)" = "$LLVM_SIZE"; \
-    echo "$LLVM_SHA256  /tmp/llvm.tar.xz" | sha256sum -c -; \
-    tar -xJf /tmp/llvm.tar.xz -C /opt/chromium-llvm; \
-    rm -f /tmp/llvm.tar.xz; \
-    test "$(cat /opt/chromium-llvm/cr_build_revision)" = llvmorg-24-init-3796-g20e97c4b-2; \
-    ln -s x86_64-unknown-linux-gnu /opt/chromium-llvm/lib/clang/24/lib/x86_64-unknown-linux-musl; \
-    ln -s ../x86_64-unknown-linux-gnu/libclang_rt.builtins.a /opt/chromium-llvm/lib/clang/24/lib/linux/libclang_rt.builtins-x86_64.a; \
-    ln -s llvm-ar /opt/chromium-llvm/bin/llvm-ranlib; \
-    printf '%s\n' '--target=x86_64-unknown-linux-musl' '-rtlib=compiler-rt' '-fuse-ld=lld' > /opt/chromium-llvm/bin/clang.cfg; \
-    cp /opt/chromium-llvm/bin/clang.cfg /opt/chromium-llvm/bin/clang++.cfg; \
-    test "$(/opt/chromium-llvm/bin/clang -dumpmachine)" = x86_64-unknown-linux-musl; \
-    /opt/chromium-llvm/bin/clang --version | grep -F 24.0.0git; \
-    ln -s /usr/lib/ninja-build/bin/ninja /usr/local/bin/ninja; \
-    test "$(/usr/local/bin/ninja --version)" = 1.13.2
+    if [ "$PRODUCT" = helium ]; then \
+        mkdir -p /opt/chromium-llvm; \
+        curl -fsSL "$LLVM_URL" -o /tmp/llvm.tar.xz; \
+        test "$(stat -c %s /tmp/llvm.tar.xz)" = "$LLVM_SIZE"; \
+        echo "$LLVM_SHA256  /tmp/llvm.tar.xz" | sha256sum -c -; \
+        tar -xJf /tmp/llvm.tar.xz -C /opt/chromium-llvm --strip-components=1; \
+        rm -f /tmp/llvm.tar.xz; \
+        printf '%s\n' "$LLVM_REVISION" > /opt/chromium-llvm/cr_build_revision; \
+        if [ "$TARGET_ARCH" = "arm64" ]; then \
+            linux_arch=aarch64; builtins_arch=aarch64; clang_major=23; \
+        else \
+            linux_arch=x86_64; builtins_arch=x86_64; clang_major=23; \
+        fi; \
+        test "$(cat /opt/chromium-llvm/cr_build_revision)" = "$LLVM_REVISION"; \
+        mkdir -p "/opt/chromium-llvm/lib/clang/${clang_major}/lib/${linux_arch}-unknown-linux-musl"; \
+        ln -sf "../linux/libclang_rt.builtins-${builtins_arch}.a" "/opt/chromium-llvm/lib/clang/${clang_major}/lib/${linux_arch}-unknown-linux-musl/libclang_rt.builtins.a"; \
+        test "$(/opt/chromium-llvm/bin/clang -dumpmachine)" = "${linux_arch}-unknown-linux-musl"; \
+        /opt/chromium-llvm/bin/clang --version | grep -F 23.1.5; \
+        ln -sf /usr/lib/ninja-build/bin/ninja /usr/local/bin/ninja; \
+        test "$(/usr/local/bin/ninja --version)" = 1.13.2; \
+    else \
+        test "$TARGET_ARCH" = amd64; \
+        mkdir -p /opt/chromium-llvm; \
+        curl -fsSL "$LLVM_URL" -o /tmp/llvm.tar.xz; \
+        test "$(stat -c %s /tmp/llvm.tar.xz)" = "$LLVM_SIZE"; \
+        echo "$LLVM_SHA256  /tmp/llvm.tar.xz" | sha256sum -c -; \
+        tar -xJf /tmp/llvm.tar.xz -C /opt/chromium-llvm; \
+        rm -f /tmp/llvm.tar.xz; \
+        test "$(cat /opt/chromium-llvm/cr_build_revision)" = llvmorg-24-init-3796-g20e97c4b-2; \
+        ln -s x86_64-unknown-linux-gnu /opt/chromium-llvm/lib/clang/24/lib/x86_64-unknown-linux-musl; \
+        ln -s ../x86_64-unknown-linux-gnu/libclang_rt.builtins.a /opt/chromium-llvm/lib/clang/24/lib/linux/libclang_rt.builtins-x86_64.a; \
+        ln -s llvm-ar /opt/chromium-llvm/bin/llvm-ranlib; \
+        printf '%s\n' '--target=x86_64-unknown-linux-musl' '-rtlib=compiler-rt' '-fuse-ld=lld' > /opt/chromium-llvm/bin/clang.cfg; \
+        cp /opt/chromium-llvm/bin/clang.cfg /opt/chromium-llvm/bin/clang++.cfg; \
+        test "$(/opt/chromium-llvm/bin/clang -dumpmachine)" = x86_64-unknown-linux-musl; \
+        /opt/chromium-llvm/bin/clang --version | grep -F 24.0.0git; \
+        ln -s /usr/lib/ninja-build/bin/ninja /usr/local/bin/ninja; \
+        test "$(/usr/local/bin/ninja --version)" = 1.13.2; \
+    fi
 
-# The Chromium Rust toolchain and Crubit are glibc host binaries. Their host
-# tools and procedural macros link against the Debian glibc runtime copied
-# above; Chromium outputs still target Alpine musl.
 COPY config/glibc /opt/chromium-glibc-src
 RUN set -eux; \
     mkdir -p /opt/chromium-glibc/lib; \
-    /opt/chromium-llvm/bin/clang --target=x86_64-unknown-linux-gnu \
-        -c /opt/chromium-glibc-src/crt1.S -o /opt/chromium-glibc/lib/Scrt1.o; \
-    cp /opt/chromium-glibc/lib/Scrt1.o /opt/chromium-glibc/lib/crt1.o; \
-    /opt/chromium-llvm/bin/clang --target=x86_64-unknown-linux-gnu \
-        -c /opt/chromium-glibc-src/crti.S -o /opt/chromium-glibc/lib/crti.o; \
-    /opt/chromium-llvm/bin/clang --target=x86_64-unknown-linux-gnu \
-        -c /opt/chromium-glibc-src/crtn.S -o /opt/chromium-glibc/lib/crtn.o; \
-    cp /opt/chromium-glibc-src/libc.so /opt/chromium-glibc/lib/libc.so; \
-    ln -s /usr/lib/x86_64-linux-gnu/libc.so.6 /opt/chromium-glibc/lib/libc.so.6; \
-    ln -s /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 /opt/chromium-glibc/lib/ld-linux-x86-64.so.2; \
-    for pair in \
-        libm.so.6:libm.so \
-        libdl.so.2:libdl.so \
-        libpthread.so.0:libpthread.so \
-        librt.so.1:librt.so \
-        libutil.so.1:libutil.so \
-        libgcc_s.so.1:libgcc_s.so; do \
-        source=${pair%%:*}; link=${pair##*:}; \
-        ln -s "/usr/lib/x86_64-linux-gnu/$source" "/opt/chromium-glibc/lib/$link"; \
-    done; \
-    for name in crtbegin crtend; do \
-        ln -s "/opt/chromium-llvm/lib/clang/24/lib/x86_64-unknown-linux-gnu/clang_rt.$name.o" \
-            "/opt/chromium-glibc/lib/$name.o"; \
-        ln -s "/opt/chromium-llvm/lib/clang/24/lib/x86_64-unknown-linux-gnu/clang_rt.$name.o" \
-            "/opt/chromium-glibc/lib/${name}S.o"; \
-    done
+    if [ "$TARGET_ARCH" = "arm64" ]; then \
+        /opt/chromium-llvm/bin/clang --target=aarch64-unknown-linux-gnu \
+            -c /opt/chromium-glibc-src/aarch64/crt1.S -o /opt/chromium-glibc/lib/Scrt1.o; \
+        cp /opt/chromium-glibc/lib/Scrt1.o /opt/chromium-glibc/lib/crt1.o; \
+        /opt/chromium-llvm/bin/clang --target=aarch64-unknown-linux-gnu \
+            -c /opt/chromium-glibc-src/aarch64/crti.S -o /opt/chromium-glibc/lib/crti.o; \
+        /opt/chromium-llvm/bin/clang --target=aarch64-unknown-linux-gnu \
+            -c /opt/chromium-glibc-src/aarch64/crtn.S -o /opt/chromium-glibc/lib/crtn.o; \
+        cp /opt/chromium-glibc-src/aarch64/libc.so /opt/chromium-glibc/lib/libc.so; \
+        ln -s "/usr/lib/${GLIBC_TRIPLET}/libc.so.6" /opt/chromium-glibc/lib/libc.so.6; \
+        ln -s "/usr/lib/${GLIBC_TRIPLET}/${LD_LINUX}" "/opt/chromium-glibc/lib/${LD_LINUX}"; \
+        for pair in \
+            libm.so.6:libm.so \
+            libdl.so.2:libdl.so \
+            libpthread.so.0:libpthread.so \
+            librt.so.1:librt.so \
+            libutil.so.1:libutil.so \
+            libgcc_s.so.1:libgcc_s.so; do \
+            source=${pair%%:*}; link=${pair##*:}; \
+            ln -s "/usr/lib/${GLIBC_TRIPLET}/$source" "/opt/chromium-glibc/lib/$link"; \
+        done; \
+        for name in crtbegin crtend; do \
+            ln -s "/opt/chromium-llvm/lib/clang/23/lib/linux/clang_rt.$name.o" \
+                "/opt/chromium-glibc/lib/$name.o"; \
+            ln -s "/opt/chromium-llvm/lib/clang/23/lib/linux/clang_rt.$name.o" \
+                "/opt/chromium-glibc/lib/${name}S.o"; \
+        done; \
+    else \
+        /opt/chromium-llvm/bin/clang --target=x86_64-unknown-linux-gnu \
+            -c /opt/chromium-glibc-src/crt1.S -o /opt/chromium-glibc/lib/Scrt1.o; \
+        cp /opt/chromium-glibc/lib/Scrt1.o /opt/chromium-glibc/lib/crt1.o; \
+        /opt/chromium-llvm/bin/clang --target=x86_64-unknown-linux-gnu \
+            -c /opt/chromium-glibc-src/crti.S -o /opt/chromium-glibc/lib/crti.o; \
+        /opt/chromium-llvm/bin/clang --target=x86_64-unknown-linux-gnu \
+            -c /opt/chromium-glibc-src/crtn.S -o /opt/chromium-glibc/lib/crtn.o; \
+        cp /opt/chromium-glibc-src/libc.so /opt/chromium-glibc/lib/libc.so; \
+        ln -s "/usr/lib/${GLIBC_TRIPLET}/libc.so.6" /opt/chromium-glibc/lib/libc.so.6; \
+        ln -s "/usr/lib/${GLIBC_TRIPLET}/${LD_LINUX}" "/opt/chromium-glibc/lib/${LD_LINUX}"; \
+        for pair in \
+            libm.so.6:libm.so \
+            libdl.so.2:libdl.so \
+            libpthread.so.0:libpthread.so \
+            librt.so.1:librt.so \
+            libutil.so.1:libutil.so \
+            libgcc_s.so.1:libgcc_s.so; do \
+            source=${pair%%:*}; link=${pair##*:}; \
+            ln -s "/usr/lib/${GLIBC_TRIPLET}/$source" "/opt/chromium-glibc/lib/$link"; \
+        done; \
+        if [ "$PRODUCT" = helium ]; then \
+            for name in crtbegin crtend; do \
+                ln -s "/opt/chromium-llvm/lib/clang/23/lib/linux/clang_rt.$name.o" \
+                    "/opt/chromium-glibc/lib/$name.o"; \
+                ln -s "/opt/chromium-llvm/lib/clang/23/lib/linux/clang_rt.$name.o" \
+                    "/opt/chromium-glibc/lib/${name}S.o"; \
+            done; \
+        else \
+            for name in crtbegin crtend; do \
+                ln -s "/opt/chromium-llvm/lib/clang/24/lib/x86_64-unknown-linux-gnu/clang_rt.$name.o" \
+                    "/opt/chromium-glibc/lib/$name.o"; \
+                ln -s "/opt/chromium-llvm/lib/clang/24/lib/x86_64-unknown-linux-gnu/clang_rt.$name.o" \
+                    "/opt/chromium-glibc/lib/${name}S.o"; \
+            done; \
+        fi; \
+    fi
 
 RUN addgroup -S chromium && adduser -S -D -H -G chromium chromium
 

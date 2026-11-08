@@ -72,8 +72,8 @@ def acceptance(archive: Path, archive_digest: str) -> dict:
         raise InstallError("archive acceptance names a different archive")
     if not isinstance(report.get("product_version"), str) or not report["product_version"]:
         raise InstallError("archive acceptance has no product version")
-    if report.get("architecture") != "amd64":
-        raise InstallError(f"archive acceptance architecture is {report.get('architecture')!r}, not amd64")
+    if report.get("architecture") not in {"amd64", "arm64"}:
+        raise InstallError(f"archive acceptance architecture is {report.get('architecture')!r}, not amd64 or arm64")
     checks = report.get("checks")
     if not isinstance(checks, dict) or not checks or any(value is not True for value in checks.values()):
         raise InstallError("archive acceptance has no successful package checks")
@@ -381,7 +381,7 @@ def main() -> int:
     parser.add_argument("--prefix", type=Path)
     parser.add_argument("--bin-dir", type=Path)
     parser.add_argument("--home", type=Path, default=Path(os.environ.get("HOME", "")))
-    parser.add_argument("--arch", choices=("amd64",), default=os.environ.get("CHROMIUM_ARCH", "amd64"))
+    parser.add_argument("--arch", choices=("amd64", "arm64"), default=os.environ.get("CHROMIUM_ARCH", "amd64"))
     parser.add_argument("--rollback", action="store_true")
     parser.add_argument("--probe", type=Path)
     args = parser.parse_args()

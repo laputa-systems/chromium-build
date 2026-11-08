@@ -88,8 +88,6 @@ def validate(product: str, platform: str, arch: str, profile: str | None) -> tup
         raise ScriptFailure(f"unsupported architecture {arch}")
     if product == "helium" and platform == "macos":
         raise ScriptFailure("Helium is not supported on macOS")
-    if product == "helium" and arch != "amd64":
-        raise ScriptFailure(f"Helium is not supported on {arch}")
     profile = profile or DEFAULT_PROFILES[product]
     if profile not in PROFILES[product]:
         raise ScriptFailure(
