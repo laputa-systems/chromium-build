@@ -14,7 +14,6 @@ from pathlib import Path, PurePosixPath
 
 import linux_runtime
 
-
 DESKTOP_ENTRY = """[Desktop Entry]
 Version=1.0
 Type=Application

@@ -348,7 +348,7 @@ def check_fixture(args: argparse.Namespace) -> int:
         report["status"] = "complete"
         write_report(report_path, report)
         return 0
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001
         report["error"] = str(error)
         if fixture is not None:
             report["attempt"] = str(fixture.attempt)

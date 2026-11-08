@@ -16,7 +16,6 @@ from pathlib import Path, PurePosixPath
 
 import linux_runtime
 
-
 HOST_LIBRARIES = linux_runtime.MUSL_LIBRARIES
 GLIBC = linux_runtime.GLIBC_LIBRARIES
 LIBRARY_DIRECTORIES = (Path("/usr/lib"), Path("/lib"))
@@ -268,9 +267,7 @@ def package_helium(stage: Path, output: Path, artifacts: Path) -> None:
                 path.chmod(0o755)
             elif path.name == "chrome_sandbox":
                 path.chmod(0o4755)
-            elif path.name == "helium-wrapper" or path.name == "helium":
-                path.chmod(0o755)
-            elif is_elf(path):
+            elif path.name == "helium-wrapper" or path.name == "helium" or is_elf(path):
                 path.chmod(0o755)
             else:
                 path.chmod(0o644)
