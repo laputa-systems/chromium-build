@@ -49,7 +49,6 @@ SYSTEM_SEEDS = (
     "libfreeblpriv3.so",
     "libfreebl3.so",
     "libnssckbi.so",
-    "libgtk-3.so.0",
     "libwayland-egl.so.1",
     "libEGL.so.1",
     "libGLESv2.so.2",

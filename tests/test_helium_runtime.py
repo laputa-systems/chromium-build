@@ -392,9 +392,9 @@ class PackageTests(unittest.TestCase):
         launcher = PACKAGE["HELIUM_LAUNCHER"]
         self.assertIn('exec "$root/helium" "$@"', launcher)
         self.assertIn('LD_LIBRARY_PATH="$root/lib', launcher)
-        self.assertIn("GDK_BACKEND=wayland", launcher)
-        self.assertIn("GTK_USE_PORTAL=0", launcher)
-        self.assertIn("NO_AT_BRIDGE=1", launcher)
+        self.assertNotIn("GDK_BACKEND", launcher)
+        self.assertNotIn("GTK_USE_PORTAL", launcher)
+        self.assertNotIn("NO_AT_BRIDGE", launcher)
         self.assertNotIn("--disable-gpu", launcher)
         self.assertNotIn("--no-sandbox", launcher)
 

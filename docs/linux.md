@@ -1,10 +1,10 @@
 # Linux musl builds
 
 The Linux backend builds headless Chromium and the Helium desktop browser in
-an Alpine container on native amd64. Linux/arm64 is out of scope: the locked
-toolchain has no native Linux arm64 LLVM archive. Chromium source and Ninja
-output use Docker named volumes. Only `fetch` needs network access; later
-phases run offline.
+an Alpine container on the native host architecture (amd64, or arm64 for
+Helium). Headless Chromium remains amd64-only; Helium also builds for
+linux/arm64. Chromium source and Ninja output use Docker named volumes. Only
+`fetch` needs network access; later phases run offline.
 
 ## Inputs and profiles
 
@@ -64,7 +64,7 @@ headless-release path through installation.
 
 ## Helium desktop package
 
-The Helium product is a Linux amd64 musl desktop build. The image, source
+The Helium product is a Linux musl desktop build (amd64 and arm64). The image, source
 inputs, package world, patch inventory, and executable name come from
 `config/helium.inputs.lock`; the only supported profile is
 `helium-wayland-release`. Browser acceptance uses the Linux CDP and Sway
@@ -76,20 +76,16 @@ The profile uses an official-style optimized build:
 `is_official_build=true`, `dcheck_always_on=false`, `chrome_pgo_phase=2`,
 `use_thin_lto=true`, and `thin_lto_enable_optimizations=true`. Chromium's
 bundled Linux PGO profile is selected from `chrome/build/pgo_profiles` through
-`chrome/build/linux.pgo.txt`, so PGO needs no network fetch. The profile keeps
-GTK3 and the native file chooser, enables VA-API video decode, disables D-Bus,
-and omits the DevTools frontend resources while retaining raw CDP. `helium-no-devtools-frontend.patch`
+`chrome/build/linux.pgo.txt`, so PGO needs no network fetch. The profile
+enables VA-API video decode, disables D-Bus and GTK, and omits the DevTools
+frontend resources while retaining raw CDP. `helium-no-devtools-frontend.patch`
 and `helium-no-dbus.patch` carry those exclusions; `TODO.md` tracks restoring
-the frontend and completing the non-D-Bus fallbacks. With `use_dbus=false`, the
-packaged browser does not require a session bus. Native notifications are
+the frontend and completing the non-D-Bus fallbacks. With `use_dbus=false` and
+`use_gtk=false`, the packaged browser does not require a session bus or GTK:
+native file choosers, GTK theming, and native dialogs are gone, and uploads
+go through the web content or CDP. Native notifications are
 disabled and external URI or file-manager launch falls back to `xdg-open` and
-`xdg-email`; the GTK file chooser remains the native picker path. The packaged
-launcher sets `GDK_BACKEND=wayland`, `GTK_USE_PORTAL=0`, and `NO_AT_BRIDGE=1`
-so the picker uses the in-process GTK dialog and GTK's accessibility bridge
-does not open a D-Bus connection. GTK's accessibility stack still links
-`libdbus` transitively, so that library may be present in the GTK runtime
-closure even though Chromium starts no session bus and the browser does not
-enable its D-Bus backend. Accessibility is disabled by default; `TODO.md`
+`xdg-email`. Accessibility is disabled by default; `TODO.md`
 tracks restoring it without requiring a session bus.
 
 VA-API decode is compiled in but the GPU driver stays host-provided: the
@@ -119,7 +115,7 @@ policy's scoped exception.
 
 `stage-runtime` takes the `//chrome:chrome` runtime dependency list from GN,
 adds the upstream desktop packaging inputs, all generated locale packs and V8
-startup data, and closes the NSS, GTK, Wayland, and Mesa GPU libraries. VA-API
+startup data, and closes the NSS, Wayland, and Mesa GPU libraries. VA-API
 is loaded from the host and is not part of the staged closure. It recursively
 audits every shipped ELF, rejects glibc and absolute build RPATHs, and keeps
 the graphics/NSS closure separate from the browser's direct dependencies. The Helium profile uses Torque's instance-type generation

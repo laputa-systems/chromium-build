@@ -229,7 +229,6 @@ def run(args: argparse.Namespace) -> int:
         environment = fixture.environment()
         environment.update(
             WAYLAND_DISPLAY=fixture.wayland_socket.name,
-            GDK_BACKEND="wayland",
             LIBGL_ALWAYS_SOFTWARE="1",
             GALLIUM_DRIVER="llvmpipe",
         )

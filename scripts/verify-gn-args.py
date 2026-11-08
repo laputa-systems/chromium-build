@@ -98,7 +98,7 @@ def helium_expected(args):
         "ozone_platform_headless": False,
         "ozone_platform_x11": False,
         "use_xkbcommon": True,
-        "use_gtk": True,
+        "use_gtk": False,
         "use_qt6": False,
         "use_dbus": False,
         "use_libpci": False,
