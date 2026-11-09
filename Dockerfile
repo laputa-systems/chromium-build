@@ -4,6 +4,9 @@ ARG GLIBC_IMAGE=debian@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e36
 ARG BASE_IMAGE=alpine@sha256:d56c381f961d307a21b3ca004cf1e3910f106644aefb1f43e654c8a56c4fd395
 FROM ${GLIBC_IMAGE} AS compiler-host-runtime
 FROM --platform=linux/amd64 ${GLIBC_IMAGE} AS compiler-host-runtime-x64
+RUN apt-get update -qq \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends libgcc-12-dev=12.2.0-14+deb12u1 \
+    && rm -rf /var/lib/apt/lists/*
 FROM ${BASE_IMAGE}
 
 ARG TARGET_ARCH=amd64
@@ -23,6 +26,9 @@ ARG CCACHE_MAXSIZE=10G
 COPY --from=compiler-host-runtime-x64 /usr/lib/x86_64-linux-gnu/ /usr/lib/x86_64-linux-gnu/
 RUN mkdir -p /lib64 && \
     ln -s /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 /lib64/ld-linux-x86-64.so.2
+COPY --from=compiler-host-runtime-x64 /usr/lib/gcc/x86_64-linux-gnu/12/libgcc.a /opt/chromium-glibc/lib/libgcc.a
+COPY --from=compiler-host-runtime-x64 /usr/lib/gcc/x86_64-linux-gnu/12/crtbeginS.o /opt/chromium-x86crt/crtbeginS.o
+COPY --from=compiler-host-runtime-x64 /usr/lib/gcc/x86_64-linux-gnu/12/crtendS.o /opt/chromium-x86crt/crtendS.o
 
 RUN set -eux; \
     if [ "$PRODUCT" = helium ]; then \
