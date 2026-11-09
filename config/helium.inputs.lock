@@ -212,11 +212,11 @@
         "linux_arch": "aarch64",
         "chromium_cpu": "arm64",
         "target_triple": "aarch64-unknown-linux-musl",
-        "revision": "llvm-musl-23.1.5-69be0e1",
+        "revision": "llvm-musl-23.1.5-dc0d9b9",
         "archive_filename": "clang+llvm-23.1.5-aarch64-linux-musl.tar.xz",
-        "archive_size": 93574152,
-        "archive_url": "https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-23.1.5-69be0e1/clang%2Bllvm-23.1.5-aarch64-linux-musl.tar.xz",
-        "archive_sha256": "1653e4d6d9a8756dbd3a3cc1d7bd7f55a9b7faacfadbb160da89eb30c60b16c3"
+        "archive_size": 93784384,
+        "archive_url": "https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-23.1.5-dc0d9b9/clang%2Bllvm-23.1.5-aarch64-linux-musl.tar.xz",
+        "archive_sha256": "fe0a382993c36a04a505157b59503a7294db97e2ac9923e5630f8b393b78f118"
       }
     }
   },

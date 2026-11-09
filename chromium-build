@@ -209,10 +209,10 @@ case "$ARCH" in
         base_image=alpine@sha256:e7a1a92a5bfeee40966aea60f0796b0e7917cc35591542701834f03a68fa3d18
         rust_host_linker=
         if [ "$PRODUCT" = helium ]; then
-            llvm_url=https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-23.1.5-69be0e1/clang%2Bllvm-23.1.5-aarch64-linux-musl.tar.xz
-            llvm_sha256=1653e4d6d9a8756dbd3a3cc1d7bd7f55a9b7faacfadbb160da89eb30c60b16c3
-            llvm_size=93574152
-            llvm_revision=llvm-musl-23.1.5-69be0e1
+            llvm_url=https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-23.1.5-dc0d9b9/clang%2Bllvm-23.1.5-aarch64-linux-musl.tar.xz
+            llvm_sha256=fe0a382993c36a04a505157b59503a7294db97e2ac9923e5630f8b393b78f118
+            llvm_size=93784384
+            llvm_revision=llvm-musl-23.1.5-dc0d9b9
         else
             fail 'Chromium 153 publishes no native Linux arm64 LLVM 24 archive; the Chromium backend currently supports amd64 only (Helium uses the laputa LLVM 23 musl toolchain for arm64)'
         fi

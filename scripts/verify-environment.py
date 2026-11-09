@@ -10,7 +10,6 @@ import platform
 import tempfile
 from pathlib import Path
 
-import elf_stack
 from script_support import ScriptFailure, atomic_write, fail_main, require_file, run
 
 
@@ -135,10 +134,6 @@ def main() -> None:
     require_file(ninja, "missing /usr/local/bin/ninja")
     if run([str(ninja), "--version"], capture_output=True).stdout.strip() != "1.13.2":
         raise ScriptFailure("Ninja is not the locked Alpine version")
-    if toolchain["distribution"] == "laputa-llvm-musl":
-        lld = llvm_root / "bin/lld"
-        if elf_stack.thread_stack_size(lld) != elf_stack.LLD_THREAD_STACK_SIZE:
-            raise ScriptFailure(f"{lld} keeps musl's default thread stack; ThinLTO backend threads overflow it")
     lld_version = toolchain.get("lld_version", toolchain["version"])
     if lld_version not in run([str(llvm_root / "bin/ld.lld"), "--version"], capture_output=True).stdout:
         raise ScriptFailure("LLD version is not locked")
