@@ -12,9 +12,15 @@
 # and third_party/rust-toolchain/VERSION, so the result is the toolchain Chromium
 # pins, rebuilt for this host. Architecture-independent parts (rust-src, vendored
 # std crates, Crubit's GN support files) are taken from the toolchain Chromium
-# downloaded, which is the same revision. Writes
+# downloaded, which is the same revision. The archive also carries the host
+# clang-format Crubit runs on generated headers, and std's profiler_builtins links
+# compiler-rt's profile runtime; both come from the LLVM release the package was
+# built from. Writes
 # <out-dir>/rust-toolchain-<rust-rev>-<arch>-linux-musl.tar.xz and its .sha256.
 set -euo pipefail
+
+LLVM_SOURCE_VERSION=23.1.5
+LLVM_SOURCE_SHA256=fb50b1eac93ddeb3aa8dab4cfe324dff74f4a9c2bdee6160c9e36188f8d06a6e
 
 src=${1:?chromium src}
 llvm=${2:?llvm prefix}
@@ -52,7 +58,68 @@ mkdir -p "$gcc_s_shim"
 printf 'INPUT ( %s )\n' "${llvm}/lib/libunwind.a" > "${gcc_s_shim}/libgcc_s.so"
 export LIBRARY_PATH="${gcc_s_shim}"
 
-echo "== rust ${rust_rev}, crubit ${crubit_rev}, bindgen ${bindgen_rev}, host ${triple}"
+llvm_version=$("${llvm}/bin/llvm-config" --version)
+[ "$llvm_version" = "$LLVM_SOURCE_VERSION" ] || die "${llvm} is LLVM ${llvm_version}, the pinned compiler-rt source is ${LLVM_SOURCE_VERSION}"
+
+echo "== rust ${rust_rev}, crubit ${crubit_rev}, bindgen ${bindgen_rev}, host ${triple}, LLVM ${llvm_version}"
+
+llvm_source="${work}/llvm-project-${llvm_version}.src.tar.xz"
+if [ ! -f "$llvm_source" ]; then
+    curl -fsSL "https://github.com/llvm/llvm-project/releases/download/llvmorg-${llvm_version}/llvm-project-${llvm_version}.src.tar.xz" -o "${llvm_source}.tmp"
+    mv "${llvm_source}.tmp" "$llvm_source"
+fi
+echo "${LLVM_SOURCE_SHA256}  ${llvm_source}" | sha256sum -c -
+rm -rf "${work}/llvm-project" "${work}/compiler-rt-build"
+mkdir -p "${work}/llvm-project"
+rm -rf "${work}/clang-format-build"
+tar -xJf "$llvm_source" -C "${work}/llvm-project" --strip-components=1 \
+    "llvm-project-${llvm_version}.src/compiler-rt" "llvm-project-${llvm_version}.src/cmake" \
+    "llvm-project-${llvm_version}.src/llvm" "llvm-project-${llvm_version}.src/clang" \
+    "llvm-project-${llvm_version}.src/third-party" "llvm-project-${llvm_version}.src/libc"
+cmake -G "Unix Makefiles" -S "${work}/llvm-project/compiler-rt" -B "${work}/compiler-rt-build" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_C_COMPILER="${llvm}/bin/clang" \
+    -DCMAKE_CXX_COMPILER="${llvm}/bin/clang++" \
+    -DCMAKE_AR="${llvm}/bin/llvm-ar" \
+    -DCMAKE_RANLIB="${llvm}/bin/llvm-ranlib" \
+    -DCMAKE_C_COMPILER_TARGET="$triple" \
+    -DCMAKE_CXX_COMPILER_TARGET="$triple" \
+    -DLLVM_CONFIG_PATH="${llvm}/bin/llvm-config" \
+    -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON \
+    -DCOMPILER_RT_BUILD_PROFILE=ON \
+    -DCOMPILER_RT_BUILD_BUILTINS=OFF \
+    -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
+    -DCOMPILER_RT_BUILD_XRAY=OFF \
+    -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
+    -DCOMPILER_RT_BUILD_MEMPROF=OFF \
+    -DCOMPILER_RT_BUILD_ORC=OFF \
+    -DCOMPILER_RT_BUILD_CTX_PROFILE=OFF \
+    -DCOMPILER_RT_BUILD_GWP_ASAN=OFF
+make -C "${work}/compiler-rt-build" -j"$(nproc)" clang_rt.profile-"${arch}"
+profiler_runtime=$(find "${work}/compiler-rt-build" -name "libclang_rt.profile*.a" | head -n 1)
+[ -n "$profiler_runtime" ] || die "compiler-rt did not produce the profile runtime"
+
+cmake -G "Unix Makefiles" -S "${work}/llvm-project/llvm" -B "${work}/clang-format-build" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_C_COMPILER="${llvm}/bin/clang" \
+    -DCMAKE_CXX_COMPILER="${llvm}/bin/clang++" \
+    -DCMAKE_AR="${llvm}/bin/llvm-ar" \
+    -DCMAKE_RANLIB="${llvm}/bin/llvm-ranlib" \
+    -DLLVM_ENABLE_PROJECTS=clang \
+    -DLLVM_TARGETS_TO_BUILD=host \
+    -DLLVM_ENABLE_LIBCXX=ON \
+    -DLLVM_ENABLE_ZLIB=OFF \
+    -DLLVM_ENABLE_ZSTD=OFF \
+    -DLLVM_ENABLE_LIBXML2=OFF \
+    -DLLVM_ENABLE_LIBEDIT=OFF \
+    -DLLVM_ENABLE_TERMINFO=OFF \
+    -DLLVM_INCLUDE_TESTS=OFF \
+    -DLLVM_INCLUDE_BENCHMARKS=OFF \
+    -DLLVM_INCLUDE_EXAMPLES=OFF \
+    -DCLANG_INCLUDE_TESTS=OFF
+make -C "${work}/clang-format-build" -j"$(nproc)" clang-format
+clang_format="${work}/clang-format-build/bin/clang-format"
+"$clang_format" --version | grep -qF "clang-format version ${llvm_version}" || die "clang-format is not LLVM ${llvm_version}"
 
 if [ ! -d "${work}/rust/.git" ]; then
     git init -q "${work}/rust"
@@ -83,7 +150,6 @@ host = ["${triple}"]
 target = ["${triple}"]
 locked-deps = true
 docs = false
-profiler = false
 extended = true
 tools = ["cargo", "clippy", "rustc-dev", "rustdoc", "rustfmt", "src"]
 cargo-native-static = true
@@ -101,6 +167,7 @@ ranlib = "${llvm}/bin/llvm-ranlib"
 linker = "${llvm}/bin/clang"
 crt-static = false
 musl-root = "${musl_root}"
+profiler = "${profiler_runtime}"
 TOML
 
 rm -rf "$prefix"
@@ -140,6 +207,7 @@ mkdir -p "$stage"
 cp -a "${prefix}/." "$stage/"
 cp "${work}/crubit-target/release/cc_bindings_from_rs" "${stage}/bin/"
 cp "${work}/bindgen-target/release/bindgen" "${stage}/bin/"
+cp "$clang_format" "${stage}/bin/clang-format"
 cp -a "${llvm}"/lib/libclang.so* "${stage}/lib/"
 rm -rf "${stage}/lib/rustlib/src"
 mkdir -p "${stage}/lib/rustlib"
