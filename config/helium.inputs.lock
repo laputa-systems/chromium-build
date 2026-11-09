@@ -4,7 +4,7 @@
     "name": "helium",
     "version": "0.20.3.1",
     "platform_version": "1",
-    "package_revision": 3,
+    "package_revision": 4,
     "source_revision": "83027a19267e526f08e25a3af1a30b45ee7e3e2e",
     "core_revision": "2f81b9cafa38a95071e20de3f9cd6b0aca6d3c65"
   },
