@@ -1,0 +1,11 @@
+--- a/build/config/rust.gni
++++ b/build/config/rust.gni
+@@ -345,7 +345,7 @@
+ }
+ 
+ if (toolchain_for_rust_host_build_tools && is_linux && is_musl &&
+-    current_cpu == "x64") {
++    current_cpu == "x64" || current_cpu == "arm64") {
+   rust_abi_target = "x86_64-unknown-linux-gnu"
+ }
+ 
