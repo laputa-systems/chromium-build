@@ -176,7 +176,7 @@ def find_source_root(chrome: Path, explicit: Path | None) -> Path:
         candidates.append(Path(configured))
     candidates.extend((chrome.parents[2] / "src", chrome.parents[1] / "src", Path("/work/src")))
     for candidate in candidates:
-        if (candidate / "chrome/installer/linux/BUILD.gn").is_file() and (candidate / "buildtools/linux64/gn").is_file():
+        if (candidate / "chrome/installer/linux/BUILD.gn").is_file() and (candidate / ".gn").is_file():
             return candidate.resolve()
     raise RuntimeError("cannot find the Chromium source root for runtime metadata")
 

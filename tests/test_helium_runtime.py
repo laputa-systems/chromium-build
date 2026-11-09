@@ -3,6 +3,7 @@
 import hashlib
 import json
 import os
+import platform
 import runpy
 import shutil
 import subprocess
@@ -23,6 +24,8 @@ PACKAGE = runpy.run_path(str(SCRIPTS / "package-runtime.py"))
 INSTALL = runpy.run_path(str(SCRIPTS / "runtime_install.py"))
 CC = os.environ.get("CC", "cc")
 GLIBC_ROOT = Path("/opt/chromium-glibc/lib")
+HOST_LINUX_ARCH = platform.machine()
+HOST_ARCH = {"x86_64": "amd64", "aarch64": "arm64"}.get(HOST_LINUX_ARCH, HOST_LINUX_ARCH)
 
 
 def compile_program(
@@ -135,7 +138,7 @@ def make_archive(
     extra: dict[str, bytes] | None = None,
     symlink: str | None = None,
 ) -> Path:
-    root_name = f"helium-{version}-linux-x86_64-musl"
+    root_name = f"helium-{version}-linux-{HOST_LINUX_ARCH}-musl"
     payload = root / root_name
     payload.mkdir(parents=True)
     (payload / "helium").write_bytes(Path("/bin/true").read_bytes())
@@ -165,7 +168,7 @@ def make_archive(
         "status": "complete",
         "product": product,
         "product_version": version,
-        "architecture": "amd64",
+        "architecture": HOST_ARCH,
         "launcher": "helium-wrapper",
         "executable": "helium",
         "files": files,
@@ -186,7 +189,7 @@ def make_archive(
                 "status": "complete",
                 "product": acceptance_product,
                 "product_version": version,
-                "architecture": "amd64",
+                "architecture": HOST_ARCH,
                 "archive": archive.name,
                 "archive_root": root_name,
                 "archive_sha256": archive_digest,
@@ -270,9 +273,9 @@ class ElfAuditTests(unittest.TestCase):
             root = Path(directory)
             program = compile_program(root, "browser", "int main(void){return 0;}\n")
             info = linux_runtime.inspect_elf(program, root)
-            if info.interpreter != linux_runtime.MUSL_INTERPRETERS["amd64"]:
+            if info.interpreter != linux_runtime.MUSL_INTERPRETERS[HOST_ARCH]:
                 self.skipTest("the local compiler does not target musl")
-            report = linux_runtime.audit_tree(root, "amd64")
+            report = linux_runtime.audit_tree(root, HOST_ARCH)
         self.assertEqual(report["status"], "complete")
 
     def test_nested_wrong_loader_helper_is_rejected(self):
@@ -282,7 +285,7 @@ class ElfAuditTests(unittest.TestCase):
             helper.mkdir()
             glibc_program(helper)
             with self.assertRaisesRegex(linux_runtime.RuntimeAuditError, "wrong ELF interpreter"):
-                linux_runtime.audit_tree(root, "amd64")
+                linux_runtime.audit_tree(root, HOST_ARCH)
 
     def test_transitive_glibc_dependency_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -297,10 +300,10 @@ class ElfAuditTests(unittest.TestCase):
                 [f"-L{lib}", "-Wl,--no-as-needed", "-lglibc", "-Wl,-rpath,$ORIGIN/lib"],
             )
             info = linux_runtime.inspect_elf(program, root)
-            if info.interpreter != linux_runtime.MUSL_INTERPRETERS["amd64"]:
+            if info.interpreter != linux_runtime.MUSL_INTERPRETERS[HOST_ARCH]:
                 self.skipTest("the local compiler does not target musl")
             with self.assertRaisesRegex(linux_runtime.RuntimeAuditError, "glibc library"):
-                linux_runtime.audit_tree(root, "amd64")
+                linux_runtime.audit_tree(root, HOST_ARCH)
 
     def test_missing_library_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -315,11 +318,11 @@ class ElfAuditTests(unittest.TestCase):
                 [f"-L{lib}", "-Wl,--no-as-needed", "-lmissing", "-Wl,-rpath,$ORIGIN/lib"],
             )
             info = linux_runtime.inspect_elf(program, root)
-            if info.interpreter != linux_runtime.MUSL_INTERPRETERS["amd64"]:
+            if info.interpreter != linux_runtime.MUSL_INTERPRETERS[HOST_ARCH]:
                 self.skipTest("the local compiler does not target musl")
             (lib / "libmissing.so").unlink()
             with self.assertRaisesRegex(linux_runtime.RuntimeAuditError, "missing runtime library"):
-                linux_runtime.audit_tree(root, "amd64")
+                linux_runtime.audit_tree(root, HOST_ARCH)
 
     def test_misplaced_soname_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -331,7 +334,7 @@ class ElfAuditTests(unittest.TestCase):
             shutil.copy2(compile_shared(lib, "one", "int one(void){return 1;}\n", ["-Wl,-soname,libshared.so"]), lib / "libone.so")
             shutil.copy2(compile_shared(nested, "two", "int two(void){return 2;}\n", ["-Wl,-soname,libshared.so"]), nested / "libtwo.so")
             with self.assertRaisesRegex(linux_runtime.RuntimeAuditError, "SONAME"):
-                linux_runtime.audit_tree(root, "amd64")
+                linux_runtime.audit_tree(root, HOST_ARCH)
 
     def test_direct_browser_gnu_runtime_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -344,12 +347,12 @@ class ElfAuditTests(unittest.TestCase):
                 compiler=shutil.which("cc") or CC,
             )
             info = linux_runtime.inspect_elf(program, root)
-            if info.interpreter != linux_runtime.MUSL_INTERPRETERS["amd64"]:
+            if info.interpreter != linux_runtime.MUSL_INTERPRETERS[HOST_ARCH]:
                 self.skipTest("the local compiler does not target musl")
             if "libstdc++.so.6" not in info.needed:
                 self.skipTest("the local C++ runtime is not dynamically linked")
             with self.assertRaisesRegex(linux_runtime.RuntimeAuditError, "GNU C\\+\\+ runtime"):
-                linux_runtime.audit_tree(root, "amd64")
+                linux_runtime.audit_tree(root, HOST_ARCH)
 
     def test_ffmpeg_closure_gnu_runtime_is_allowed(self):
         libstdcxx = Path("/usr/lib/libstdc++.so.6")
@@ -369,7 +372,7 @@ class ElfAuditTests(unittest.TestCase):
                 ["-Wl,--no-as-needed", "-l:libstdc++.so.6", "-Wl,-soname,libavcodec.so.62"],
             )
             shutil.move(str(shared), lib / "libavcodec.so.62")
-            report = linux_runtime.audit_tree(root, "amd64")
+            report = linux_runtime.audit_tree(root, HOST_ARCH)
         self.assertEqual(report["status"], "complete")
         self.assertIn("lib/libavcodec.so.62", report["ffmpeg_gnu_closure"])
 
@@ -382,7 +385,7 @@ class ElfAuditTests(unittest.TestCase):
             runtime.mkdir()
             (runtime / "helper").symlink_to(outside)
             with self.assertRaisesRegex(linux_runtime.RuntimeAuditError, "symlink escapes"):
-                linux_runtime.audit_tree(runtime, "amd64")
+                linux_runtime.audit_tree(runtime, HOST_ARCH)
 
 
 class PackageTests(unittest.TestCase):
@@ -407,7 +410,7 @@ class PackageTests(unittest.TestCase):
             with tarfile.open(archive, "w:xz") as bundle:
                 bundle.add(payload, arcname="../escape")
             with self.assertRaisesRegex(RuntimeError, "escapes its root"):
-                PACKAGE["verify_archive"](archive, "expected-root", {"files": [], "architecture": "amd64"})
+                PACKAGE["verify_archive"](archive, "expected-root", {"files": [], "architecture": HOST_ARCH})
 
     def test_staged_digest_mismatch_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
