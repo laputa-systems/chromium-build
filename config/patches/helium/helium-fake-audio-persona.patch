@@ -32,12 +32,13 @@
  }  // namespace media
 --- a/media/audio/fake_audio_manager.cc
 +++ b/media/audio/fake_audio_manager.cc
-@@ -6,6 +6,8 @@
+@@ -6,6 +6,9 @@
  
  #include <algorithm>
  #include <utility>
 +#include "base/command_line.h"
 +#include "base/strings/string_split.h"
++#include "base/strings/string_util.h"
  #include "media/base/audio_parameters.h"
  #include "media/base/channel_layout.h"
  
@@ -117,10 +118,10 @@
 +    if (equals == std::string::npos) {
 +      continue;
 +    }
-+    const std::string key = base::TrimWhitespaceASCII(
-+        base::StringPiece(part).substr(0, equals).as_string());
-+    const std::string field = base::TrimWhitespaceASCII(
-+        base::StringPiece(part).substr(equals + 1).as_string());
++    const std::string key(base::TrimWhitespaceASCII(
++        std::string_view(part).substr(0, equals), base::TRIM_ALL));
++    const std::string field(base::TrimWhitespaceASCII(
++        std::string_view(part).substr(equals + 1), base::TRIM_ALL));
 +    if (key == "sample_rate") {
 +      persona.sample_rate =
 +          ParsePositiveInt(field, persona.sample_rate);
