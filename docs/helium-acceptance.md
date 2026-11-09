@@ -40,7 +40,7 @@ may be complete only if every mandatory row for that artifact passed.
 | navigation-tabs | open local A, navigate to B, back to A; create a second tab, switch, and close it; require expected target URLs and active content | target creation alone cannot pass tab switching |
 | vertical-tabs | use the real Helium UI command/shortcut to switch layouts; create two tabs and select both; require observable layout and content changes | preference-file edit without a visible layout change fails |
 | settings | navigate to settings, wait for actual settings controls, change one harmless preference and read it back | a nonempty HTML shell or blank WebUI cannot pass |
-| onboarding | with a fresh disposable profile and normal first-run behavior, require actual onboarding resources and controls; complete a harmless step and verify the persisted onboarding state | the pilot's no-first-run flags must not suppress this check |
+| no-onboarding | with a fresh disposable profile and normal first-run behavior, require the expected start surface with no setup tab; `chrome://setup` must not resolve and the installed resources must contain no `helium_onboarding` payload | a setup tab, a `chrome://setup` handler, or any bundled onboarding resource fails |
 | privacy-defaults | compare the new profile's defining defaults to the pinned Helium patches; verify blocked Google/service behavior through local observations where possible | inherited Chromium defaults cannot be normalized away |
 | bundled-ublock | component metadata shows the bundled Imput 1.75.0 build enabled; load one deterministic blocked URL and one allowed sibling URL; blocked URL never reaches server or executes, allowed URL does both | disable the component in a separate disposable test profile and prove the blocked fixture reaches the server; then restore an enabled fresh profile |
 | extension | load the existing separate test extension through the supported Helium extension path and require its page-visible action | a prepopulated fixture variable without a live extension cannot pass |
@@ -167,9 +167,10 @@ python3 scripts/test-functional.py --product helium --runtime-kind package \
 Those options are the target contract, not current behavior. Until the harness
 implements them, leave the affected rows `not-executed` and use the manual
 steps: launch the package, open a local fixture, create and switch two tabs,
-use vertical tabs, visit settings and onboarding, type and paste unique fixture
+use vertical tabs, visit settings, type and paste unique fixture
 text, upload and download the fixture, restart with the same disposable
-profile, and confirm persisted state. Capture the browser in dwl and record the
+profile, and confirm persisted state. Confirm that `chrome://setup` does not
+resolve and that no setup tab opens. Capture the browser in dwl and record the
 actual outcomes in the acceptance report. Sway IPC observations do not apply to
 dwl.
 

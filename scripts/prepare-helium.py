@@ -176,6 +176,9 @@ def main() -> None:
         "-c",
         str(args.inputs),
         str(args.source),
+        "--components",
+        "search_engines_data",
+        "ublock_origin",
     ]
     run(deps)
     pruning_entries = [

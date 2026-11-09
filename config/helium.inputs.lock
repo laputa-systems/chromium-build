@@ -40,15 +40,6 @@
       "size": 2015138,
       "sha512": "b7b67d8e5d1c0a10f17e2d2419303c1ad2d7eeef89b18af6978dbda84ce7294d7aa76e0acc43c1f53cd351c35042fa240f48fc0b34e38e3d3fa8e76eaced61bd"
     },
-    "onboarding": {
-      "version": "202610161403",
-      "filename": "onboarding-page-202610161403.tar.gz",
-      "url": "https://github.com/imputnet/helium-onboarding/releases/download/202610161403/helium-onboarding-202610161403.tar.gz",
-      "size": 135976237,
-      "sha512": "3da405d57f6679ca9ccab97aea82f2e294ab7a363ea96e2423e7b6cd37a562d32a69204f074adedb14f40898369daeed388ab8182caf86dbd46206c2bac1f111",
-      "upstream_sha256": "b35de6deb79e0864f53a0a70ea8819cecd46843a3b0518a20dd6a6b7d26900ac",
-      "destination": "components/helium_onboarding"
-    },
     "search_engines_data": {
       "version": "202609082320",
       "filename": "nonfree-search-engines-data-202609082320.tar.gz",

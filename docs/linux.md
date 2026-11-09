@@ -72,6 +72,11 @@ harness; Shadowdriver remains macOS-only. The package ships no glibc, gcompat,
 static browser, or sandbox bypass, and needs no X server, session bus, or
 hardware GPU; VA-API is optional at runtime.
 
+The build ships no Helium onboarding component and no first-run setup. The
+input lock carries no onboarding payload, `prepare` unpacks only the search
+engine data and uBlock components, and `helium-remove-onboarding.patch` drops
+the `chrome://setup` page and its startup redirect.
+
 The profile uses an official-style optimized build:
 `is_official_build=true`, `dcheck_always_on=false`, `chrome_pgo_phase=2`,
 `use_thin_lto=true`, and `thin_lto_enable_optimizations=true`. Chromium's
