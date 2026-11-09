@@ -208,8 +208,8 @@ case "$ARCH" in
     arm64)
         platform=linux/arm64
         base_image=alpine@sha256:e7a1a92a5bfeee40966aea60f0796b0e7917cc35591542701834f03a68fa3d18
-        glibc_triplet=aarch64-linux-gnu
-        ld_linux=ld-linux-aarch64.so.1
+        glibc_triplet=x86_64-linux-gnu
+        ld_linux=ld-linux-x86-64.so.2
         if [ "$PRODUCT" = helium ]; then
             llvm_url=https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-23.1.5-c4f9b08/clang%2Bllvm-23.1.5-aarch64-linux-musl.tar.xz
             llvm_sha256=7055513530fc60361e29d01d5c849d356b25e9e38124811a420970941dd32979

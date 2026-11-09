@@ -3,6 +3,7 @@
 ARG GLIBC_IMAGE=debian@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251
 ARG BASE_IMAGE=alpine@sha256:d56c381f961d307a21b3ca004cf1e3910f106644aefb1f43e654c8a56c4fd395
 FROM ${GLIBC_IMAGE} AS compiler-host-runtime
+FROM --platform=linux/amd64 ${GLIBC_IMAGE} AS compiler-host-runtime-x64
 FROM ${BASE_IMAGE}
 
 ARG TARGET_ARCH=amd64
@@ -18,14 +19,9 @@ ARG LLVM_REVISION=llvmorg-24-init-3796-g20e97c4b-2
 ARG GLIBC_TRIPLET=x86_64-linux-gnu
 ARG LD_LINUX=ld-linux-x86-64.so.2
 
-COPY --from=compiler-host-runtime /usr/lib/${GLIBC_TRIPLET}/ /usr/lib/${GLIBC_TRIPLET}/
-RUN if [ "$TARGET_ARCH" = "arm64" ]; then \
-        mkdir -p /lib; \
-        ln -s "/usr/lib/${GLIBC_TRIPLET}/${LD_LINUX}" "/lib/${LD_LINUX}"; \
-    else \
-        mkdir -p /lib64; \
-        ln -s "/usr/lib/${GLIBC_TRIPLET}/${LD_LINUX}" "/lib64/${LD_LINUX}"; \
-    fi
+COPY --from=compiler-host-runtime-x64 /usr/lib/x86_64-linux-gnu/ /usr/lib/x86_64-linux-gnu/
+RUN mkdir -p /lib64 && \
+    ln -s /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 /lib64/ld-linux-x86-64.so.2
 
 RUN set -eux; \
     if [ "$PRODUCT" = helium ]; then \
@@ -118,34 +114,7 @@ RUN set -eux; \
 COPY config/glibc /opt/chromium-glibc-src
 RUN set -eux; \
     mkdir -p /opt/chromium-glibc/lib; \
-    if [ "$TARGET_ARCH" = "arm64" ]; then \
-        /opt/chromium-llvm/bin/clang --target=aarch64-unknown-linux-gnu \
-            -c /opt/chromium-glibc-src/aarch64/crt1.S -o /opt/chromium-glibc/lib/Scrt1.o; \
-        cp /opt/chromium-glibc/lib/Scrt1.o /opt/chromium-glibc/lib/crt1.o; \
-        /opt/chromium-llvm/bin/clang --target=aarch64-unknown-linux-gnu \
-            -c /opt/chromium-glibc-src/aarch64/crti.S -o /opt/chromium-glibc/lib/crti.o; \
-        /opt/chromium-llvm/bin/clang --target=aarch64-unknown-linux-gnu \
-            -c /opt/chromium-glibc-src/aarch64/crtn.S -o /opt/chromium-glibc/lib/crtn.o; \
-        cp /opt/chromium-glibc-src/aarch64/libc.so /opt/chromium-glibc/lib/libc.so; \
-        ln -s "/usr/lib/${GLIBC_TRIPLET}/libc.so.6" /opt/chromium-glibc/lib/libc.so.6; \
-        ln -s "/usr/lib/${GLIBC_TRIPLET}/${LD_LINUX}" "/opt/chromium-glibc/lib/${LD_LINUX}"; \
-        for pair in \
-            libm.so.6:libm.so \
-            libdl.so.2:libdl.so \
-            libpthread.so.0:libpthread.so \
-            librt.so.1:librt.so \
-            libutil.so.1:libutil.so \
-            libgcc_s.so.1:libgcc_s.so; do \
-            source=${pair%%:*}; link=${pair##*:}; \
-            ln -s "/usr/lib/${GLIBC_TRIPLET}/$source" "/opt/chromium-glibc/lib/$link"; \
-        done; \
-        for name in crtbegin crtend; do \
-            ln -s "/opt/chromium-llvm/lib/clang/23/lib/linux/clang_rt.$name.o" \
-                "/opt/chromium-glibc/lib/$name.o"; \
-            ln -s "/opt/chromium-llvm/lib/clang/23/lib/linux/clang_rt.$name.o" \
-                "/opt/chromium-glibc/lib/${name}S.o"; \
-        done; \
-    else \
+    if true; then \
         /opt/chromium-llvm/bin/clang --target=x86_64-unknown-linux-gnu \
             -c /opt/chromium-glibc-src/crt1.S -o /opt/chromium-glibc/lib/Scrt1.o; \
         cp /opt/chromium-glibc/lib/Scrt1.o /opt/chromium-glibc/lib/crt1.o; \

@@ -1,12 +1,5 @@
 #!/bin/sh
-if [ "${CHROMIUM_ARCH:-}" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
-  exec /opt/chromium-llvm/bin/clang "$@" \
-    --target=aarch64-unknown-linux-gnu \
-    --sysroot=/opt/chromium-glibc \
-    -L/opt/chromium-glibc/lib
-else
-  exec /opt/chromium-llvm/bin/clang "$@" \
-    --target=x86_64-unknown-linux-gnu \
-    --sysroot=/opt/chromium-glibc \
-    -L/opt/chromium-glibc/lib
-fi
+exec /opt/chromium-llvm/bin/clang "$@" \
+  --target=x86_64-unknown-linux-gnu \
+  --sysroot=/opt/chromium-glibc \
+  -L/opt/chromium-glibc/lib

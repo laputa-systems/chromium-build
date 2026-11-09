@@ -141,7 +141,7 @@ def main() -> None:
         raise ScriptFailure("missing compiler-rt builtins for the musl target")
     if not (resource_dir / f"lib/linux/libclang_rt.builtins-{expected_linux}.a").is_file():
         raise ScriptFailure("missing Chromium GN compiler-rt builtins path")
-    expected_loader = "/lib/ld-linux-aarch64.so.1" if arch == "arm64" else "/lib64/ld-linux-x86-64.so.2"
+    expected_loader = "/lib64/ld-linux-x86-64.so.2"
     if not Path(expected_loader).is_file():
         raise ScriptFailure("build-only glibc loader is missing")
     ccache = Path(os.environ.get("CCACHE_BIN", "/usr/bin/ccache"))
