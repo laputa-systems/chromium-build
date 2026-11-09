@@ -1,0 +1,43 @@
+diff --git a/content/browser/devtools/devtools_http_handler.cc b/content/browser/devtools/devtools_http_handler.cc
+--- a/content/browser/devtools/devtools_http_handler.cc
++++ b/content/browser/devtools/devtools_http_handler.cc
+@@ -35,6 +35,7 @@
+ #include "base/threading/thread.h"
+ #include "base/uuid.h"
+ #include "base/values.h"
++#include "base/version_info/version_info.h"
+ #include "build/build_config.h"
+ #include "build/util/chromium_git_revision.h"
+ #include "content/browser/devtools/devtools_manager.h"
+@@ -627,7 +628,9 @@
+     base::DictValue version;
+     version.Set("Protocol-Version", DevToolsAgentHost::GetProtocolVersion());
+     version.Set("WebKit-Version", GetWebKitVersion());
+-    version.Set("Browser", GetContentClient()->browser()->GetProduct());
++    version.Set("Browser",
++                base::StrCat({version_info::GetProductName(), "/",
++                              version_info::GetHeliumVersionNumber()}));
+     version.Set("File-Path-Style", kNativeFilePathStyle);
+     version.Set("User-Agent", GetContentClient()->browser()->GetUserAgent());
+     version.Set("V8-Version", V8_VERSION_STRING);
+diff --git a/content/browser/devtools/protocol/browser_handler.cc b/content/browser/devtools/protocol/browser_handler.cc
+--- a/content/browser/devtools/protocol/browser_handler.cc
++++ b/content/browser/devtools/protocol/browser_handler.cc
+@@ -26,6 +26,7 @@
+ #include "base/strings/utf_string_conversions.h"
+ #include "base/task/sequenced_task_runner.h"
+ #include "base/types/expected_macros.h"
++#include "base/version_info/version_info.h"
+ #include "build/build_config.h"
+ #include "build/util/chromium_git_revision.h"
+ #include "components/download/public/common/download_item.h"
+@@ -133,7 +134,8 @@
+                                     std::string* js_version) {
+   *protocol_version = DevToolsAgentHost::GetProtocolVersion();
+   *revision = CHROMIUM_GIT_REVISION;
+-  *product = GetContentClient()->browser()->GetProduct();
++  *product = base::StrCat({version_info::GetProductName(), "/",
++                           version_info::GetHeliumVersionNumber()});
+   *user_agent = GetContentClient()->browser()->GetUserAgent();
+   *js_version = V8_VERSION_STRING;
+   return Response::Success();

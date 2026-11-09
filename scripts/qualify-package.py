@@ -42,28 +42,57 @@ def headless_renderers_sandboxed(renderers: object) -> bool:
     )
 
 
+def headless_checks(headless: dict) -> dict[str, bool]:
+    version_info = section(headless, "version_info")
+    headless_exit = section(headless, "exit")
+    return {
+        "headless-devtools": str(headless.get("devtools_endpoint", "")).startswith("ws://"),
+        "headless-page": section(headless, "page").get("evaluated") == {"status": "ready", "layout": True},
+        "headless-sandbox-renderer": headless_renderers_sandboxed(section(headless, "sandbox").get("renderers")),
+        "headless-clean-exit": headless_exit.get("returncode") == 0 and headless_exit.get("survivors") == [],
+        "headless-identity": str(version_info.get("Browser", "")).startswith("Helium/"),
+        "headless-user-agent": "Chrome/" in str(version_info.get("User-Agent", ""))
+        and "Helium" not in str(version_info.get("User-Agent", "")),
+    }
+
+
 def report_checks(report: dict) -> dict[str, bool]:
     renderers = section(report, "sandbox").get("renderers")
     headless = section(report, "headless")
     headless_version = section(headless, "version_info")
-    headless_exit = section(headless, "exit")
     checks = {
         "product-identity": bool(report.get("version") and report.get("version_info")),
         "wayland-window": bool(report.get("window") and report.get("compositor")),
         "page-rendering": bool(report.get("screenshot")),
         "sandbox-renderer": isinstance(renderers, list) and bool(renderers),
         "clean-shutdown": section(report, "cleanup").get("ok") is True,
-        "headless-devtools": str(headless.get("devtools_endpoint", "")).startswith("ws://"),
-        "headless-identity": "Helium" in str(report.get("version", ""))
-        and bool(headless_version.get("Browser"))
-        and headless_version.get("Browser") == section(report, "version_info").get("Browser"),
-        "headless-page": section(headless, "page").get("evaluated") == {"status": "ready", "layout": True},
-        "headless-sandbox-renderer": headless_renderers_sandboxed(section(headless, "sandbox").get("renderers")),
-        "headless-clean-exit": headless_exit.get("returncode") == 0 and headless_exit.get("survivors") == [],
+        **headless_checks(headless),
     }
+    checks["headless-identity"] = (
+        checks["headless-identity"]
+        and "Helium" in str(report.get("version", ""))
+        and headless_version.get("Browser") == section(report, "version_info").get("Browser")
+    )
     if not all(checks.values()):
         failed = sorted(name for name, value in checks.items() if not value)
         raise runtime_install.InstallError(f"browser report does not prove: {', '.join(failed)}")
+    return checks
+
+
+def host_headless_checks(report: dict, product_version: str) -> dict[str, bool]:
+    if report.get("status") != "complete" or report.get("product") != "helium" or report.get("scope") != "headless":
+        raise runtime_install.InstallError("host headless report is not a complete Helium headless result")
+    if report.get("product_version") != product_version:
+        raise runtime_install.InstallError("host headless report version does not match the archive")
+    headless_browser = section(section(report, "headless"), "version_info").get("Browser")
+    checks = {
+        "host-executable-identity": "Helium" in str(report.get("version", "")),
+        "host-devtools-browser": headless_browser == f"Helium/{product_version}",
+    }
+    checks.update({f"host-{name}": value for name, value in headless_checks(section(report, "headless")).items()})
+    if not all(checks.values()):
+        failed = sorted(name for name, value in checks.items() if not value)
+        raise runtime_install.InstallError(f"host headless report does not prove: {', '.join(failed)}")
     return checks
 
 
@@ -102,6 +131,7 @@ def main() -> int:
     parser.add_argument("--archive", required=True, type=Path)
     parser.add_argument("--report", required=True, type=Path)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--host-headless-report", type=Path, help="helium_test_fast.py --headless-only result from the extracted archive on a host")
     args = parser.parse_args()
     try:
         report = json.loads(args.report.read_text(encoding="utf-8"))
@@ -125,7 +155,21 @@ def main() -> int:
             "archive_sha256": manifest["archive_sha256"],
             "report_sha256": digest(args.report),
             "checks": checks,
+            "identities": {
+                "executable_version": report["version"],
+                "devtools_browser": section(section(report, "headless"), "version_info")["Browser"],
+            },
         }
+        if args.host_headless_report:
+            host_report = json.loads(args.host_headless_report.read_text(encoding="utf-8"))
+            host_checks = host_headless_checks(host_report, manifest["product_version"])
+            acceptance["host_headless"] = {
+                "report_sha256": digest(args.host_headless_report),
+                "executable_version": host_report["version"],
+                "devtools_browser": section(section(host_report, "headless"), "version_info")["Browser"],
+                "user_namespaces": section(section(host_report, "headless"), "user_namespaces"),
+                "checks": host_checks,
+            }
         temporary = output.with_name(f".{output.name}.tmp-{os.getpid()}")
         temporary.write_text(json.dumps(acceptance, indent=2) + "\n", encoding="utf-8")
         os.replace(temporary, output)

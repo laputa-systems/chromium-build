@@ -9,10 +9,11 @@ import runtime_install
 
 QUALIFY = runpy.run_path(str(Path(__file__).resolve().parents[1] / "scripts/qualify-package.py"))
 REPORT_CHECKS = QUALIFY["report_checks"]
+HOST_HEADLESS_CHECKS = QUALIFY["host_headless_checks"]
 
 PASSING = {
     "version": "Helium 0.20.3.1 (Chromium 156.0.8078.79)",
-    "version_info": {"Browser": "Chrome/156.0.8078.79", "User-Agent": "Mozilla/5.0 Chrome/156.0.0.0"},
+    "version_info": {"Browser": "Helium/0.20.3.1", "User-Agent": "Mozilla/5.0 Chrome/156.0.0.0"},
     "window": {"pid": 10},
     "compositor": {"pixels": {}},
     "screenshot": {"sha256": "0" * 64},
@@ -20,7 +21,7 @@ PASSING = {
     "cleanup": {"ok": True},
     "headless": {
         "devtools_endpoint": "ws://127.0.0.1:4444/devtools/browser/x",
-        "version_info": {"Browser": "Chrome/156.0.8078.79", "User-Agent": "Mozilla/5.0 HeadlessChrome/156.0.0.0"},
+        "version_info": {"Browser": "Helium/0.20.3.1", "User-Agent": "Mozilla/5.0 HeadlessChrome/156.0.0.0"},
         "page": {"evaluated": {"status": "ready", "layout": True}},
         "sandbox": {"renderers": [{"pid": 21, "no_new_privs": "1", "seccomp": "2", "nspid": ["21", "2"]}]},
         "exit": {"returncode": 0, "survivors": []},
@@ -36,8 +37,9 @@ class ReportChecksTest(unittest.TestCase):
         cases = {
             "headless-sandbox-renderer": lambda report: report["headless"]["sandbox"]["renderers"][0].update(nspid=["21"]),
             "headless-clean-exit": lambda report: report["headless"]["exit"].update(survivors=[22]),
-            "headless-identity": lambda report: report["headless"]["version_info"].update(Browser="HeadlessChrome/156.0.8078.79"),
+            "headless-identity": lambda report: report["headless"]["version_info"].update(Browser="Chrome/156.0.8078.79"),
             "headless-page": lambda report: report["headless"]["page"].update(evaluated={"status": "not-ready"}),
+            "headless-user-agent": lambda report: report["headless"]["version_info"].update({"User-Agent": "Mozilla/5.0 Helium/0.20.3.1"}),
         }
         for check, damage in cases.items():
             report = copy.deepcopy(PASSING)
@@ -50,6 +52,45 @@ class ReportChecksTest(unittest.TestCase):
         del report["headless"]
         with self.assertRaisesRegex(runtime_install.InstallError, "headless-devtools"):
             REPORT_CHECKS(report)
+
+
+HOST_PASSING = {
+    "status": "complete",
+    "scope": "headless",
+    "product": "helium",
+    "product_version": "0.20.3.1",
+    "chromium_version": "156.0.8078.79",
+    "version": PASSING["version"],
+    "headless": copy.deepcopy(PASSING["headless"]),
+}
+
+
+class HostHeadlessChecksTest(unittest.TestCase):
+    def test_complete_host_headless_report_qualifies(self):
+        self.assertTrue(all(HOST_HEADLESS_CHECKS(HOST_PASSING, "0.20.3.1").values()))
+
+    def test_host_headless_failures_block_qualification(self):
+        cases = {
+            "host-headless-sandbox-renderer": lambda report: report["headless"]["sandbox"]["renderers"][0].update(seccomp="0"),
+            "host-headless-clean-exit": lambda report: report["headless"]["exit"].update(returncode=1),
+            "host-devtools-browser": lambda report: report["headless"]["version_info"].update(Browser="Helium/0.20.3.0"),
+            "host-executable-identity": lambda report: report.update(version="Chromium 156.0.8078.79"),
+        }
+        for check, damage in cases.items():
+            report = copy.deepcopy(HOST_PASSING)
+            damage(report)
+            with self.subTest(check), self.assertRaisesRegex(runtime_install.InstallError, check):
+                HOST_HEADLESS_CHECKS(report, "0.20.3.1")
+
+    def test_headed_report_is_not_a_host_headless_report(self):
+        report = copy.deepcopy(HOST_PASSING)
+        del report["scope"]
+        with self.assertRaisesRegex(runtime_install.InstallError, "not a complete Helium headless result"):
+            HOST_HEADLESS_CHECKS(report, "0.20.3.1")
+
+    def test_other_version_does_not_qualify(self):
+        with self.assertRaisesRegex(runtime_install.InstallError, "does not match the archive"):
+            HOST_HEADLESS_CHECKS(HOST_PASSING, "0.20.3.2")
 
 
 if __name__ == "__main__":

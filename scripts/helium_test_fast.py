@@ -208,7 +208,7 @@ def wait_devtools_line(log_path: Path, process: subprocess.Popen, timeout: float
     raise RuntimeError("headless Helium never printed its DevTools endpoint")
 
 
-def run_headless(args: argparse.Namespace, output: Path, environment: dict, browser_version: str) -> dict:
+def run_headless(args: argparse.Namespace, output: Path, environment: dict, devtools_product: str) -> dict:
     environment = {name: value for name, value in environment.items() if name not in ("WAYLAND_DISPLAY", "DISPLAY", "XDG_SESSION_TYPE")}
     profile = Path(tempfile.mkdtemp(prefix="helium-headless-profile-", dir=output))
     home = profile / "home"
@@ -237,8 +237,8 @@ def run_headless(args: argparse.Namespace, output: Path, environment: dict, brow
         port = urllib.parse.urlparse(endpoint).port
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/json/version", timeout=10) as response:
             version_info = json.load(response)
-        if version_info.get("Browser") != f"Chrome/{browser_version}":
-            raise RuntimeError(f"headless /json/version is not Helium's Chrome/{browser_version} product: {version_info}")
+        if version_info.get("Browser") != devtools_product:
+            raise RuntimeError(f"headless /json/version is not {devtools_product}: {version_info}")
         result.update({"devtools_endpoint": endpoint, "version_info": version_info})
         browser_connection = CdpConnection(WebSocket(version_info["webSocketDebuggerUrl"]))
         page_url = f"http://127.0.0.1:{server.server_address[1]}/{args.fixture.name}"
@@ -335,10 +335,14 @@ def run(args: argparse.Namespace) -> int:
         report["version"] = version_text
         headless_environment = dict(version_environment)
         try:
-            report["headless"] = run_headless(args, output, headless_environment, browser_version)
+            report["headless"] = run_headless(args, output, headless_environment, f"Helium/{product_version}")
         except BaseException:
             report["headless"] = args.headless_result
             raise
+        if args.headless_only:
+            report["status"] = "complete"
+            report["scope"] = "headless"
+            return 0
         fixture = HeadlessSway(
             output,
             "sway",
@@ -392,8 +396,8 @@ def run(args: argparse.Namespace) -> int:
         process._chromium_process_group = os.getpgid(process.pid)
         version_info = wait_cdp(debug_port, process, 30)
         browser = version_info.get("Browser", "")
-        if "Helium" not in browser and browser_version not in browser:
-            raise RuntimeError(f"DevTools browser identity is not Helium: {browser!r}")
+        if browser != f"Helium/{product_version}":
+            raise RuntimeError(f"DevTools browser identity is not Helium/{product_version}: {browser!r}")
         browser_connection = CdpConnection(WebSocket(version_info["webSocketDebuggerUrl"]))
         server = urllib.request.Request(
             f"http://127.0.0.1:{debug_port}/json/new?{urllib.parse.quote(args.fixture.as_uri(), safe=':/?=&')}",
@@ -469,6 +473,7 @@ def main() -> int:
     parser.add_argument("--fixtures", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--inputs-lock", type=Path, default=Path("/opt/chromium-build/config/helium.inputs.lock"))
+    parser.add_argument("--headless-only", action="store_true", help="run only the display-free headless checks, e.g. directly on a host")
     args = parser.parse_args()
     args.fixture = args.fixtures / "helium-fast.html"
     if not args.fixture.is_file():

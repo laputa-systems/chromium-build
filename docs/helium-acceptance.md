@@ -30,7 +30,7 @@ and no Wayland or X server, and the acceptance sidecar adds these checks:
 | Check | Pass condition |
 | --- | --- |
 | headless-devtools | the browser stays up and prints `DevTools listening on ws://…` |
-| headless-identity | `/json/version` reports the headed browser's product, `Chrome/<Chromium version>`, for the executable whose `--version` names Helium; Helium does not change Chromium's CDP product string |
+| headless-identity | `/json/version` reports `Browser` as `Helium/<Helium version>`, the same product as the headed browser, for the executable whose `--version` names Helium; the web User-Agent stays Chrome's |
 | headless-page | a page served over loopback HTTP loads and `Runtime.evaluate` returns the values its script computed |
 | headless-sandbox-renderer | every live renderer has `NoNewPrivs=1`, `Seccomp=2`, and more than one `NSpid` field |
 | headless-clean-exit | `Browser.close` exits the browser with status 0 and leaves no process in its group |

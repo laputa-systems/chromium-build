@@ -238,6 +238,7 @@
     "helium-fake-audio-persona.patch",
     "helium-remove-onboarding.patch",
     "helium-disable-autoupdates.patch",
-    "helium-partitionalloc-musl-ifunc.patch"
+    "helium-partitionalloc-musl-ifunc.patch",
+    "helium-devtools-product.patch"
   ]
 }

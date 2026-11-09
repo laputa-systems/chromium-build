@@ -134,8 +134,9 @@ with no display server and the normal Linux sandbox. `test-fast` and
 `test-staged` run that headless path first, with no `WAYLAND_DISPLAY` or
 `DISPLAY`, and then the Wayland path. The headless run needs unprivileged user
 namespaces and proves the `DevTools listening on ws://` line, the same
-`/json/version` product as the headed browser (`Chrome/<Chromium version>`; Helium
-keeps Chromium's CDP product string, and `--version` names Helium), a CDP evaluation on a page served over loopback
+`/json/version` product as the headed browser (`Helium/<Helium version>`;
+`helium-devtools-product.patch` sets it for `/json/version` and
+`Browser.getVersion`, while the web User-Agent stays Chrome's), a CDP evaluation on a page served over loopback
 HTTP, renderers with `NoNewPrivs: 1`, `Seccomp: 2`, and their own PID namespace,
 and a `Browser.close` that exits 0 with no processes left.
 `qualify-package.py` requires all of those checks.
@@ -223,7 +224,23 @@ python3 scripts/qualify-package.py --archive "$ARCHIVE" --report "$REPORT"
 
 The resulting `.acceptance.json` sidecar is required by archive installation.
 It names the archive digest, product, version, architecture, and the actual
-browser checks that passed.
+browser checks that passed. Its `identities` record both names the build
+answers to: the executable's `--version` (`Helium <version> (Chromium
+<version>)`) and the `/json/version` `Browser` (`Helium/<version>`).
+
+The container harness runs privileged. To record the headless path as an
+ordinary user on a host with no display server, extract the archive and run
+the headless checks there, then pass that report too:
+
+```sh
+python3 scripts/install-runtime.py --archive "$ARCHIVE" --verify-extract "$DIR"
+python3 scripts/helium_test_fast.py --headless-only --helium "$DIR/helium-wrapper" \
+    --fixtures tests/fixtures --inputs-lock config/helium.inputs.lock --output "$HOST_OUT"
+python3 scripts/qualify-package.py --archive "$ARCHIVE" --report "$REPORT" \
+    --host-headless-report "$HOST_OUT/test-fast.json"
+```
+
+The sidecar's `host_headless` section then carries those checks.
 
 The offline installer needs only Python's standard library and the package,
 checksum, and acceptance sidecar; it makes no Docker calls:
