@@ -88,8 +88,9 @@ RUN set -eux; \
             linux_arch=x86_64; builtins_arch=x86_64; clang_major=23; \
         fi; \
         test "$(cat /opt/chromium-llvm/cr_build_revision)" = "$LLVM_REVISION"; \
-        mkdir -p "/opt/chromium-llvm/lib/clang/${clang_major}/lib/${linux_arch}-unknown-linux-musl"; \
+        mkdir -p "/opt/chromium-llvm/lib/clang/${clang_major}/lib/${linux_arch}-unknown-linux-musl" "/opt/chromium-llvm/lib/clang/${clang_major}/lib/${linux_arch}-unknown-linux-gnu"; \
         ln -sf "../linux/libclang_rt.builtins-${builtins_arch}.a" "/opt/chromium-llvm/lib/clang/${clang_major}/lib/${linux_arch}-unknown-linux-musl/libclang_rt.builtins.a"; \
+        ln -sf "../linux/libclang_rt.builtins-${builtins_arch}.a" "/opt/chromium-llvm/lib/clang/${clang_major}/lib/${linux_arch}-unknown-linux-gnu/libclang_rt.builtins.a"; \
         test "$(/opt/chromium-llvm/bin/clang -dumpmachine)" = "${linux_arch}-unknown-linux-musl"; \
         /opt/chromium-llvm/bin/clang --version | grep -F 23.1.5; \
         ln -sf /usr/lib/ninja-build/bin/ninja /usr/local/bin/ninja; \

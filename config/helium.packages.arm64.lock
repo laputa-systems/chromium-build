@@ -1,7 +1,7 @@
 {
   "architecture": "arm64",
   "base_release": "3.24.1",
-  "manifest_sha256": "1f23814cadecc423411292258ad853fa432ddd8ee9a70279b0c32dc9f1a6c588",
+  "manifest_sha256": "92842c35e2f72fe4ec79a388d2577f7f12eeea126ac706d9a54623444fb18912",
   "repositories": [
     "https://dl-cdn.alpinelinux.org/alpine/v3.24/main",
     "https://dl-cdn.alpinelinux.org/alpine/v3.24/community"
@@ -14,7 +14,6 @@
     "alpine-keys-2.6-r0",
     "alpine-release-3.24.1-r0",
     "alsa-lib-1.2.15.3-r0",
-    "alsa-lib-dev-1.2.15.3-r0",
     "aom-libs-3.14.1-r0",
     "apk-tools-3.0.6-r0",
     "at-spi2-core-2.60.5-r0",
@@ -338,7 +337,6 @@
   "schema": 1,
   "status": "resolved",
   "world": [
-    "alsa-lib-dev=1.2.15.3-r0",
     "bash=5.3.9-r1",
     "bison=3.8.2-r3",
     "bsd-compat-headers=0.7.2-r6",

@@ -232,6 +232,7 @@
     "helium-no-devtools-frontend.patch",
     "helium-no-dbus.patch",
     "helium-dawn-vulkan-headers.patch",
-    "helium-devtools-policy-prefs.patch"
+    "helium-devtools-policy-prefs.patch",
+    "helium-fake-audio-persona.patch"
   ]
 }

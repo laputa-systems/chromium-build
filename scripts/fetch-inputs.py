@@ -90,7 +90,8 @@ def fetch_one(item, inputs_root):
             temporary_path = Path(temporary.name)
         try:
             opener = urllib.request.build_opener(HTTPSRedirectHandler())
-            with opener.open(item["url"]) as response, temporary_path.open("wb") as output:
+            request = Request(item["url"], headers={"User-Agent": "curl/8.0"})
+            with opener.open(request) as response, temporary_path.open("wb") as output:
                 final_url = response.geturl()
                 if urllib.parse.urlparse(final_url).scheme != "https":
                     raise RuntimeError(f'{item["name"]}: final URL is not HTTPS')

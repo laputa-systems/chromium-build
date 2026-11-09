@@ -64,6 +64,9 @@ def main() -> None:
     if target_cpu is None:
         raise ScriptFailure(f"unsupported architecture {arch}")
     clang_major = lock["toolchain"]["version"].split(".", 1)[0]
+    use_alsa = "true"
+    if profile_name == "helium-wayland-release" and arch == "arm64":
+        use_alsa = "false"
     run(
         [
             "python3",
@@ -76,6 +79,8 @@ def main() -> None:
             target_cpu,
             "--clang-major",
             clang_major,
+            "--use-alsa",
+            use_alsa,
             "--args-output",
             str(args_file),
             "--probe-output",

@@ -1,0 +1,111 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Helium audio persona fixture</title>
+<div id="status">not-ready</div>
+<script>
+document.querySelector("#status").textContent = "ready";
+
+window.audioTest = async () => {
+  const result = {};
+  // AudioContext: must reach running; sampleRate/baseLatency/outputLatency/maxChannelCount
+  // are driven by --helium-fake-audio-persona (sample_rate, frames_per_buffer, max_channel_count).
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  try {
+    await ctx.resume();
+  } catch (_) {}
+  if (ctx.state !== "running") {
+    throw new Error("AudioContext did not reach running: " + ctx.state);
+  }
+  result.sampleRate = ctx.sampleRate;
+  result.baseLatency = ctx.baseLatency;
+  result.outputLatency = ctx.outputLatency;
+  result.maxChannelCount = ctx.destination ? ctx.destination.maxChannelCount : null;
+  result.audioContextState = ctx.state;
+  // Device enumeration: kinds/counts and no fake-identifying labels after permission.
+  let devices = await navigator.mediaDevices.enumerateDevices();
+  const beforeKinds = devices.map(d => d.kind).sort();
+  result.beforeCount = devices.length;
+  result.beforeKinds = beforeKinds;
+  let stream = null;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (error) {
+    result.getUserMediaError = String(error && error.name || error);
+  }
+  devices = await navigator.mediaDevices.enumerateDevices();
+  result.devices = devices.map(d => ({
+    kind: d.kind,
+    deviceId: d.deviceId,
+    groupId: d.groupId,
+    label: d.label,
+  }));
+  const joined = devices.map(d => [d.deviceId, d.groupId, d.label].join("|")).join("\n");
+  result.hasFakeMarker = /fake/i.test(joined);
+  result.audioInputCount = devices.filter(d => d.kind === "audioinput").length;
+  result.audioOutputCount = devices.filter(d => d.kind === "audiooutput").length;
+  if (stream) {
+    stream.getTracks().forEach(t => t.stop());
+  }
+  // Video with an audio track must play to ended, timeupdate advancing in real time.
+  const wav = (() => {
+    const sampleRate = 48000;
+    const seconds = 1;
+    const n = sampleRate * seconds;
+    const buf = new ArrayBuffer(44 + n * 2);
+    const view = new DataView(buf);
+    const writeString = (offset, text) => {
+      for (let i = 0; i < text.length; i++) view.setUint8(offset + i, text.charCodeAt(i));
+    };
+    writeString(0, "RIFF");
+    view.setUint32(4, 36 + n * 2, true);
+    writeString(8, "WAVE");
+    writeString(12, "fmt ");
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeString(36, "data");
+    view.setUint32(40, n * 2, true);
+    for (let i = 0; i < n; i++) view.setInt16(44 + i * 2, Math.round(1000 * Math.sin(2 * Math.PI * 440 * i / sampleRate)), true);
+    let binary = "";
+    const bytes = new Uint8Array(buf);
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return "data:audio/wav;base64," + btoa(binary);
+  })();
+  const video = document.createElement("video");
+  video.src = wav;
+  video.preload = "auto";
+  document.body.appendChild(video);
+  const startedAt = performance.now();
+  let last = 0;
+  let lastAt = startedAt;
+  let advanced = false;
+  const onTimeUpdate = () => {
+    const now = performance.now();
+    if (video.currentTime > last) {
+      if (now - lastAt > 0) advanced = true;
+      last = video.currentTime;
+      lastAt = now;
+    }
+  };
+  video.addEventListener("timeupdate", onTimeUpdate);
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("video did not end in 10s")), 10000);
+    video.addEventListener("ended", () => { clearTimeout(timer); resolve(); }, { once: true });
+    video.addEventListener("error", () => { clearTimeout(timer); reject(new Error("video element error")); }, { once: true });
+    video.play().catch(reject);
+  });
+  result.videoDuration = video.duration;
+  result.videoEnded = video.ended;
+  result.videoTimeAdvanced = advanced;
+  result.videoLastCurrentTime = video.currentTime;
+  result.videoPlaybackMs = performance.now() - startedAt;
+  result.videoReadyState = video.readyState;
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  try { await ctx.close(); } catch (_) {}
+  return result;
+};
+</script>

@@ -103,7 +103,7 @@ def helium_expected(args):
         "use_qt6": False,
         "use_dbus": False,
         "use_libpci": False,
-        "use_alsa": True,
+        "use_alsa": args.target_cpu != "arm64",
         "use_pulseaudio": False,
         "rtc_use_pipewire": False,
         "rtc_link_pipewire": False,

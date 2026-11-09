@@ -11,9 +11,25 @@
      } else {
        cpu_abi_cflags += [ "-m64" ]
        cpu_abi_ldflags += [ "-m64" ]
+@@ -84,8 +84,8 @@
+     ]
+   } else if (current_cpu == "arm64") {
+     if (is_clang && !is_android && !is_fuchsia && !is_chromeos_device) {
+-      cpu_abi_cflags += [ "--target=aarch64-linux-gnu" ]
+-      cpu_abi_ldflags += [ "--target=aarch64-linux-gnu" ]
++      cpu_abi_cflags += [ "--target=aarch64-alpine-linux-musl" ]
++      cpu_abi_ldflags += [ "--target=aarch64-alpine-linux-musl" ]
+     }
+     if (target_os == "chromeos" && cros_target_cpu_arch != "" &&
+         is_a_target_toolchain) {
 --- a/build/config/rust.gni
 +++ b/build/config/rust.gni
-@@ -206,7 +206,7 @@
+@@ -202,11 +202,11 @@
+ rust_abi_target = ""
+ if (is_linux || is_chromeos) {
+   if (current_cpu == "arm64") {
+-    rust_abi_target = "aarch64-unknown-linux-gnu"
++    rust_abi_target = "aarch64-unknown-linux-musl"
    } else if (current_cpu == "x86") {
      rust_abi_target = "i686-unknown-linux-gnu"
    } else if (current_cpu == "x64") {
@@ -24,7 +40,7 @@
        float_suffix = "hf"
 --- a/build/config/clang/BUILD.gn
 +++ b/build/config/clang/BUILD.gn
-@@ -201,7 +201,8 @@
+@@ -201,13 +201,15 @@
          _dir = "darwin"
        } else if (is_linux || is_chromeos) {
          if (current_cpu == "x64") {
@@ -34,3 +50,11 @@
          } else if (current_cpu == "x86") {
            _dir = "i386-unknown-linux-gnu"
          } else if (current_cpu == "arm") {
+           _dir = "armv7-unknown-linux-gnueabihf"
+         } else if (current_cpu == "arm64") {
+-          _dir = "aarch64-unknown-linux-gnu"
++          _dir = "linux"
++          _suffix = "-aarch64"
+         } else if (current_cpu == "loong64") {
+           _dir = "loongarch64-unknown-linux-gnu"
+         } else if (current_cpu == "riscv64") {

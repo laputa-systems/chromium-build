@@ -44,12 +44,17 @@ def main():
     parser.add_argument("--profile", type=Path, required=True)
     parser.add_argument("--target-cpu", required=True)
     parser.add_argument("--clang-major", required=True)
+    parser.add_argument("--use-alsa", choices=("true", "false"), default="true")
     parser.add_argument("--args-output", type=Path, required=True)
     parser.add_argument("--probe-output", type=Path, required=True)
     args = parser.parse_args()
 
     profile = args.profile.read_text(encoding="utf-8")
-    rendered = profile.replace("@TARGET_CPU@", args.target_cpu).replace("@CLANG_MAJOR@", args.clang_major)
+    rendered = (
+        profile.replace("@TARGET_CPU@", args.target_cpu)
+        .replace("@CLANG_MAJOR@", args.clang_major)
+        .replace("@USE_ALSA@", args.use_alsa)
+    )
     probe = {
         "schema": 1,
         "status": "complete",

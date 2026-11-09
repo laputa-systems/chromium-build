@@ -1,0 +1,301 @@
+--- a/media/audio/fake_audio_manager.h
++++ b/media/audio/fake_audio_manager.h
+@@ -27,6 +27,12 @@
+   bool HasAudioOutputDevices() override;
+   bool HasAudioInputDevices() override;
+   const std::string_view GetName() override;
++  bool GetAudioInputDeviceNames(AudioDeviceNames* device_names) override;
++  bool GetAudioOutputDeviceNames(AudioDeviceNames* device_names) override;
++  std::string GetDefaultInputDeviceID() override;
++  std::string GetDefaultOutputDeviceID() override;
++  std::string GetGroupIDOutput(const std::string& output_device_id) override;
++  std::string GetGroupIDInput(const std::string& input_device_id) override;
+ 
+   // Implementation of AudioManagerBase.
+   AudioOutputStream* MakeLinearOutputStream(
+@@ -51,6 +57,16 @@
+   AudioParameters GetPreferredOutputStreamParameters(
+       const std::string& output_device_id,
+       const AudioParameters& input_params) override;
++
++ private:
++  struct Persona {
++    int sample_rate = 48000;
++    int frames_per_buffer = 2048;
++    int max_channel_count = 2;
++    int output_devices = 1;
++    int input_devices = 1;
++  };
++  Persona GetPersona() const;
+ };
+ 
+ }  // namespace media
+--- a/media/audio/fake_audio_manager.cc
++++ b/media/audio/fake_audio_manager.cc
+@@ -6,6 +6,8 @@
+ 
+ #include <algorithm>
+ #include <utility>
++#include "base/command_line.h"
++#include "base/strings/string_split.h"
+ #include "media/base/audio_parameters.h"
+ #include "media/base/channel_layout.h"
+ 
+@@ -16,6 +18,55 @@
+ const int kDefaultInputBufferSize = 1024;
+ const int kDefaultSampleRate = 48000;
+ 
++#if defined(__aarch64__)
++constexpr char kPersonaSwitch[] = "helium-fake-audio-persona";
++
++int ParsePositiveInt(const std::string& value, int fallback) {
++  if (value.empty()) {
++    return fallback;
++  }
++  int parsed = 0;
++  for (char character : value) {
++    if (character < '0' || character > '9') {
++      return fallback;
++    }
++    parsed = parsed * 10 + (character - '0');
++    if (parsed > 128 * 1024) {
++      return fallback;
++    }
++  }
++  return parsed > 0 ? parsed : fallback;
++}
++
++std::string PersonaOutputLabel(int index) {
++  if (index == 0) {
++    return "Default - Speakers";
++  }
++  return "Speakers (USB Audio Device)";
++}
++
++std::string PersonaInputLabel(int index) {
++  if (index == 0) {
++    return "Default - Microphone";
++  }
++  return "Microphone (USB Audio Device)";
++}
++
++std::string PersonaDeviceID(int index) {
++  if (index == 0) {
++    return "default";
++  }
++  return "hw:0," + std::to_string(index - 1);
++}
++
++std::string PersonaGroupID(const std::string& device_id) {
++  if (device_id == "default") {
++    return "default";
++  }
++  return "alsa-card-0";
++}
++#endif  // defined(__aarch64__)
++
+ }  // namespace
+ 
+ FakeAudioManager::FakeAudioManager(std::unique_ptr<AudioThread> audio_thread,
+@@ -24,15 +75,154 @@
+ 
+ FakeAudioManager::~FakeAudioManager() = default;
+ 
++#if defined(__aarch64__)
++FakeAudioManager::Persona FakeAudioManager::GetPersona() const {
++  Persona persona;
++  const base::CommandLine* command_line =
++      base::CommandLine::ForCurrentProcess();
++  if (!command_line->HasSwitch(kPersonaSwitch)) {
++    return persona;
++  }
++  const std::string value =
++      command_line->GetSwitchValueASCII(kPersonaSwitch);
++  for (const std::string& part : base::SplitString(
++           value, ",", base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY)) {
++    const auto equals = part.find('=');
++    if (equals == std::string::npos) {
++      continue;
++    }
++    const std::string key = base::TrimWhitespaceASCII(
++        base::StringPiece(part).substr(0, equals).as_string());
++    const std::string field = base::TrimWhitespaceASCII(
++        base::StringPiece(part).substr(equals + 1).as_string());
++    if (key == "sample_rate") {
++      persona.sample_rate =
++          ParsePositiveInt(field, persona.sample_rate);
++    } else if (key == "frames_per_buffer") {
++      persona.frames_per_buffer =
++          ParsePositiveInt(field, persona.frames_per_buffer);
++    } else if (key == "max_channel_count") {
++      persona.max_channel_count =
++          ParsePositiveInt(field, persona.max_channel_count);
++    } else if (key == "output_devices") {
++      const int parsed = ParsePositiveInt(field, -1);
++      persona.output_devices = parsed >= 0 ? parsed : persona.output_devices;
++      if (field == "0") {
++        persona.output_devices = 0;
++      }
++    } else if (key == "input_devices") {
++      const int parsed = ParsePositiveInt(field, -1);
++      persona.input_devices = parsed >= 0 ? parsed : persona.input_devices;
++      if (field == "0") {
++        persona.input_devices = 0;
++      }
++    }
++  }
++  if (persona.max_channel_count < 1) {
++    persona.max_channel_count = 1;
++  }
++  if (persona.max_channel_count > 8) {
++    persona.max_channel_count = 8;
++  }
++  if (persona.output_devices < 0) {
++    persona.output_devices = 0;
++  }
++  if (persona.input_devices < 0) {
++    persona.input_devices = 0;
++  }
++  return persona;
++}
++#else
++FakeAudioManager::Persona FakeAudioManager::GetPersona() const {
++  return Persona();
++}
++#endif
++
+ // Implementation of AudioManager.
+-bool FakeAudioManager::HasAudioOutputDevices() { return false; }
++bool FakeAudioManager::HasAudioOutputDevices() {
++#if defined(__aarch64__)
++  return GetPersona().output_devices > 0;
++#else
++  return false;
++#endif
++}
+ 
+-bool FakeAudioManager::HasAudioInputDevices() { return false; }
++bool FakeAudioManager::HasAudioInputDevices() {
++#if defined(__aarch64__)
++  return GetPersona().input_devices > 0;
++#else
++  return false;
++#endif
++}
+ 
+ const std::string_view FakeAudioManager::GetName() {
+   return "Fake";
+ }
+ 
++bool FakeAudioManager::GetAudioInputDeviceNames(
++    AudioDeviceNames* device_names) {
++#if defined(__aarch64__)
++  const Persona persona = GetPersona();
++  device_names->clear();
++  for (int index = 0; index < persona.input_devices; ++index) {
++    device_names->emplace_back(PersonaInputLabel(index),
++                               PersonaDeviceID(index));
++  }
++  return true;
++#else
++  return false;
++#endif
++}
++
++bool FakeAudioManager::GetAudioOutputDeviceNames(
++    AudioDeviceNames* device_names) {
++#if defined(__aarch64__)
++  const Persona persona = GetPersona();
++  device_names->clear();
++  for (int index = 0; index < persona.output_devices; ++index) {
++    device_names->emplace_back(PersonaOutputLabel(index),
++                               PersonaDeviceID(index));
++  }
++  return true;
++#else
++  return false;
++#endif
++}
++
++std::string FakeAudioManager::GetDefaultInputDeviceID() {
++#if defined(__aarch64__)
++  return GetPersona().input_devices > 0 ? PersonaDeviceID(0) : std::string();
++#else
++  return std::string();
++#endif
++}
++
++std::string FakeAudioManager::GetDefaultOutputDeviceID() {
++#if defined(__aarch64__)
++  return GetPersona().output_devices > 0 ? PersonaDeviceID(0) : std::string();
++#else
++  return std::string();
++#endif
++}
++
++std::string FakeAudioManager::GetGroupIDOutput(
++    const std::string& output_device_id) {
++#if defined(__aarch64__)
++  return PersonaGroupID(output_device_id);
++#else
++  return output_device_id + "output";
++#endif
++}
++
++std::string FakeAudioManager::GetGroupIDInput(
++    const std::string& input_device_id) {
++#if defined(__aarch64__)
++  return PersonaGroupID(input_device_id);
++#else
++  return input_device_id + "input";
++#endif
++}
++
+ // Implementation of AudioManagerBase.
+ AudioOutputStream* FakeAudioManager::MakeLinearOutputStream(
+     const AudioParameters& params,
+@@ -64,6 +254,18 @@
+ AudioParameters FakeAudioManager::GetPreferredOutputStreamParameters(
+     const std::string& output_device_id,
+     const AudioParameters& input_params) {
++#if defined(__aarch64__)
++  const Persona persona = GetPersona();
++  ChannelLayoutConfig channel_layout_config = ChannelLayoutConfig::Stereo();
++  if (persona.max_channel_count == 1) {
++    channel_layout_config = ChannelLayoutConfig::Mono();
++  } else {
++    channel_layout_config = ChannelLayoutConfig::Stereo();
++  }
++  return AudioParameters(AudioParameters::AUDIO_PCM_LOW_LATENCY,
++                         channel_layout_config, persona.sample_rate,
++                         persona.frames_per_buffer);
++#else
+   constexpr int kDefaultOutputBufferSize = 2048;
+   ChannelLayoutConfig channel_layout_config = ChannelLayoutConfig::Stereo();
+   int sample_rate = kDefaultSampleRate;
+@@ -76,13 +278,25 @@
+ 
+   return AudioParameters(AudioParameters::AUDIO_PCM_LOW_LATENCY,
+                          channel_layout_config, sample_rate, buffer_size);
++#endif
+ }
+ 
+ AudioParameters FakeAudioManager::GetInputStreamParameters(
+     const std::string& device_id) {
++#if defined(__aarch64__)
++  const Persona persona = GetPersona();
++  ChannelLayoutConfig channel_layout_config = ChannelLayoutConfig::Stereo();
++  if (persona.max_channel_count == 1) {
++    channel_layout_config = ChannelLayoutConfig::Mono();
++  }
+   return AudioParameters(AudioParameters::AUDIO_PCM_LOW_LATENCY,
++                         channel_layout_config, persona.sample_rate,
++                         persona.frames_per_buffer);
++#else
++  return AudioParameters(AudioParameters::AUDIO_PCM_LOW_LATENCY,
+                          ChannelLayoutConfig::Stereo(), kDefaultSampleRate,
+                          kDefaultInputBufferSize);
++#endif
+ }
+ 
+ }  // namespace media

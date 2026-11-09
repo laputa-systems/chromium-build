@@ -48,7 +48,7 @@ use_dbus = false
 use_libpci = false
 
 use_kerberos = false
-use_alsa = true
+use_alsa = @USE_ALSA@
 use_pulseaudio = false
 rtc_use_pipewire = false
 rtc_link_pipewire = false

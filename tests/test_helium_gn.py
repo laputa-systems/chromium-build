@@ -132,7 +132,8 @@ class VerifyArgsTest(unittest.TestCase):
             profile.write_text(
                 HELIUM_PROFILE.read_text(encoding="utf-8")
                 .replace("@TARGET_CPU@", "x64")
-                .replace("@CLANG_MAJOR@", "24"),
+                .replace("@CLANG_MAJOR@", "24")
+                .replace("@USE_ALSA@", "true"),
                 encoding="utf-8",
             )
             values = verify_args.parse_args(profile)
