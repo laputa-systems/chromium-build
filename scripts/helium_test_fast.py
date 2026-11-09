@@ -27,6 +27,7 @@ from pathlib import Path
 from browser_test_support import (
     CdpConnection,
     WebSocket,
+    pid_is_alive,
     process_group_pids,
     terminate_process,
 )
@@ -207,9 +208,18 @@ def wait_devtools_line(log_path: Path, process: subprocess.Popen, timeout: float
     raise RuntimeError("headless Helium never printed its DevTools endpoint")
 
 
-def run_headless(args: argparse.Namespace, output: Path, environment: dict, product_version: str) -> dict:
+def run_headless(args: argparse.Namespace, output: Path, environment: dict, browser_version: str) -> dict:
     environment = {name: value for name, value in environment.items() if name not in ("WAYLAND_DISPLAY", "DISPLAY", "XDG_SESSION_TYPE")}
     profile = Path(tempfile.mkdtemp(prefix="helium-headless-profile-", dir=output))
+    home = profile / "home"
+    home.mkdir(mode=0o700)
+    environment.update(
+        HOME=str(home),
+        XDG_CONFIG_HOME=str(home / ".config"),
+        XDG_CACHE_HOME=str(home / ".cache"),
+        XDG_DATA_HOME=str(home / ".local/share"),
+    )
+    user_data = profile / "user-data"
     result: dict = {"user_namespaces": unprivileged_user_namespaces(), "profile": str(profile)}
     server = serve_fixtures(args.fixtures)
     log_path = output / "test-fast-headless.log"
@@ -217,7 +227,7 @@ def run_headless(args: argparse.Namespace, output: Path, environment: dict, prod
     browser_connection = None
     connection = None
     try:
-        command = [str(args.helium), "--headless=new", "--remote-debugging-port=0", f"--user-data-dir={profile}", "about:blank"]
+        command = [str(args.helium), "--headless=new", "--remote-debugging-port=0", f"--user-data-dir={user_data}", "about:blank"]
         result["command"] = command
         with log_path.open("w", encoding="utf-8") as log:
             process = subprocess.Popen(command, env=environment, stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
@@ -227,9 +237,8 @@ def run_headless(args: argparse.Namespace, output: Path, environment: dict, prod
         port = urllib.parse.urlparse(endpoint).port
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/json/version", timeout=10) as response:
             version_info = json.load(response)
-        identity = " ".join(str(version_info.get(key, "")) for key in ("Browser", "User-Agent"))
-        if "Helium" not in identity or product_version not in identity:
-            raise RuntimeError(f"headless /json/version does not identify Helium {product_version}: {version_info}")
+        if version_info.get("Browser") != f"Chrome/{browser_version}":
+            raise RuntimeError(f"headless /json/version is not Helium's Chrome/{browser_version} product: {version_info}")
         result.update({"devtools_endpoint": endpoint, "version_info": version_info})
         browser_connection = CdpConnection(WebSocket(version_info["webSocketDebuggerUrl"]))
         page_url = f"http://127.0.0.1:{server.server_address[1]}/{args.fixture.name}"
@@ -248,10 +257,16 @@ def run_headless(args: argparse.Namespace, output: Path, environment: dict, prod
         browser_connection.close()
         browser_connection = None
         returncode = process.wait(timeout=30)
-        survivors = process_group_pids(process_group)
-        result["exit"] = {"returncode": returncode, "survivors": survivors}
+        deadline = time.monotonic() + 10
+        survivors = [pid for pid in process_group_pids(process_group) if pid_is_alive(pid)]
+        while survivors and time.monotonic() < deadline:
+            time.sleep(0.2)
+            survivors = [pid for pid in process_group_pids(process_group) if pid_is_alive(pid)]
+        exited_unreaped = [pid for pid in process_group_pids(process_group) if pid not in survivors]
+        result["exit"] = {"returncode": returncode, "survivors": survivors, "exited_unreaped": exited_unreaped}
         if returncode != 0 or survivors:
-            raise RuntimeError(f"headless Browser.close left status {returncode} and processes {survivors}")
+            commands = {pid: Path(f"/proc/{pid}/cmdline").read_bytes().replace(b"\0", b" ").decode("utf-8", "replace")[:200] for pid in survivors if Path(f"/proc/{pid}/cmdline").exists()}
+            raise RuntimeError(f"headless Browser.close left status {returncode} and processes {commands or survivors}")
         process = None
         shutil.rmtree(profile, ignore_errors=True)
         result.pop("profile")
@@ -320,7 +335,7 @@ def run(args: argparse.Namespace) -> int:
         report["version"] = version_text
         headless_environment = dict(version_environment)
         try:
-            report["headless"] = run_headless(args, output, headless_environment, product_version)
+            report["headless"] = run_headless(args, output, headless_environment, browser_version)
         except BaseException:
             report["headless"] = args.headless_result
             raise

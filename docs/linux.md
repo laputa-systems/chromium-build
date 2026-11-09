@@ -119,8 +119,9 @@ the default; `--headless=new` or `--ozone-platform=headless` runs the browser
 with no display server and the normal Linux sandbox. `test-fast` and
 `test-staged` run that headless path first, with no `WAYLAND_DISPLAY` or
 `DISPLAY`, and then the Wayland path. The headless run needs unprivileged user
-namespaces and proves the `DevTools listening on ws://` line, the Helium
-identity from `/json/version`, a CDP evaluation on a page served over loopback
+namespaces and proves the `DevTools listening on ws://` line, the same
+`/json/version` product as the headed browser (`Chrome/<Chromium version>`; Helium
+keeps Chromium's CDP product string, and `--version` names Helium), a CDP evaluation on a page served over loopback
 HTTP, renderers with `NoNewPrivs: 1`, `Seccomp: 2`, and their own PID namespace,
 and a `Browser.close` that exits 0 with no processes left.
 `qualify-package.py` requires all of those checks.

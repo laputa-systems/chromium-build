@@ -435,9 +435,9 @@ def terminate_process(process):
         escalated = True
     survivors = []
     for _ in range(10):
-        survivors = [pid for pid in _descendant_pids(root_pid) if _pid_is_alive(pid)]
+        survivors = [pid for pid in _descendant_pids(root_pid) if pid_is_alive(pid)]
         if process_group is not None:
-            survivors.extend(pid for pid in process_group_pids(process_group) if _pid_is_alive(pid))
+            survivors.extend(pid for pid in process_group_pids(process_group) if pid_is_alive(pid))
         if not survivors:
             break
         for pid in set(survivors):
@@ -460,7 +460,7 @@ def terminate_process(process):
     }
 
 
-def _pid_is_alive(pid):
+def pid_is_alive(pid):
     try:
         status = (Path(f"/proc/{pid}") / "status").read_text(encoding="utf-8")
         if any(line.startswith("State:") and "\tZ" in line for line in status.splitlines()):

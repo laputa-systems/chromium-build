@@ -12,7 +12,7 @@ REPORT_CHECKS = QUALIFY["report_checks"]
 
 PASSING = {
     "version": "Helium 0.20.3.1 (Chromium 156.0.8078.79)",
-    "version_info": {"Browser": "Chrome/156.0.8078.79"},
+    "version_info": {"Browser": "Chrome/156.0.8078.79", "User-Agent": "Mozilla/5.0 Chrome/156.0.0.0"},
     "window": {"pid": 10},
     "compositor": {"pixels": {}},
     "screenshot": {"sha256": "0" * 64},
@@ -20,7 +20,7 @@ PASSING = {
     "cleanup": {"ok": True},
     "headless": {
         "devtools_endpoint": "ws://127.0.0.1:4444/devtools/browser/x",
-        "version_info": {"Browser": "HeadlessChrome/156.0.8078.79", "User-Agent": "Mozilla/5.0 Helium/0.20.3.1"},
+        "version_info": {"Browser": "Chrome/156.0.8078.79", "User-Agent": "Mozilla/5.0 HeadlessChrome/156.0.0.0"},
         "page": {"evaluated": {"status": "ready", "layout": True}},
         "sandbox": {"renderers": [{"pid": 21, "no_new_privs": "1", "seccomp": "2", "nspid": ["21", "2"]}]},
         "exit": {"returncode": 0, "survivors": []},
@@ -36,7 +36,7 @@ class ReportChecksTest(unittest.TestCase):
         cases = {
             "headless-sandbox-renderer": lambda report: report["headless"]["sandbox"]["renderers"][0].update(nspid=["21"]),
             "headless-clean-exit": lambda report: report["headless"]["exit"].update(survivors=[22]),
-            "headless-identity": lambda report: report["headless"]["version_info"].update({"User-Agent": "Chrome"}),
+            "headless-identity": lambda report: report["headless"]["version_info"].update(Browser="HeadlessChrome/156.0.8078.79"),
             "headless-page": lambda report: report["headless"]["page"].update(evaluated={"status": "not-ready"}),
         }
         for check, damage in cases.items():

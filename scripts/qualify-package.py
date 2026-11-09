@@ -54,7 +54,9 @@ def report_checks(report: dict) -> dict[str, bool]:
         "sandbox-renderer": isinstance(renderers, list) and bool(renderers),
         "clean-shutdown": section(report, "cleanup").get("ok") is True,
         "headless-devtools": str(headless.get("devtools_endpoint", "")).startswith("ws://"),
-        "headless-identity": "Helium" in f"{headless_version.get('Browser', '')} {headless_version.get('User-Agent', '')}",
+        "headless-identity": "Helium" in str(report.get("version", ""))
+        and bool(headless_version.get("Browser"))
+        and headless_version.get("Browser") == section(report, "version_info").get("Browser"),
         "headless-page": section(headless, "page").get("evaluated") == {"status": "ready", "layout": True},
         "headless-sandbox-renderer": headless_renderers_sandboxed(section(headless, "sandbox").get("renderers")),
         "headless-clean-exit": headless_exit.get("returncode") == 0 and headless_exit.get("survivors") == [],
