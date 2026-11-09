@@ -184,15 +184,19 @@ def main() -> None:
     pruning_entries = [
         line.strip()
         for line in (core / "pruning.list").read_text(encoding="utf-8").splitlines()
-        if line.strip() and not line.startswith("#")
+        if line.strip() and not line.startswith("#") and not line.startswith("components/helium_onboarding/")
     ]
+    filtered_pruning = args.patches / "pruning.list"
+    filtered_pruning.write_text(
+        "\n".join(pruning_entries) + "\n", encoding="utf-8"
+    )
     pruning_present = {entry for entry in pruning_entries if (args.source / entry).exists()}
     run([
         python,
         str(core / "utils/prune_binaries.py"),
         "--keep-build-dependencies",
         str(args.source),
-        str(core / "pruning.list"),
+        str(filtered_pruning),
     ])
     pruning_removed = sorted(entry for entry in pruning_present if not (args.source / entry).exists())
     pruning_retained = sorted(entry for entry in pruning_present if (args.source / entry).exists())
