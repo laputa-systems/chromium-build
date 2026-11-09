@@ -380,7 +380,7 @@ def _process_table():
     return processes
 
 
-def _process_group_pids(process_group):
+def process_group_pids(process_group):
     return [pid for pid, values in _process_table().items() if values["pgid"] == process_group]
 
 
@@ -423,7 +423,7 @@ def terminate_process(process):
         except OSError:
             pass
         process.wait(timeout=5)
-    group_pids = _process_group_pids(process_group) if process_group is not None else []
+    group_pids = process_group_pids(process_group) if process_group is not None else []
     for pid in descendants + _descendant_pids(root_pid) + group_pids:
         try:
             os.kill(pid, signal.SIGKILL)
@@ -437,7 +437,7 @@ def terminate_process(process):
     for _ in range(10):
         survivors = [pid for pid in _descendant_pids(root_pid) if _pid_is_alive(pid)]
         if process_group is not None:
-            survivors.extend(pid for pid in _process_group_pids(process_group) if _pid_is_alive(pid))
+            survivors.extend(pid for pid in process_group_pids(process_group) if _pid_is_alive(pid))
         if not survivors:
             break
         for pid in set(survivors):

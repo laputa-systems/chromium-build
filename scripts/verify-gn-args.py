@@ -95,7 +95,7 @@ def helium_expected(args):
         "ozone_auto_platforms": False,
         "ozone_platform": "wayland",
         "ozone_platform_wayland": True,
-        "ozone_platform_headless": False,
+        "ozone_platform_headless": True,
         "ozone_platform_x11": False,
         "use_xkbcommon": True,
         "use_gtk": False,

@@ -23,16 +23,41 @@ def digest(path: Path) -> str:
     return hasher.hexdigest()
 
 
+def section(report: dict, key: str) -> dict:
+    value = report.get(key)
+    return value if isinstance(value, dict) else {}
+
+
+def headless_renderers_sandboxed(renderers: object) -> bool:
+    return (
+        isinstance(renderers, list)
+        and bool(renderers)
+        and all(
+            isinstance(item, dict)
+            and item.get("no_new_privs") == "1"
+            and item.get("seccomp") == "2"
+            and len(item.get("nspid", [])) > 1
+            for item in renderers
+        )
+    )
+
+
 def report_checks(report: dict) -> dict[str, bool]:
-    sandbox = report.get("sandbox")
-    renderers = sandbox.get("renderers") if isinstance(sandbox, dict) else None
-    cleanup = report.get("cleanup")
+    renderers = section(report, "sandbox").get("renderers")
+    headless = section(report, "headless")
+    headless_version = section(headless, "version_info")
+    headless_exit = section(headless, "exit")
     checks = {
         "product-identity": bool(report.get("version") and report.get("version_info")),
         "wayland-window": bool(report.get("window") and report.get("compositor")),
         "page-rendering": bool(report.get("screenshot")),
         "sandbox-renderer": isinstance(renderers, list) and bool(renderers),
-        "clean-shutdown": isinstance(cleanup, dict) and cleanup.get("ok") is True,
+        "clean-shutdown": section(report, "cleanup").get("ok") is True,
+        "headless-devtools": str(headless.get("devtools_endpoint", "")).startswith("ws://"),
+        "headless-identity": "Helium" in f"{headless_version.get('Browser', '')} {headless_version.get('User-Agent', '')}",
+        "headless-page": section(headless, "page").get("evaluated") == {"status": "ready", "layout": True},
+        "headless-sandbox-renderer": headless_renderers_sandboxed(section(headless, "sandbox").get("renderers")),
+        "headless-clean-exit": headless_exit.get("returncode") == 0 and headless_exit.get("survivors") == [],
     }
     if not all(checks.values()):
         failed = sorted(name for name, value in checks.items() if not value)

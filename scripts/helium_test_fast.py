@@ -1,25 +1,35 @@
 #!/usr/bin/env python3
-"""Run the Helium headed Wayland fast path under an owned Sway session."""
+"""Run Helium headless without a display server, then headed under an owned Sway session."""
 
 from __future__ import annotations
 
 import argparse
 import base64
+import functools
 import hashlib
+import http.server
 import json
 import os
+import re
+import shutil
 import socket
 import struct
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from browser_test_support import CdpConnection, WebSocket, terminate_process
+from browser_test_support import (
+    CdpConnection,
+    WebSocket,
+    process_group_pids,
+    terminate_process,
+)
 from helium_wayland import FIXTURE_SIZE, HeadlessSway, verify_png
 
 CONTENT_COLOR = (51, 204, 102)
@@ -127,7 +137,7 @@ def sample_pixels(path: Path, window: dict) -> dict:
     return {"background": background, "content": center, "chrome": chrome, "window": rect}
 
 
-def sandbox_observations(connection: CdpConnection) -> dict:
+def sandbox_observations(connection: CdpConnection, require_pid_namespace: bool = False) -> dict:
     try:
         processes = connection.call("SystemInfo.getProcessInfo").get("processInfo", [])
     except Exception as error:
@@ -150,17 +160,115 @@ def sandbox_observations(connection: CdpConnection) -> dict:
                 values[name.strip()] = value.strip()
         if values.get("NoNewPrivs") != "1" or values.get("Seccomp") != "2":
             raise RuntimeError(f"renderer {pid} lacks the Chromium namespace/seccomp sandbox: {values.get('NoNewPrivs')}, {values.get('Seccomp')}")
+        nspid = values.get("NSpid", "").split()
+        if require_pid_namespace and len(nspid) < 2:
+            raise RuntimeError(f"renderer {pid} is not in its own PID namespace: NSpid {values.get('NSpid')!r}")
         observations.append(
             {
                 "pid": pid,
                 "no_new_privs": values.get("NoNewPrivs"),
                 "seccomp": values.get("Seccomp"),
+                "nspid": nspid,
                 "cmdline": Path(f"/proc/{pid}/cmdline").read_bytes().replace(b"\0", b" ").decode("utf-8", "replace").strip(),
             }
         )
     if not observations:
         raise RuntimeError("renderer process evidence was not readable")
     return {"renderers": observations}
+
+
+def unprivileged_user_namespaces() -> dict:
+    values = {}
+    for name in ("user/max_user_namespaces", "kernel/unprivileged_userns_clone"):
+        path = Path("/proc/sys") / name
+        if path.is_file():
+            values[name] = path.read_text(encoding="utf-8").strip()
+    if values.get("user/max_user_namespaces", "0") == "0" or values.get("kernel/unprivileged_userns_clone", "1") != "1":
+        raise RuntimeError(f"unprivileged user namespaces are unavailable: {values}")
+    return values
+
+
+def serve_fixtures(directory: Path) -> http.server.ThreadingHTTPServer:
+    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(directory))
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server
+
+
+def wait_devtools_line(log_path: Path, process: subprocess.Popen, timeout: float) -> str:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        match = re.search(r"DevTools listening on (ws://\S+)", log_path.read_text(encoding="utf-8", errors="replace"))
+        if match:
+            return match.group(1)
+        if process.poll() is not None:
+            raise RuntimeError(f"headless Helium exited before DevTools started with {process.returncode}")
+        time.sleep(0.1)
+    raise RuntimeError("headless Helium never printed its DevTools endpoint")
+
+
+def run_headless(args: argparse.Namespace, output: Path, environment: dict, product_version: str) -> dict:
+    environment = {name: value for name, value in environment.items() if name not in ("WAYLAND_DISPLAY", "DISPLAY", "XDG_SESSION_TYPE")}
+    profile = Path(tempfile.mkdtemp(prefix="helium-headless-profile-", dir=output))
+    result: dict = {"user_namespaces": unprivileged_user_namespaces(), "profile": str(profile)}
+    server = serve_fixtures(args.fixtures)
+    log_path = output / "test-fast-headless.log"
+    process = None
+    browser_connection = None
+    connection = None
+    try:
+        command = [str(args.helium), "--headless=new", "--remote-debugging-port=0", f"--user-data-dir={profile}", "about:blank"]
+        result["command"] = command
+        with log_path.open("w", encoding="utf-8") as log:
+            process = subprocess.Popen(command, env=environment, stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
+        process_group = os.getpgid(process.pid)
+        process._chromium_process_group = process_group
+        endpoint = wait_devtools_line(log_path, process, 30)
+        port = urllib.parse.urlparse(endpoint).port
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/json/version", timeout=10) as response:
+            version_info = json.load(response)
+        identity = " ".join(str(version_info.get(key, "")) for key in ("Browser", "User-Agent"))
+        if "Helium" not in identity or product_version not in identity:
+            raise RuntimeError(f"headless /json/version does not identify Helium {product_version}: {version_info}")
+        result.update({"devtools_endpoint": endpoint, "version_info": version_info})
+        browser_connection = CdpConnection(WebSocket(version_info["webSocketDebuggerUrl"]))
+        page_url = f"http://127.0.0.1:{server.server_address[1]}/{args.fixture.name}"
+        request = urllib.request.Request(f"http://127.0.0.1:{port}/json/new?about:blank", method="PUT")
+        with urllib.request.urlopen(request, timeout=10) as response:
+            target = json.load(response)
+        connection = CdpConnection(WebSocket(target["webSocketDebuggerUrl"]))
+        navigate(connection, page_url)
+        page = evaluate(connection, "({status: document.querySelector('#status').textContent, layout: window.fixture.layout})")
+        if page != {"status": "ready", "layout": True}:
+            raise RuntimeError(f"headless page did not compute its fixture values: {page}")
+        result.update({"page": {"url": page_url, "evaluated": page}, "sandbox": sandbox_observations(browser_connection, require_pid_namespace=True)})
+        connection.close()
+        connection = None
+        browser_connection.call("Browser.close")
+        browser_connection.close()
+        browser_connection = None
+        returncode = process.wait(timeout=30)
+        survivors = process_group_pids(process_group)
+        result["exit"] = {"returncode": returncode, "survivors": survivors}
+        if returncode != 0 or survivors:
+            raise RuntimeError(f"headless Browser.close left status {returncode} and processes {survivors}")
+        process = None
+        shutil.rmtree(profile, ignore_errors=True)
+        result.pop("profile")
+        return result
+    except BaseException as error:
+        result["error"] = str(error)
+        result["log"] = str(log_path)
+        raise RuntimeError(f"headless: {error}") from error
+    finally:
+        if connection is not None:
+            connection.close()
+        if browser_connection is not None:
+            browser_connection.close()
+        if process is not None:
+            result["cleanup"] = terminate_process(process)
+        server.shutdown()
+        args.headless_result = result
 
 
 def chromium_version(lock: dict) -> tuple[str, str]:
@@ -210,6 +318,12 @@ def run(args: argparse.Namespace) -> int:
         if version.returncode or product_version not in version_text or browser_version not in version_text:
             raise RuntimeError(f"Helium version mismatch: {version_text!r}")
         report["version"] = version_text
+        headless_environment = dict(version_environment)
+        try:
+            report["headless"] = run_headless(args, output, headless_environment, product_version)
+        except BaseException:
+            report["headless"] = args.headless_result
+            raise
         fixture = HeadlessSway(
             output,
             "sway",
@@ -328,8 +442,6 @@ def run(args: argparse.Namespace) -> int:
             fixture.stop()
         report["duration_seconds"] = time.monotonic() - started
         if report["status"] == "complete" and cleanup and cleanup.get("ok"):
-            import shutil
-
             shutil.rmtree(profile, ignore_errors=True)
             report.pop("profile", None)
         write_json(report_path, report)

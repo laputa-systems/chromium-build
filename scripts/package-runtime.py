@@ -181,7 +181,7 @@ def package_chromium(stage: Path, output: Path) -> None:
     print(f"package: {len(libraries)} libraries and {len(files)} files bundled at {output}")
 
 
-def product_identity() -> tuple[str, str]:
+def product_identity() -> tuple[str, int, str]:
     import linux_product
 
     product = linux_product.resolve(
@@ -191,12 +191,13 @@ def product_identity() -> tuple[str, str]:
     )
     if not product.product_version:
         raise RuntimeError("Helium product version is missing from the inputs lock")
-    return product.product_version, product.arch
+    revision = json.loads(product.inputs_lock.read_text(encoding="utf-8"))["product"]["package_revision"]
+    return product.product_version, revision, product.arch
 
 
-def archive_name(version: str, architecture: str = "amd64") -> str:
+def archive_name(version: str, revision: int, architecture: str = "amd64") -> str:
     linux_arch = {"amd64": "x86_64", "arm64": "aarch64"}.get(architecture, architecture)
-    return f"helium-{version}-linux-{linux_arch}-musl"
+    return f"helium-{version}-r{revision}-linux-{linux_arch}-musl"
 
 
 def archive_package(
@@ -250,7 +251,7 @@ def verify_archive(archive: Path, archive_root: str, expected: dict) -> None:
 
 
 def package_helium(stage: Path, output: Path, artifacts: Path) -> None:
-    version, architecture = product_identity()
+    version, revision, architecture = product_identity()
     manifest = stage_manifest(stage, "helium")
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = Path(tempfile.mkdtemp(prefix=f".{output.name}.", dir=output.parent))
@@ -301,7 +302,7 @@ def package_helium(stage: Path, output: Path, artifacts: Path) -> None:
             ],
         }
         (temporary / "package-manifest.json").write_text(json.dumps(packaged, indent=2) + "\n", encoding="utf-8")
-        archive_root = archive_name(version, architecture)
+        archive_root = archive_name(version, revision, architecture)
         archive, checksum = archive_package(
             temporary,
             archive_root,

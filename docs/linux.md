@@ -114,6 +114,17 @@ harness; Shadowdriver remains macOS-only. The package ships no glibc, gcompat,
 static browser, or sandbox bypass, and needs no X server, session bus, or
 hardware GPU; VA-API is optional at runtime.
 
+The profile compiles in the Wayland and headless Ozone backends. Wayland stays
+the default; `--headless=new` or `--ozone-platform=headless` runs the browser
+with no display server and the normal Linux sandbox. `test-fast` and
+`test-staged` run that headless path first, with no `WAYLAND_DISPLAY` or
+`DISPLAY`, and then the Wayland path. The headless run needs unprivileged user
+namespaces and proves the `DevTools listening on ws://` line, the Helium
+identity from `/json/version`, a CDP evaluation on a page served over loopback
+HTTP, renderers with `NoNewPrivs: 1`, `Seccomp: 2`, and their own PID namespace,
+and a `Browser.close` that exits 0 with no processes left.
+`qualify-package.py` requires all of those checks.
+
 The build ships no Helium onboarding component and no first-run setup. The
 input lock carries no onboarding payload, `prepare` unpacks only the search
 engine data and uBlock components, and `helium-remove-onboarding.patch` drops
@@ -178,8 +189,10 @@ because Chromium's prebuilt `llvm-libclang` is a glibc binary in this musl
 builder; `v8_use_metagen_instance_types=false` selects the supported path.
 
 `package` writes the relocatable bundle at `/work/package/<profile>` and the
-candidate archive at `/work/artifacts/helium-0.20.3.1-linux-x86_64-musl.tar.xz`
-with its `.sha256` sidecar. It does not publish or install it.
+candidate archive at `/work/artifacts/helium-0.20.3.1-r2-linux-<arch>-musl.tar.xz`
+with its `.sha256` sidecar. It does not publish or install it. The `r2` is the
+lock's `product.package_revision`; it changes whenever the package changes for the
+same Helium version, so a new archive cannot be mistaken for an accepted one.
 
 After a passing browser report for that archive, bind the report to the
 archive digest before installation:

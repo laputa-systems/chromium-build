@@ -21,7 +21,22 @@ For `helium-0.20.3.1-linux-x86_64-musl.tar.xz` the automated run covered:
 | sandbox-renderer | three live renderers with `NoNewPrivs=1` and `Seccomp=2` |
 | clean-shutdown | browser and owned children exited after `Browser.close` |
 
-These five checks are the whole automated package acceptance. Every other row
+From package revision 2 the same run first starts the browser with
+`--headless=new --remote-debugging-port=0 --user-data-dir=<dir> about:blank`
+and no Wayland or X server, and the acceptance sidecar adds these checks:
+
+| Check | Pass condition |
+| --- | --- |
+| headless-devtools | the browser stays up and prints `DevTools listening on ws://…` |
+| headless-identity | `/json/version` names Helium |
+| headless-page | a page served over loopback HTTP loads and `Runtime.evaluate` returns the values its script computed |
+| headless-sandbox-renderer | every live renderer has `NoNewPrivs=1`, `Seccomp=2`, and more than one `NSpid` field |
+| headless-clean-exit | `Browser.close` exits the browser with status 0 and leaves no process in its group |
+
+The headless run refuses root and requires unprivileged user namespaces. No
+check may use `--no-sandbox`, `--single-process`, or `--no-zygote`.
+
+These checks are the whole automated package acceptance. Every other row
 below is not covered by the package path; some need new harness support and
 others need the target session. `TODO.md` carries the remaining work.
 

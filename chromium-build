@@ -254,7 +254,7 @@ if [ "$PRODUCT" = helium ] && [ "$command_name" = install ]; then
     [ -z "$INSTALL_PREFIX" ] || install_args+=(--prefix "$INSTALL_PREFIX")
     [ -z "$INSTALL_BIN_DIR" ] || install_args+=(--bin-dir "$INSTALL_BIN_DIR")
     if [ -z "$ARCHIVE_PATH" ] && [ "$ROLLBACK" = 0 ]; then
-        version=$("${CHROMIUM_PYTHON:-python3}" -c 'import json, sys; print(json.load(open(sys.argv[1]))["product"]["version"])' "$INPUTS_LOCK")
+        version=$("${CHROMIUM_PYTHON:-python3}" -c 'import json, sys; product = json.load(open(sys.argv[1]))["product"]; print(f"{product["version"]}-r{product["package_revision"]}")' "$INPUTS_LOCK")
         case "$ARCH" in
             amd64) linux_triple=x86_64 ;;
             arm64) linux_triple=aarch64 ;;
