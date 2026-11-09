@@ -157,6 +157,7 @@ RUN addgroup -S chromium && adduser -S -D -H -G chromium chromium
 
 COPY config /opt/chromium-build/config
 COPY scripts /opt/chromium-build/scripts
+RUN if [ "$PRODUCT" = helium ]; then python3 /opt/chromium-build/scripts/elf_stack.py /opt/chromium-llvm/bin/lld; fi
 COPY tests/probes /opt/chromium-build/tests/probes
 COPY tests/fixtures /opt/chromium-build/tests/fixtures
 COPY tests/test_browser_test_support.py /opt/chromium-build/tests/test_browser_test_support.py
