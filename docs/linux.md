@@ -72,10 +72,12 @@ The Linux overlay is an x86_64 tree, so `prepare` on arm64 also deletes every
 ELF file built for another architecture and the unused Debian glibc sysroots.
 Anything that would have needed emulation then fails as a missing file. The
 host tools the arm64 build does run are native: Alpine's `node` at Chromium's
-`node-linux-x64` path, the npm `@typescript/typescript-linux-arm64` compiler
-pinned as `typescript_native` at the version Chromium's TypeScript package
-records, and the toolchain archive's `clang-format` at
-`buildtools/linux64-format/clang-format`. Gate A fails if an arm64 builder has a glibc
+`node-linux-x64` path, the toolchain archive's `clang-format` at
+`buildtools/linux64-format/clang-format`, and two npm arm64 binaries pinned in
+the lock: `@typescript/typescript-linux-arm64` as `typescript_native` and
+`@esbuild/linux-arm64` (the DevTools inspector overlay bundler) as
+`esbuild_native`. `prepare` installs each over Chromium's x86_64 path only if
+Chromium pins the same version and the binary is aarch64 and reports it. Gate A fails if an arm64 builder has a glibc
 loader, a `*-linux-gnu` library directory, `/opt/chromium-glibc`, or a
 `RUST_HOST_LINKER`.
 

@@ -189,31 +189,32 @@ def remove_foreign_host_binaries(source: Path, arch: str) -> dict:
     return {"glibc_sysroots": GLIBC_SYSROOT_GLOB, "removed": dict(sorted(removed.items())), "network": "none"}
 
 
-def install_typescript_native(source: Path, inputs: Path, lock: dict, arch: str) -> dict | None:
-    item = lock["architecture_inputs"][arch].get("typescript_native")
-    if item is None:
-        return None
+NATIVE_EXECUTABLES = ("typescript_native", "esbuild_native")
+
+
+def install_native_executable(source: Path, inputs: Path, item: dict, arch: str) -> dict:
     destination = source / item["destination"]
-    pinned = json.loads((destination.parent.parent / "package.json").read_text(encoding="utf-8"))["version"]
-    if pinned != item["version"]:
-        raise SystemExit(f"Chromium pins TypeScript {pinned}, the lock provides {item['version']}")
+    pin = item["chromium_pin"]
+    if pin["contains"] not in (source / pin["path"]).read_text(encoding="utf-8"):
+        raise SystemExit(f"{pin['path']} does not pin {pin['contains']!r}; {item['filename']} would not match Chromium")
     archive = inputs / item["filename"]
     if not archive.is_file():
-        raise SystemExit(f"missing locked TypeScript compiler {archive}")
+        raise SystemExit(f"missing locked host tool {archive}")
     with tarfile.open(archive) as stream:
         member = stream.extractfile(item["member"])
         if member is None:
             raise SystemExit(f"{archive.name} has no {item['member']}")
         temporary = destination.with_name(f".{destination.name}.tmp-{os.getpid()}")
+        temporary.parent.mkdir(parents=True, exist_ok=True)
         temporary.write_bytes(member.read())
     temporary.chmod(0o755)
     if elf_machine(temporary) != ELF_MACHINES[arch]:
         raise SystemExit(f"{item['member']} in {archive.name} is not a {arch} executable")
     temporary.replace(destination)
     version = subprocess.run([str(destination), "--version"], check=True, capture_output=True, text=True).stdout.strip()
-    if version != f"Version {item['version']}":
-        raise SystemExit(f"installed tsc reports {version!r}, expected Version {item['version']}")
-    return {"path": item["destination"], "archive": item["filename"], "sha512": item["sha512"], "version": item["version"], "network": "none"}
+    if version != item["version_output"]:
+        raise SystemExit(f"{item['destination']} reports {version!r}, expected {item['version_output']!r}")
+    return {"path": item["destination"], "archive": item["filename"], "sha512": item["sha512"], "version": version, "network": "none"}
 
 
 def toolchain_selection(lock: dict, arch: str) -> dict:
@@ -425,10 +426,14 @@ def main() -> None:
 
     rust_toolchain = install_rust_toolchain(args.source, args.inputs, lock, args.arch)
     native_host_tools = None
-    typescript_native = None
+    native_executables = None
     if args.arch == "arm64":
         native_host_tools = remove_foreign_host_binaries(args.source, args.arch)
-        typescript_native = install_typescript_native(args.source, args.inputs, lock, args.arch)
+        architecture_inputs = lock["architecture_inputs"][args.arch]
+        native_executables = {
+            name: install_native_executable(args.source, args.inputs, architecture_inputs[name], args.arch)
+            for name in NATIVE_EXECUTABLES
+        }
         go_path = "third_party/dawn/tools/golang/linux-arm64/bin/go"
     else:
         go_path = "third_party/dawn/tools/golang/linux-amd64/bin/go"
@@ -480,7 +485,7 @@ def main() -> None:
             "builder_links": builder_links,
             "rust_toolchain": rust_toolchain,
             "native_host_tools": native_host_tools,
-            "typescript_native": typescript_native,
+            "native_executables": native_executables,
         },
         "source_revisions": {
             "core": lock["product"]["core_revision"],

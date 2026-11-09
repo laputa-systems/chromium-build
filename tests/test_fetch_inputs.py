@@ -39,7 +39,7 @@ class FetchInputsTest(unittest.TestCase):
 
         self.assertEqual(arm64["rust_toolchain"]["destination"], "third_party/rust-toolchain")
         self.assertTrue(arm64["rust_toolchain"]["filename"].endswith("-aarch64-linux-musl.tar.xz"))
-        self.assertEqual(set(arm64) - amd64, {"rust_toolchain", "typescript_native"})
+        self.assertEqual(set(arm64) - amd64, {"rust_toolchain", "typescript_native", "esbuild_native"})
 
     def test_architecture_inputs_reject_an_unlisted_architecture(self):
         lock = json.loads((ROOT / "config/helium.inputs.lock").read_text(encoding="utf-8"))

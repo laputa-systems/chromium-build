@@ -92,7 +92,20 @@
         "size": 8900516,
         "sha512": "421e1e538ff2df20e39df8e3c8f62284c8f9fce0c8966b7e073bb5ece23e7e24910d6e7b4265394a237addec4f44d24f294cdc73520d6b535776b27e32a1e351",
         "member": "package/lib/tsc",
-        "destination": "third_party/typescript/linux-amd64/src/lib/tsc"
+        "destination": "third_party/typescript/linux-amd64/src/lib/tsc",
+        "chromium_pin": {"path": "third_party/typescript/linux-amd64/src/package.json", "contains": "\"version\": \"7.0.2\""},
+        "version_output": "Version 7.0.2"
+      },
+      "esbuild_native": {
+        "version": "0.28.2",
+        "filename": "esbuild-linux-arm64-0.28.2.tgz",
+        "url": "https://registry.npmjs.org/@esbuild/linux-arm64/-/linux-arm64-0.28.2.tgz",
+        "size": 4283627,
+        "sha512": "a56e000b43f78adf1cedda3d315338a79d45cc7cdd33f4d9adeaeeae045c1c9d964dad55435088ab5f319dc7e9049c38a23922659aca5b6c8805604ff768fa52",
+        "member": "package/bin/esbuild",
+        "destination": "third_party/devtools-frontend/src/third_party/esbuild/esbuild",
+        "chromium_pin": {"path": "third_party/devtools-frontend/src/DEPS", "contains": "version:3@0.28.2.chromium"},
+        "version_output": "0.28.2"
       }
     }
   },
