@@ -288,6 +288,12 @@ case "$native_arch" in
 esac
 [ "$native_arch" = "$ARCH" ] || fail "requested $ARCH is not the native Docker architecture ($native_arch)"
 
+docker_mem_bytes=$(docker info --format '{{.MemTotal}}' 2>/dev/null || echo 0)
+docker_mem_gib=$((docker_mem_bytes / 1073741824))
+ccache_gib=$((docker_mem_gib / 2))
+[ "$ccache_gib" -lt 10 ] && ccache_gib=10
+CCACHE_MAXSIZE="${ccache_gib}G"
+
 if [ "$command_name" = image ]; then
     image_args=(
         --platform "$platform"
@@ -299,6 +305,7 @@ if [ "$command_name" = image ]; then
         --build-arg LLVM_REVISION="$llvm_revision"
         --build-arg GLIBC_TRIPLET="$glibc_triplet"
         --build-arg LD_LINUX="$ld_linux"
+        --build-arg CCACHE_MAXSIZE="$CCACHE_MAXSIZE"
         --build-arg PRODUCT="$PRODUCT"
     )
     if [ "$PRODUCT" = helium ]; then
@@ -393,6 +400,7 @@ run_gate() {
         -e SYSTEM_LIBRARY_PREFLIGHT="/opt/chromium-build-metadata/system-library-preflight.json" \
         -e EGL_PLATFORM=surfaceless \
         -e CCACHE_VOLUME="$CACHE_VOLUME" \
+        -e CCACHE_MAXSIZE="$CCACHE_MAXSIZE" \
         ${test_environment[@]+"${test_environment[@]}"} \
         ${build_environment[@]+"${build_environment[@]}"} \
         -v "$WORK_VOLUME:/work" \

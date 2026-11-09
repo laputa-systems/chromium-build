@@ -18,6 +18,7 @@ ARG LLVM_SIZE=59131228
 ARG LLVM_REVISION=llvmorg-24-init-3796-g20e97c4b-2
 ARG GLIBC_TRIPLET=x86_64-linux-gnu
 ARG LD_LINUX=ld-linux-x86-64.so.2
+ARG CCACHE_MAXSIZE=10G
 
 COPY --from=compiler-host-runtime-x64 /usr/lib/x86_64-linux-gnu/ /usr/lib/x86_64-linux-gnu/
 RUN mkdir -p /lib64 && \
@@ -199,7 +200,7 @@ ENV PATH="/opt/chromium-llvm/bin:$PATH" \
     CCACHE_COMPILERCHECK=content \
     CCACHE_COMPRESS=true \
     CCACHE_COMPRESSLEVEL=1 \
-    CCACHE_MAXSIZE=10G \
+    CCACHE_MAXSIZE=${CCACHE_MAXSIZE} \
     CCACHE_NAMESPACE=${TARGET_ARCH}-${LLVM_SHA256}-compiler-command-v2 \
     RUST_HOST_LINKER=/opt/chromium-build/scripts/rust-host-linker \
     CFLAGS=-Wno-unknown-warning-option \

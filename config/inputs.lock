@@ -95,7 +95,7 @@
     "license": "GPL-3.0-or-later",
     "cache_root": "/ccache",
     "temp_root": "/ccache/tmp",
-    "max_size": "10G",
+    "min_size": "10G",
     "compiler_check": "content",
     "compress": true,
     "compress_level": 1,

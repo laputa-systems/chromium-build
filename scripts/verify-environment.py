@@ -146,7 +146,14 @@ def main() -> None:
         raise ScriptFailure("build-only glibc loader is missing")
     ccache = Path(os.environ.get("CCACHE_BIN", "/usr/bin/ccache"))
     require_file(ccache, "missing ccache")
-    if os.environ.get("CCACHE_DIR") != "/ccache" or os.environ.get("CCACHE_TEMPDIR") != "/ccache/tmp" or os.environ.get("CCACHE_MAXSIZE") != "10G":
+    ccache_maxsize = os.environ.get("CCACHE_MAXSIZE", "")
+    ccache_maxsize_gib = 0
+    if ccache_maxsize.endswith("G"):
+        try:
+            ccache_maxsize_gib = int(ccache_maxsize[:-1])
+        except ValueError:
+            ccache_maxsize_gib = 0
+    if os.environ.get("CCACHE_DIR") != "/ccache" or os.environ.get("CCACHE_TEMPDIR") != "/ccache/tmp" or ccache_maxsize_gib < 10:
         raise ScriptFailure("ccache directory or size policy is invalid")
     if os.environ.get("CCACHE_COMPILERCHECK") != "content" or os.environ.get("CCACHE_COMPRESS") != "true" or os.environ.get("CCACHE_COMPRESSLEVEL") != "1":
         raise ScriptFailure("ccache policy is invalid")
