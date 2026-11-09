@@ -59,10 +59,10 @@
     }
   },
   "base": {
-    "release": "3.24.1",
+    "release": "3.24.2",
     "digests": {
-      "arm64": "sha256:e7a1a92a5bfeee40966aea60f0796b0e7917cc35591542701834f03a68fa3d18",
-      "amd64": "sha256:79ff19e9084a00eece421b2523fb93e22d730e2c0e525905de047e848e56d95f"
+      "arm64": "sha256:260479a1cfaf304c4c20da7f8405d3ce313513dcd534bb743257bdd2fe0f3e2d",
+      "amd64": "sha256:d56c381f961d307a21b3ca004cf1e3910f106644aefb1f43e654c8a56c4fd395"
     }
   },
   "toolchain": {

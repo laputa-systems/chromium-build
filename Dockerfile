@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 ARG GLIBC_IMAGE=debian@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251
-ARG BASE_IMAGE=alpine@sha256:79ff19e9084a00eece421b2523fb93e22d730e2c0e525905de047e848e56d95f
+ARG BASE_IMAGE=alpine@sha256:d56c381f961d307a21b3ca004cf1e3910f106644aefb1f43e654c8a56c4fd395
 FROM ${GLIBC_IMAGE} AS compiler-host-runtime
 FROM ${BASE_IMAGE}
 
@@ -34,32 +34,32 @@ RUN set -eux; \
             bash=5.3.9-r1 \
             bison=3.8.2-r3 \
             bsd-compat-headers=0.7.2-r6 \
-            ca-certificates=20260909-r0 \
+            ca-certificates=20261020-r0 \
             cargo=1.96.1-r0 \
             ccache=4.13.6-r0 \
             clang22-libclang=22.1.3-r2 \
-            curl=8.22.0-r0 \
-            expat-dev=2.8.5-r0 \
-            ffmpeg-dev=8.1.2-r0 \
+            curl=8.23.0-r0 \
+            expat-dev=2.10.0-r0 \
+            ffmpeg-dev=8.1.3-r0 \
             file=5.47-r2 \
             findutils=4.10.0-r1 \
             flex=2.6.4-r8 \
-            font-noto=2026.06.01-r0 \
-            gn=0_git20260717-r0 \
-            go=1.26.8-r0 \
+            font-noto=2026.11.01-r0 \
+            gn=0_git20260924-r0 \
+            go=1.26.10-r0 \
             gperf=3.3-r0 \
             libdrm-dev=2.4.134-r0 \
             linux-headers=7.0.0-r1 \
             mesa-dev=26.1.6-r0 \
-            musl-dev=1.2.6-r2 \
+            musl-dev=1.2.6-r3 \
             ninja-build=1.13.2-r1 \
-            nodejs=24.18.1-r0 \
+            nodejs=24.22.1-r1 \
             nspr-dev=4.38.2-r0 \
             nss-dev=3.124-r0 \
-            patch=2.8-r0 \
-            perl=5.42.2-r0 \
+            patch=2.8.1-r0 \
+            perl=5.42.3-r0 \
             pkgconf=2.5.1-r0 \
-            python3=3.14.7-r1 \
+            python3=3.14.10-r1 \
             rust=1.96.1-r0 \
             rust-bindgen=0.72.1-r1 \
             rustfmt=1.96.1-r0 \
