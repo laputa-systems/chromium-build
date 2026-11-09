@@ -1,0 +1,121 @@
+--- a/components/update_client/update_checker.cc
++++ b/components/update_client/update_checker.cc
+@@ -104,6 +104,7 @@
+     scoped_refptr<UpdateContext> context,
+     const base::flat_map<std::string, std::string>& additional_attributes,
+     UpdateCheckCallback update_check_callback) {
++  return;
+   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+ 
+   update_check_callback_ = std::move(update_check_callback);
+--- a/components/component_updater/configurator_impl.cc
++++ b/components/component_updater/configurator_impl.cc
+@@ -124,12 +124,12 @@
+ 
+ bool ConfiguratorImpl::EnabledComponentUpdates() const {
+   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+-  return true;
++  return false;
+ }
+ 
+ bool ConfiguratorImpl::EnabledBackgroundDownloader() const {
+   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+-  return background_downloads_enabled_;
++  return false;
+ }
+ 
+ bool ConfiguratorImpl::EnabledCupSigning() const {
+--- a/components/helium_services/helium_services_helpers.cc
++++ b/components/helium_services/helium_services_helpers.cc
+@@ -97,14 +97,11 @@
+ }
+ 
+ bool ShouldAccessUpdateService(const PrefService& prefs) {
+-  return ShouldAccessServices(prefs) &&
+-         prefs.GetBoolean(prefs::kHeliumUpdateFetchingEnabled);
++  return false;
+ }
+ 
+ bool ShouldAccessComponentUpdateService(const PrefService& prefs) {
+-    return ShouldAccessServices(prefs) &&
+-            HasAcceptedSchema(prefs, 1) &&
+-            prefs.GetBoolean(prefs::kHeliumUpdateFetchingEnabled);
++  return false;
+ }
+ 
+ bool ShouldAccessUBlockAssets(const PrefService& prefs) {
+--- a/chrome/browser/ui/browser_ui_prefs.cc
++++ b/chrome/browser/ui/browser_ui_prefs.cc
+@@ -266,7 +266,7 @@
+     registry->RegisterBooleanPref(prefs::kHeliumExtProxyEnabled, true);
+     registry->RegisterBooleanPref(prefs::kHeliumSpellcheckEnabled, true);
+     registry->RegisterStringPref(prefs::kHeliumServicesOrigin, "");
+-    registry->RegisterBooleanPref(prefs::kHeliumUpdateFetchingEnabled, true);
++    registry->RegisterBooleanPref(prefs::kHeliumUpdateFetchingEnabled, false);
+     registry->RegisterBooleanPref(prefs::kHeliumUBlockAssetsEnabled, true);
+   }
+ 
+--- a/chrome/browser/resources/settings/privacy_page/services_page.html
++++ b/chrome/browser/resources/settings/privacy_page/services_page.html
+@@ -72,11 +72,7 @@
+                     sub-label="$i18n{heliumSpellcheckToggleDescription}">
+                 </settings-toggle-button>
+             </if>
+-            <settings-toggle-button id="updatesToggleButton"
+-                pref="{{prefs.helium.services.browser_updates}}"
+-                label="$i18n{heliumUpdatesToggle}"
+-                sub-label="$i18n{heliumUpdatesToggleDescription}">
+-            </settings-toggle-button>
++
+             <settings-toggle-button id="filterlistToggleButton"
+                 pref="{{prefs.helium.services.ublock_assets}}"
+                 label="$i18n{heliumUboToggle}"
+--- a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
++++ b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
+@@ -2697,9 +2697,7 @@
+       {"heliumSpellcheckToggle", IDS_SETTINGS_HELIUM_SERVICES_SPELLCHECK_TOGGLE},
+       {"heliumSpellcheckToggleDescription",
+         IDS_SETTINGS_HELIUM_SERVICES_SPELLCHECK_TOGGLE_DESCRIPTION},
+-      {"heliumUpdatesToggle", IDS_SETTINGS_HELIUM_SERVICES_UPDATE},
+-      {"heliumUpdatesToggleDescription",
+-        IDS_SETTINGS_HELIUM_SERVICES_UPDATE_DESCRIPTION},
++
+       {"heliumUboToggle",
+         IDS_SETTINGS_HELIUM_SERVICES_UBO},
+       {"heliumUboToggleDescription",
+--- a/chrome/app/settings_strings.grdp
++++ b/chrome/app/settings_strings.grdp
+@@ -1716,22 +1716,6 @@
+     <message name="IDS_SETTINGS_HELIUM_SERVICES_SPELLCHECK_TOGGLE_DESCRIPTION" desc="Description of the for enabling/disabling of downloading spellcheck files">
+       Helium will fetch dictionary files used for spell checking when requested. When disabled, spell checking will not work.
+     </message>
+-    <if expr="not is_linux">
+-      <message name="IDS_SETTINGS_HELIUM_SERVICES_UPDATE" desc="Toggle for automatic update downloads">
+-        Allow automatic browser updates
+-      </message>
+-      <message name="IDS_SETTINGS_HELIUM_SERVICES_UPDATE_DESCRIPTION" desc="Description of the toggle for automatic update downloads">
+-        Helium will automatically check for updates and install them. This includes browser and component updates. We recommend keeping this setting enabled to ensure you get the latest features and security updates.
+-      </message>
+-    </if>
+-    <if expr="is_linux">
+-      <message name="IDS_SETTINGS_HELIUM_SERVICES_UPDATE" desc="Toggle for automatic update downloads">
+-        Allow automatic component updates
+-      </message>
+-      <message name="IDS_SETTINGS_HELIUM_SERVICES_UPDATE_DESCRIPTION" desc="Description of the toggle for automatic update downloads">
+-        Helium will automatically check for component updates and install them. We recommend keeping this setting enabled. On Linux, browser updates are handled by your distro's package manager. Please check for Helium package updates at least every week.
+-      </message>
+-    </if>
+     <message name="IDS_SETTINGS_HELIUM_SERVICES_UBO" desc="Description of the toggle for uBO filter lists">
+       Allow downloading filter lists for uBlock Origin
+     </message>
+--- a/chrome/browser/extensions/api/settings_private/prefs_util.cc
++++ b/chrome/browser/extensions/api/settings_private/prefs_util.cc
+@@ -493,8 +493,6 @@
+       settings_api::PrefType::kBoolean;
+   (*s_allowlist)[::prefs::kHeliumSpellcheckEnabled] =
+       settings_api::PrefType::kBoolean;
+-  (*s_allowlist)[::prefs::kHeliumUpdateFetchingEnabled] =
+-      settings_api::PrefType::kBoolean;
+   (*s_allowlist)[::prefs::kHeliumUBlockAssetsEnabled] =
+       settings_api::PrefType::kBoolean;
+   (*s_allowlist)[::prefs::kHeliumServicesOrigin] =

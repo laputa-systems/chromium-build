@@ -77,6 +77,14 @@ input lock carries no onboarding payload, `prepare` unpacks only the search
 engine data and uBlock components, and `helium-remove-onboarding.patch` drops
 the `chrome://setup` page and its startup redirect.
 
+Autoupdates are fully off: `helium-disable-autoupdates.patch` forces the
+Helium services browser/component update gates off, defaults the browser-updates
+preference off, removes its settings toggle, and stops the component updater
+(`CheckForUpdates` returns early; component and background-downloader switches
+are off, with `UpdateUrl` already empty). Extension updates (uBlock and
+extensions) still run. On Linux, browser updates stay with the distro package
+manager.
+
 The profile uses an official-style optimized build:
 `is_official_build=true`, `dcheck_always_on=false`, `chrome_pgo_phase=2`,
 `use_thin_lto=true`, and `thin_lto_enable_optimizations=true`. Chromium's
