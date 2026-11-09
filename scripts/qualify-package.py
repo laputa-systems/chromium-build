@@ -90,6 +90,15 @@ def host_headless_checks(report: dict, product_version: str) -> dict[str, bool]:
         "host-devtools-browser": headless_browser == f"Helium/{product_version}",
     }
     checks.update({f"host-{name}": value for name, value in headless_checks(section(report, "headless")).items()})
+    load = section(report, "headless_load")
+    results = load.get("results")
+    checks["host-headless-load"] = (
+        isinstance(results, list)
+        and len(results) >= 3
+        and load.get("crashes") == 0
+        and load.get("sigsys_exits") == 0
+        and all(isinstance(item, dict) and item.get("iterations", 0) > 0 and "error" not in item for item in results)
+    )
     if not all(checks.values()):
         failed = sorted(name for name, value in checks.items() if not value)
         raise runtime_install.InstallError(f"host headless report does not prove: {', '.join(failed)}")
@@ -168,6 +177,7 @@ def main() -> int:
                 "executable_version": host_report["version"],
                 "devtools_browser": section(section(host_report, "headless"), "version_info")["Browser"],
                 "user_namespaces": section(section(host_report, "headless"), "user_namespaces"),
+                "load": {key: host_report["headless_load"][key] for key in ("instances", "seconds", "iterations", "crashes", "sigsys_exits")},
                 "checks": host_checks,
             }
         temporary = output.with_name(f".{output.name}.tmp-{os.getpid()}")

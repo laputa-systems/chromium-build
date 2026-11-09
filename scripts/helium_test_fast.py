@@ -208,9 +208,24 @@ def wait_devtools_line(log_path: Path, process: subprocess.Popen, timeout: float
     raise RuntimeError("headless Helium never printed its DevTools endpoint")
 
 
-def run_headless(args: argparse.Namespace, output: Path, environment: dict, devtools_product: str) -> dict:
+def close_browser(browser_connection: CdpConnection, process: subprocess.Popen, process_group: int) -> dict:
+    browser_connection.call("Browser.close")
+    browser_connection.close()
+    returncode = process.wait(timeout=30)
+    deadline = time.monotonic() + 10
+    survivors = [pid for pid in process_group_pids(process_group) if pid_is_alive(pid)]
+    while survivors and time.monotonic() < deadline:
+        time.sleep(0.2)
+        survivors = [pid for pid in process_group_pids(process_group) if pid_is_alive(pid)]
+    exited_unreaped = [pid for pid in process_group_pids(process_group) if pid not in survivors]
+    if returncode != 0 or survivors:
+        commands = {pid: Path(f"/proc/{pid}/cmdline").read_bytes().replace(b"\0", b" ").decode("utf-8", "replace")[:200] for pid in survivors if Path(f"/proc/{pid}/cmdline").exists()}
+        raise RuntimeError(f"headless Browser.close left status {returncode} and processes {commands or survivors}")
+    return {"returncode": returncode, "survivors": survivors, "exited_unreaped": exited_unreaped}
+
+
+def headless_environment_for(environment: dict, profile: Path) -> dict:
     environment = {name: value for name, value in environment.items() if name not in ("WAYLAND_DISPLAY", "DISPLAY", "XDG_SESSION_TYPE")}
-    profile = Path(tempfile.mkdtemp(prefix="helium-headless-profile-", dir=output))
     home = profile / "home"
     home.mkdir(mode=0o700)
     environment.update(
@@ -219,6 +234,115 @@ def run_headless(args: argparse.Namespace, output: Path, environment: dict, devt
         XDG_CACHE_HOME=str(home / ".cache"),
         XDG_DATA_HOME=str(home / ".local/share"),
     )
+    return environment
+
+
+SIGSYS = 31
+
+
+def crashed_targets(connection: CdpConnection) -> list[dict]:
+    crashes = [event.get("params", {}) for event in connection.events if event.get("method") == "Target.targetCrashed"]
+    connection.events = [event for event in connection.events if event.get("method") != "Target.targetCrashed"]
+    return [
+        {
+            "target_id": crash.get("targetId"),
+            "status": crash.get("status"),
+            "error_code": crash.get("errorCode"),
+            "sigsys": (int(crash.get("errorCode") or 0) & 0x7F) == SIGSYS,
+        }
+        for crash in crashes
+    ]
+
+
+def load_instance(args: argparse.Namespace, output: Path, environment: dict, index: int, deadline: float, server_port: int, result: dict) -> None:
+    profile = Path(tempfile.mkdtemp(prefix=f"helium-load-{index}-", dir=output))
+    log_path = output / f"test-fast-load-{index}.log"
+    process = None
+    browser_connection = None
+    result.update({"iterations": 0, "crashes": [], "profile": str(profile)})
+    try:
+        command = [str(args.helium), "--headless=new", "--remote-debugging-port=0", f"--user-data-dir={profile / 'user-data'}", "about:blank"]
+        result["command"] = command
+        with log_path.open("w", encoding="utf-8") as log:
+            process = subprocess.Popen(command, env=headless_environment_for(environment, profile), stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
+        process_group = os.getpgid(process.pid)
+        process._chromium_process_group = process_group
+        port = urllib.parse.urlparse(wait_devtools_line(log_path, process, 30)).port
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/json/version", timeout=10) as response:
+            version_info = json.load(response)
+        browser_connection = CdpConnection(WebSocket(version_info["webSocketDebuggerUrl"]))
+        browser_connection.call("Target.setDiscoverTargets", {"discover": True})
+        page_url = f"http://127.0.0.1:{server_port}/{args.fixture.name}"
+        expression = "document.readyState === 'complete' && document.querySelector('#status') ? ({status: document.querySelector('#status').textContent, layout: window.fixture.layout}) : null"
+        while time.monotonic() < deadline:
+            request = urllib.request.Request(f"http://127.0.0.1:{port}/json/new?{urllib.parse.quote(page_url, safe=':/?=&')}", method="PUT")
+            with urllib.request.urlopen(request, timeout=10) as response:
+                target = json.load(response)
+            connection = CdpConnection(WebSocket(target["webSocketDebuggerUrl"]))
+            try:
+                page_deadline = time.monotonic() + 30
+                page = evaluate(connection, expression)
+                while page != {"status": "ready", "layout": True} and time.monotonic() < page_deadline:
+                    time.sleep(0.05)
+                    page = evaluate(connection, expression)
+            finally:
+                connection.close()
+            if page != {"status": "ready", "layout": True}:
+                raise RuntimeError(f"load page {result['iterations']} did not compute its fixture values: {page}")
+            browser_connection.call("Target.closeTarget", {"targetId": target["id"]})
+            result["iterations"] += 1
+            result["crashes"].extend(crashed_targets(browser_connection))
+        browser_connection.call("Browser.getVersion")
+        result["crashes"].extend(crashed_targets(browser_connection))
+        result["exit"] = close_browser(browser_connection, process, process_group)
+        browser_connection = None
+        process = None
+        shutil.rmtree(profile, ignore_errors=True)
+        result.pop("profile")
+    except Exception as error:  # noqa: BLE001
+        result["error"] = str(error)
+        result["log"] = str(log_path)
+    finally:
+        if browser_connection is not None:
+            browser_connection.close()
+        if process is not None:
+            result["cleanup"] = terminate_process(process)
+
+
+def run_headless_load(args: argparse.Namespace, output: Path, environment: dict) -> dict:
+    server = serve_fixtures(args.fixtures)
+    deadline = time.monotonic() + args.load_seconds
+    instances: list[dict] = [{} for _ in range(args.load_instances)]
+    threads = [
+        threading.Thread(target=load_instance, args=(args, output, environment, index, deadline, server.server_address[1], instances[index]))
+        for index in range(args.load_instances)
+    ]
+    try:
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+    finally:
+        server.shutdown()
+    crashes = [crash for instance in instances for crash in instance.get("crashes", [])]
+    result = {
+        "instances": args.load_instances,
+        "seconds": args.load_seconds,
+        "iterations": sum(instance.get("iterations", 0) for instance in instances),
+        "crashes": len(crashes),
+        "sigsys_exits": sum(1 for crash in crashes if crash["sigsys"]),
+        "results": instances,
+    }
+    failed = [index for index, instance in enumerate(instances) if "error" in instance or not instance.get("iterations")]
+    args.load_result = result
+    if failed or crashes:
+        raise RuntimeError(f"headless load failed: instances {failed}, {len(crashes)} crashed targets ({result['sigsys_exits']} SIGSYS)")
+    return result
+
+
+def run_headless(args: argparse.Namespace, output: Path, environment: dict, devtools_product: str) -> dict:
+    profile = Path(tempfile.mkdtemp(prefix="helium-headless-profile-", dir=output))
+    environment = headless_environment_for(environment, profile)
     user_data = profile / "user-data"
     result: dict = {"user_namespaces": unprivileged_user_namespaces(), "profile": str(profile)}
     server = serve_fixtures(args.fixtures)
@@ -253,20 +377,8 @@ def run_headless(args: argparse.Namespace, output: Path, environment: dict, devt
         result.update({"page": {"url": page_url, "evaluated": page}, "sandbox": sandbox_observations(browser_connection, require_pid_namespace=True)})
         connection.close()
         connection = None
-        browser_connection.call("Browser.close")
-        browser_connection.close()
+        result["exit"] = close_browser(browser_connection, process, process_group)
         browser_connection = None
-        returncode = process.wait(timeout=30)
-        deadline = time.monotonic() + 10
-        survivors = [pid for pid in process_group_pids(process_group) if pid_is_alive(pid)]
-        while survivors and time.monotonic() < deadline:
-            time.sleep(0.2)
-            survivors = [pid for pid in process_group_pids(process_group) if pid_is_alive(pid)]
-        exited_unreaped = [pid for pid in process_group_pids(process_group) if pid not in survivors]
-        result["exit"] = {"returncode": returncode, "survivors": survivors, "exited_unreaped": exited_unreaped}
-        if returncode != 0 or survivors:
-            commands = {pid: Path(f"/proc/{pid}/cmdline").read_bytes().replace(b"\0", b" ").decode("utf-8", "replace")[:200] for pid in survivors if Path(f"/proc/{pid}/cmdline").exists()}
-            raise RuntimeError(f"headless Browser.close left status {returncode} and processes {commands or survivors}")
         process = None
         shutil.rmtree(profile, ignore_errors=True)
         result.pop("profile")
@@ -340,6 +452,12 @@ def run(args: argparse.Namespace) -> int:
             report["headless"] = args.headless_result
             raise
         if args.headless_only:
+            if args.load_instances:
+                try:
+                    report["headless_load"] = run_headless_load(args, output, headless_environment)
+                except BaseException:
+                    report["headless_load"] = getattr(args, "load_result", None)
+                    raise
             report["status"] = "complete"
             report["scope"] = "headless"
             return 0
@@ -474,6 +592,8 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--inputs-lock", type=Path, default=Path("/opt/chromium-build/config/helium.inputs.lock"))
     parser.add_argument("--headless-only", action="store_true", help="run only the display-free headless checks, e.g. directly on a host")
+    parser.add_argument("--load-instances", type=int, default=0, help="with --headless-only, concurrent headless browsers for the page-evaluation load check")
+    parser.add_argument("--load-seconds", type=float, default=180.0)
     args = parser.parse_args()
     args.fixture = args.fixtures / "helium-fast.html"
     if not args.fixture.is_file():

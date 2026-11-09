@@ -234,13 +234,19 @@ the headless checks there, then pass that report too:
 
 ```sh
 python3 scripts/install-runtime.py --archive "$ARCHIVE" --verify-extract "$DIR"
-python3 scripts/helium_test_fast.py --headless-only --helium "$DIR/helium-wrapper" \
-    --fixtures tests/fixtures --inputs-lock config/helium.inputs.lock --output "$HOST_OUT"
+python3 scripts/helium_test_fast.py --headless-only --load-instances 3 --load-seconds 180 \
+    --helium "$DIR/helium-wrapper" --fixtures tests/fixtures \
+    --inputs-lock config/helium.inputs.lock --output "$HOST_OUT"
 python3 scripts/qualify-package.py --archive "$ARCHIVE" --report "$REPORT" \
     --host-headless-report "$HOST_OUT/test-fast.json"
 ```
 
-The sidecar's `host_headless` section then carries those checks.
+The load run keeps three headless browsers opening the loopback fixture page,
+evaluating it, and closing the tab until the time runs out, while each browser
+connection watches `Target.targetCrashed`. A crashed target, or a wait status
+whose signal is `SIGSYS`, fails the run; musl sandbox gaps showed up exactly
+that way, as renderers killed under load. The sidecar's `host_headless`
+section then carries those checks and the load totals.
 
 The offline installer needs only Python's standard library and the package,
 checksum, and acceptance sidecar; it makes no Docker calls:

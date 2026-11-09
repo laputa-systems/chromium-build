@@ -62,6 +62,14 @@ HOST_PASSING = {
     "chromium_version": "156.0.8078.79",
     "version": PASSING["version"],
     "headless": copy.deepcopy(PASSING["headless"]),
+    "headless_load": {
+        "instances": 3,
+        "seconds": 180.0,
+        "iterations": 90,
+        "crashes": 0,
+        "sigsys_exits": 0,
+        "results": [{"iterations": 30, "crashes": []} for _ in range(3)],
+    },
 }
 
 
@@ -75,11 +83,23 @@ class HostHeadlessChecksTest(unittest.TestCase):
             "host-headless-clean-exit": lambda report: report["headless"]["exit"].update(returncode=1),
             "host-devtools-browser": lambda report: report["headless"]["version_info"].update(Browser="Helium/0.20.3.0"),
             "host-executable-identity": lambda report: report.update(version="Chromium 156.0.8078.79"),
+            "host-headless-load": lambda report: report["headless_load"].update(sigsys_exits=1, crashes=1),
         }
         for check, damage in cases.items():
             report = copy.deepcopy(HOST_PASSING)
             damage(report)
             with self.subTest(check), self.assertRaisesRegex(runtime_install.InstallError, check):
+                HOST_HEADLESS_CHECKS(report, "0.20.3.1")
+
+    def test_host_report_without_concurrent_load_does_not_qualify(self):
+        for damage in (
+            lambda report: report.pop("headless_load"),
+            lambda report: report["headless_load"].update(results=[{"iterations": 30, "crashes": []}]),
+            lambda report: report["headless_load"]["results"][1].update(iterations=0),
+        ):
+            report = copy.deepcopy(HOST_PASSING)
+            damage(report)
+            with self.assertRaisesRegex(runtime_install.InstallError, "host-headless-load"):
                 HOST_HEADLESS_CHECKS(report, "0.20.3.1")
 
     def test_headed_report_is_not_a_host_headless_report(self):

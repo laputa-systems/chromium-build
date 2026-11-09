@@ -34,6 +34,7 @@ and no Wayland or X server, and the acceptance sidecar adds these checks:
 | headless-page | a page served over loopback HTTP loads and `Runtime.evaluate` returns the values its script computed |
 | headless-sandbox-renderer | every live renderer has `NoNewPrivs=1`, `Seccomp=2`, and more than one `NSpid` field |
 | headless-clean-exit | `Browser.close` exits the browser with status 0 and leaves no process in its group |
+| host-headless-load | on the host, three concurrent headless browsers repeat the loopback page evaluation for the run's duration with no crashed target and no renderer `SIGSYS` exit |
 
 The headless run refuses root and requires unprivileged user namespaces. No
 check may use `--no-sandbox`, `--single-process`, or `--no-zygote`.
