@@ -58,6 +58,7 @@ HELIUM_PROFILE = "helium-wayland-release"
 
 
 def helium_expected(args):
+    pure_arm64 = args.target_cpu == "arm64"
     return {
         "target_os": "linux",
         "target_cpu": args.target_cpu,
@@ -88,7 +89,7 @@ def helium_expected(args):
         "use_custom_libcxx": True,
         "use_custom_libunwind": True,
         "use_safe_libstdcxx": False,
-        "use_system_libffi": True,
+        "use_system_libffi": not pure_arm64,
         "use_siso": False,
         "use_remoteexec": False,
         "use_ozone": True,
@@ -99,17 +100,21 @@ def helium_expected(args):
         "ozone_platform_x11": False,
         "use_xkbcommon": True,
         "use_gtk": False,
+        "use_glib": not pure_arm64,
+        "use_gio": not pure_arm64,
         "use_pangocairo": False,
         "use_qt6": False,
         "use_dbus": False,
+        "use_udev": not pure_arm64,
         "use_libpci": False,
+        "use_system_minigbm": not pure_arm64,
         "use_alsa": args.target_cpu != "arm64",
         "use_pulseaudio": False,
         "rtc_use_pipewire": False,
         "rtc_link_pipewire": False,
-        "use_vaapi": True,
+        "use_vaapi": not pure_arm64,
         "enable_vulkan": False,
-        "enable_swiftshader": False,
+        "enable_swiftshader": pure_arm64,
         "enable_printing": True,
         "use_cups": False,
         "ffmpeg_branding": "Chrome",

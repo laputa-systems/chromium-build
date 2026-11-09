@@ -223,6 +223,13 @@ class RuntimeCollectionTests(unittest.TestCase):
         self.assertIn("libqt6_shim.so", reasons)
         self.assertIn("libvulkan.so.1", reasons)
 
+    def test_arm64_seeds_only_the_pure_nss_modules(self):
+        self.assertEqual(STAGE["system_seeds"]("arm64"), STAGE["NSS_SEEDS"])
+        for name in STAGE["MESA_SEEDS"]:
+            self.assertIn(name, STAGE["system_seeds"]("amd64"))
+        for name in STAGE["NSS_SEEDS"]:
+            self.assertIn(name, STAGE["system_seeds"]("amd64"))
+
     def test_missing_runtime_dependency_file_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

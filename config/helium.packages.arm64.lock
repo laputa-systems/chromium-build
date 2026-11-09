@@ -1,7 +1,7 @@
 {
   "architecture": "arm64",
   "base_release": "3.24.1",
-  "manifest_sha256": "92842c35e2f72fe4ec79a388d2577f7f12eeea126ac706d9a54623444fb18912",
+  "manifest_sha256": "a93591834b565566e305a9ea63da22ea14087ecc002b60052209a74d8fb7ce90",
   "repositories": [
     "https://dl-cdn.alpinelinux.org/alpine/v3.24/main",
     "https://dl-cdn.alpinelinux.org/alpine/v3.24/community"
@@ -152,7 +152,7 @@
     "libncurses++-6.6_p20260516-r0",
     "libncursesw-6.6_p20260516-r0",
     "libogg-1.3.6-r0",
-    "libopenmpt-0.8.9-r0",
+    "libopenmpt-0.8.10-r0",
     "libpanelw-6.6_p20260516-r0",
     "libpciaccess-0.19-r0",
     "libpciaccess-dev-0.19-r0",

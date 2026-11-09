@@ -44,11 +44,13 @@ HELIUM_OPTIONAL = (
     "MEIPreload/manifest.json",
     "MEIPreload/preloaded_data.pb",
 )
-SYSTEM_SEEDS = (
+NSS_SEEDS = (
     "libsoftokn3.so",
     "libfreeblpriv3.so",
     "libfreebl3.so",
     "libnssckbi.so",
+)
+MESA_SEEDS = (
     "libwayland-egl.so.1",
     "libEGL.so.1",
     "libGLESv2.so.2",
@@ -271,19 +273,26 @@ def system_library(name: str, directories: tuple[Path, ...]) -> Path | None:
     return None
 
 
-def copy_system_closure(stage: Path) -> list[str]:
+def system_seeds(architecture: str) -> tuple[str, ...]:
+    if architecture == "arm64":
+        return NSS_SEEDS
+    return NSS_SEEDS + MESA_SEEDS
+
+
+def copy_system_closure(stage: Path, architecture: str) -> list[str]:
     directories = (Path("/usr/lib"), Path("/lib"))
     seeds = []
-    for name in SYSTEM_SEEDS:
+    for name in system_seeds(architecture):
         found = system_library(name, directories)
         if found is not None:
             seeds.append(found)
-    for pattern in MESA_SEED_GLOBS:
-        for directory in directories:
-            seeds.extend(sorted(directory.glob(pattern)))
-    dri_root = Path("/usr/lib/dri")
-    if dri_root.is_dir():
-        seeds.extend(sorted(dri_root.rglob("*_dri.so")))
+    if architecture != "arm64":
+        for pattern in MESA_SEED_GLOBS:
+            for directory in directories:
+                seeds.extend(sorted(directory.glob(pattern)))
+        dri_root = Path("/usr/lib/dri")
+        if dri_root.is_dir():
+            seeds.extend(sorted(dri_root.rglob("*_dri.so")))
     browser = linux_runtime.inspect_elf(stage / "helium", stage)
     for needed in browser.needed:
         if needed in linux_runtime.MUSL_LIBRARIES:
@@ -379,7 +388,7 @@ def stage_helium(chrome: Path, output: Path, runtime_deps: Path, source_root: Pa
             target = temporary / destination
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content, encoding="utf-8")
-        libraries = copy_system_closure(temporary)
+        libraries = copy_system_closure(temporary, architecture)
         browser = linux_runtime.inspect_elf(temporary / "helium", temporary)
         if browser.interpreter != linux_runtime.MUSL_INTERPRETERS[architecture]:
             raise RuntimeError(f"helium uses the wrong ELF interpreter: {browser.interpreter}")

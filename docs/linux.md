@@ -94,9 +94,11 @@ They link against the Debian runtime copied into the amd64 image through
 shipped shared object target musl on both architectures.
 
 The Helium Wayland fixture owns a headless Sway session with the pixman
-renderer and Mesa llvmpipe for the browser. `scripts/helium_wayland.py
---check-fixture` proves output, clipboard, and screenshot ownership without a
-GPU device, XWayland, or the host session.
+renderer. On amd64 the browser renders with Mesa llvmpipe; on arm64 it uses
+Chromium's in-tree ANGLE/SwiftShader, so the reported WebGL vendor and renderer
+are SwiftShader's. `scripts/helium_wayland.py --check-fixture` proves output,
+clipboard, and screenshot ownership without a GPU device, XWayland, or the host
+session.
 
 `stage-runtime` audits Chrome's ELF interpreter and direct dependencies.
 `package` collects Chrome, its runtime libraries, font configuration, and
@@ -113,6 +115,18 @@ inputs, package world, patch inventory, and executable name come from
 harness; Shadowdriver remains macOS-only. The package ships no glibc, gcompat,
 static browser, or sandbox bypass, and needs no X server, session bus, or
 hardware GPU; VA-API is optional at runtime.
+
+On arm64 the staged `lib/` directory contains only Chromium's own libraries
+plus pure-musl builds of SQLite 3.53.4, expat 2.10.0, xkbcommon 1.13.1, zlib
+1.4, libffi 3.5.2 (static PIC), NSS 3.124, and NSPR 4.38.2. The pinned sources and their sizes and SHA-512 digests
+are `runtime_sources.arm64` in the lock; the image builds them in a separate
+builder stage with the image's llvm-prebuilt-musl clang and installs the shared
+objects in `/usr/lib`, where `stage-runtime` reads them. FFmpeg, ANGLE, and
+SwiftShader are Chromium's in-tree builds. Mesa, the GCC-built Alpine
+libraries, libstdc++, and libgcc_s are not staged. The arm64 profile disables
+glib, gio, atk, udev, system libffi, system minigbm, and VA-API, and enables
+ANGLE/SwiftShader. udev-based device hotplug and media capture are therefore
+not compiled in on arm64.
 
 The profile compiles in the Wayland and headless Ozone backends. Wayland stays
 the default; `--headless=new` or `--ozone-platform=headless` runs the browser
@@ -155,11 +169,12 @@ disabled and external URI or file-manager launch falls back to `xdg-open` and
 `xdg-email`. Accessibility is disabled by default; `TODO.md`
 tracks restoring it without requiring a session bus.
 
-VA-API decode is compiled in but the GPU driver stays host-provided: the
-browser loads the host's musl `libva` and Intel driver at runtime. On Intel
-Broadwell, `libva-intel-driver` provides H.264 and VP8 decode through Mesa's
-iris OpenGL driver. VP9 and HEVC fall back to software, as does the whole path
-when no VA-API device is present.
+The amd64 profile compiles VA-API decode in, but the GPU driver stays
+host-provided: the browser loads the host's musl `libva` and Intel driver at
+runtime. On Intel Broadwell, `libva-intel-driver` provides H.264 and VP8 decode
+through Mesa's iris OpenGL driver. VP9 and HEVC fall back to software, as does
+the whole path when no VA-API device is present. The arm64 profile sets
+`use_vaapi=false`; decode there is software or bundled FFmpeg.
 
 ```sh
 ./chromium-build --product helium --profile helium-wayland-release image
@@ -175,23 +190,27 @@ when no VA-API device is present.
 ```
 
 `//chrome:chrome` does not build the `chrome_sandbox` data dependency, so
-`build-target chrome_sandbox` must run before staging. `stage-runtime` also
-closes the system FFmpeg libraries; their `libstdc++.so.6` and `libgcc_s.so.1`
-dependencies are allowed only below the FFmpeg roots, matching the builder
-policy's scoped exception.
+`build-target chrome_sandbox` must run before staging. On amd64 `stage-runtime`
+also closes the system FFmpeg libraries; their `libstdc++.so.6` and
+`libgcc_s.so.1` dependencies are allowed only below the FFmpeg roots, matching
+the builder policy's scoped exception. The arm64 stage has no such closure.
 
 `stage-runtime` takes the `//chrome:chrome` runtime dependency list from GN,
 adds the upstream desktop packaging inputs, all generated locale packs and V8
-startup data, and closes the NSS, Wayland, and Mesa GPU libraries. VA-API
-is loaded from the host and is not part of the staged closure. It recursively
-audits every shipped ELF, rejects glibc and absolute build RPATHs, and keeps
-the graphics/NSS closure separate from the browser's direct dependencies. The Helium profile uses Torque's instance-type generation
+startup data, and closes the system libraries the browser still needs. On amd64
+it seeds the Mesa, Wayland, and NSS libraries and closes the system FFmpeg
+libraries; their `libstdc++.so.6` and `libgcc_s.so.1` dependencies are allowed
+only below the FFmpeg roots. On arm64 it seeds only the pure NSS modules;
+bundled FFmpeg, ANGLE, and SwiftShader come from the Chromium output. VA-API is
+loaded from the host on amd64 and is not part of the staged closure. The audit
+recursively rejects glibc and absolute build RPATHs, and keeps the graphics/NSS
+closure separate from the browser's direct dependencies. The Helium profile uses Torque's instance-type generation
 because Chromium's prebuilt `llvm-libclang` is a glibc binary in this musl
 builder; `v8_use_metagen_instance_types=false` selects the supported path.
 
 `package` writes the relocatable bundle at `/work/package/<profile>` and the
-candidate archive at `/work/artifacts/helium-0.20.3.1-r2-linux-<arch>-musl.tar.xz`
-with its `.sha256` sidecar. It does not publish or install it. The `r2` is the
+candidate archive at `/work/artifacts/helium-0.20.3.1-r3-linux-<arch>-musl.tar.xz`
+with its `.sha256` sidecar. It does not publish or install it. The `r3` is the
 lock's `product.package_revision`; it changes whenever the package changes for the
 same Helium version, so a new archive cannot be mistaken for an accepted one.
 

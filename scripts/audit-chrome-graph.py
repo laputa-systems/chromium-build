@@ -11,6 +11,10 @@ from pathlib import Path
 
 TOOLCHAIN = "/opt/chromium-llvm"
 CCACHE = "/usr/bin/ccache"
+BUNDLED_FFMPEG = (
+    os.environ.get("CHROMIUM_PRODUCT") == "helium"
+    and os.environ.get("CHROMIUM_ARCH") == "arm64"
+)
 COMPILERS = {"clang", "clang++"}
 ARCHIVERS = {"ar", "llvm-ar", "ranlib", "llvm-ranlib"}
 FORBIDDEN_TEXT = {
@@ -130,7 +134,7 @@ def audit_command_lines(lines):
                 )
             ):
                 linker_failures.append(f"line {number}: link command does not select LLD")
-        if "third_party/ffmpeg" in line:
+        if not BUNDLED_FFMPEG and "third_party/ffmpeg" in line:
             direct_failures.append(f"line {number}: bundled FFmpeg path in a compiler/link command")
 
     return counts, direct_failures, ccache_failures, compiler_failures, linker_failures, archive_failures
@@ -275,7 +279,10 @@ def main():
         failures.append("no link commands found")
     if counts["archive_commands"] == 0:
         failures.append("no archive commands found")
-    if "media/ffmpeg" not in command_text and "ffmpeg_stub" not in command_text:
+    if BUNDLED_FFMPEG:
+        if "third_party/ffmpeg" not in command_text:
+            failures.append("bundled FFmpeg commands were not found")
+    elif "media/ffmpeg" not in command_text and "ffmpeg_stub" not in command_text:
         failures.append("system FFmpeg shim commands were not found")
 
     response_report = []
@@ -299,10 +306,9 @@ def main():
             "ccache_compile_wrapper": not any("ccache" in item for item in failures),
             "absolute_chromium_compilers": not any("compiler is not" in item for item in failures),
             "direct_chromium_archives_and_ranlib": not any("archive tool" in item or "ranlib tool" in item for item in failures),
-            "system_ffmpeg_shim": "media/ffmpeg" in command_text or "ffmpeg_stub" in command_text,
-            "no_bundled_ffmpeg": not any(
-                "bundled FFmpeg path in a compiler/link command" in item for item in failures
-            ),
+            "ffmpeg_mode": "bundled" if BUNDLED_FFMPEG else "system",
+            "system_ffmpeg_shim": not BUNDLED_FFMPEG and ("media/ffmpeg" in command_text or "ffmpeg_stub" in command_text),
+            "bundled_ffmpeg": BUNDLED_FFMPEG and "third_party/ffmpeg" in command_text,
             "no_forbidden_flags_or_paths": not failures,
         },
         "failures": failures,

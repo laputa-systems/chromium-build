@@ -317,6 +317,16 @@ if [ "$command_name" = image ]; then
             --build-arg PATCH_DISPOSITION="config/$(basename -- "$PATCH_DISPOSITION")"
             --build-arg SYSTEM_LIBRARY_POLICY="config/$(basename -- "$SYSTEM_LIBRARY_POLICY")"
         )
+        while IFS=$'\t' read -r source_name source_url source_sha512 source_size; do
+            [ -n "$source_name" ] || continue
+            source_prefix=$(printf '%s' "$source_name" | tr '[:lower:]' '[:upper:]')
+            image_args+=(
+                --build-arg "PURE_${source_prefix}_URL=$source_url"
+                --build-arg "PURE_${source_prefix}_SHA512=$source_sha512"
+                --build-arg "PURE_${source_prefix}_SIZE=$source_size"
+            )
+        done < <("${CHROMIUM_PYTHON:-python3}" "$ROOT/scripts/linux_product.py" \
+            --product helium --arch "$ARCH" --profile "$PROFILE" --root "$ROOT" --runtime-sources)
     fi
     docker build "${image_args[@]}" -t "$IMAGE" "$ROOT"
     docker image inspect "$IMAGE" --format 'image={{.Id}}'

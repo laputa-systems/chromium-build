@@ -10,7 +10,7 @@ RUN mkdir -p /rootfs/usr/lib /rootfs/lib64 \
 FROM ${BASE_IMAGE} AS host-runtime-arm64
 RUN mkdir /rootfs
 FROM host-runtime-${TARGET_ARCH} AS host-runtime
-FROM ${BASE_IMAGE}
+FROM ${BASE_IMAGE} AS builder-base
 
 ARG TARGET_ARCH
 ARG PRODUCT=chromium
@@ -164,23 +164,6 @@ COPY tests/test_browser_test_support.py /opt/chromium-build/tests/test_browser_t
 COPY tests/test_fetch_inputs.py /opt/chromium-build/tests/test_fetch_inputs.py
 COPY tests/test_helium_runtime.py /opt/chromium-build/tests/test_helium_runtime.py
 
-RUN set -eux; \
-    mkdir -p /opt/chromium-build-metadata; \
-    apk info -v | sort > "/opt/chromium-build-metadata/packages.$TARGET_ARCH.txt"
-
-RUN python3 /opt/chromium-build/scripts/write-environment-metadata.py "$TARGET_ARCH" \
-    --inputs-lock "/opt/chromium-build/$INPUTS_LOCK" \
-    --package-lock "/opt/chromium-build/$PACKAGE_LOCK" \
-    --policy "/opt/chromium-build/$SYSTEM_LIBRARY_POLICY" \
-    --output /opt/chromium-build-metadata/environment.json
-
-RUN CHROMIUM_ARCH="$TARGET_ARCH" CHROMIUM_PRODUCT="$PRODUCT" \
-    SYSTEM_LIBRARY_POLICY="/opt/chromium-build/$SYSTEM_LIBRARY_POLICY" \
-    CHROMIUM_METADATA_ROOT=/opt/chromium-build-metadata \
-    python3 /opt/chromium-build/scripts/preflight-system-libraries.py \
-    --lock "/opt/chromium-build/$PACKAGE_LOCK" \
-    --policy "/opt/chromium-build/$SYSTEM_LIBRARY_POLICY"
-
 ENV PATH="/opt/chromium-llvm/bin:$PATH" \
     CC=/opt/chromium-llvm/bin/clang \
     CXX=/opt/chromium-llvm/bin/clang++ \
@@ -207,5 +190,64 @@ ENV PATH="/opt/chromium-llvm/bin:$PATH" \
     CFLAGS=-Wno-unknown-warning-option \
     CXXFLAGS=-Wno-unknown-warning-option \
     NETWORK_MODE=none
+
+WORKDIR /work
+
+FROM builder-base AS pure-runtime
+ARG TARGET_ARCH
+ARG PRODUCT
+ARG PURE_NSS_URL=
+ARG PURE_NSS_SHA512=
+ARG PURE_NSS_SIZE=
+ARG PURE_NSPR_URL=
+ARG PURE_NSPR_SHA512=
+ARG PURE_NSPR_SIZE=
+ARG PURE_SQLITE_URL=
+ARG PURE_SQLITE_SHA512=
+ARG PURE_SQLITE_SIZE=
+ARG PURE_EXPAT_URL=
+ARG PURE_EXPAT_SHA512=
+ARG PURE_EXPAT_SIZE=
+ARG PURE_XKBCOMMON_URL=
+ARG PURE_XKBCOMMON_SHA512=
+ARG PURE_XKBCOMMON_SIZE=
+ARG PURE_ZLIB_URL=
+ARG PURE_ZLIB_SHA512=
+ARG PURE_ZLIB_SIZE=
+ARG PURE_LIBFFI_URL=
+ARG PURE_LIBFFI_SHA512=
+ARG PURE_LIBFFI_SIZE=
+RUN /opt/chromium-build/scripts/build-pure-runtime.sh
+
+FROM builder-base
+ARG TARGET_ARCH
+ARG PRODUCT
+ARG INPUTS_LOCK=config/inputs.lock
+ARG PACKAGE_LOCK=config/packages.amd64.lock
+ARG SYSTEM_LIBRARY_POLICY=config/system-library-preflight.schema.json
+COPY --from=pure-runtime /opt/pure-runtime /opt/pure-runtime
+RUN set -eux; \
+    if [ "$PRODUCT" = "helium" ] && [ "$TARGET_ARCH" = "arm64" ]; then \
+        for library in /opt/pure-runtime/lib/*.so*; do \
+            rm -f "/usr/lib/$(basename -- "$library")"; \
+        done; \
+        cp -a /opt/pure-runtime/lib/*.so* /usr/lib/; \
+        cp -a /opt/pure-runtime/lib/libffi_pic.a /usr/lib/; \
+    fi; \
+    rm -rf /opt/pure-runtime
+RUN set -eux; \
+    mkdir -p /opt/chromium-build-metadata; \
+    apk info -v | sort > "/opt/chromium-build-metadata/packages.$TARGET_ARCH.txt"
+RUN python3 /opt/chromium-build/scripts/write-environment-metadata.py "$TARGET_ARCH" \
+    --inputs-lock "/opt/chromium-build/$INPUTS_LOCK" \
+    --package-lock "/opt/chromium-build/$PACKAGE_LOCK" \
+    --policy "/opt/chromium-build/$SYSTEM_LIBRARY_POLICY" \
+    --output /opt/chromium-build-metadata/environment.json
+RUN CHROMIUM_ARCH="$TARGET_ARCH" CHROMIUM_PRODUCT="$PRODUCT" \
+    SYSTEM_LIBRARY_POLICY="/opt/chromium-build/$SYSTEM_LIBRARY_POLICY" \
+    CHROMIUM_METADATA_ROOT=/opt/chromium-build-metadata \
+    python3 /opt/chromium-build/scripts/preflight-system-libraries.py \
+    --lock "/opt/chromium-build/$PACKAGE_LOCK" \
+    --policy "/opt/chromium-build/$SYSTEM_LIBRARY_POLICY"
 
 WORKDIR /work

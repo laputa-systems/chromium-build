@@ -220,11 +220,21 @@ def resolve_main(argv: list[str]) -> int:
     parser.add_argument("--profile")
     parser.add_argument("--root", type=Path)
     parser.add_argument("--package-world", action="store_true")
+    parser.add_argument("--runtime-sources", action="store_true")
     args = parser.parse_args(argv)
     try:
         product = resolve(args.product, args.arch, args.profile, args.root)
         if args.package_world:
             print(" ".join(package_world(product.package_lock)))
+            return 0
+        if args.runtime_sources:
+            lock = json.loads(product.inputs_lock.read_text(encoding="utf-8"))
+            sources = lock.get("runtime_sources", {}).get(product.arch, {})
+            for name, item in sorted(sources.items()):
+                for key in ("url", "sha512", "size"):
+                    if key not in item:
+                        raise ScriptFailure(f"{product.inputs_lock}: runtime source {name} has no {key}")
+                print(f"{name}\t{item['url']}\t{item['sha512']}\t{item['size']}")
             return 0
     except ScriptFailure as error:
         print(f"linux_product: {error}", file=sys.stderr)

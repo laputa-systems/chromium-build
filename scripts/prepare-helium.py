@@ -453,8 +453,22 @@ def main() -> None:
         path.symlink_to(target)
         builder_links.append({"path": relative, "target": target, "added": True, "network": "none"})
 
-    unbundle_script = args.source / "build/linux/unbundle/replace_gn_files.py"
-    run([python, str(unbundle_script), "--system-libraries", "ffmpeg"], cwd=args.source)
+    if args.arch == "arm64":
+        ffmpeg_unbundle = {
+            "name": "ffmpeg",
+            "state": "bundled",
+            "gn_replacement": "third_party/ffmpeg/BUILD.gn",
+            "removed_source_trees": [],
+        }
+    else:
+        unbundle_script = args.source / "build/linux/unbundle/replace_gn_files.py"
+        run([python, str(unbundle_script), "--system-libraries", "ffmpeg"], cwd=args.source)
+        ffmpeg_unbundle = {
+            "name": "ffmpeg",
+            "state": "system",
+            "gn_replacement": "third_party/ffmpeg/BUILD.gn",
+            "removed_source_trees": [],
+        }
 
     source_report = {
         "schema": 1,
@@ -535,7 +549,7 @@ def main() -> None:
         "schema": 1,
         "status": "complete",
         "network": "none",
-        "libraries": [{"name": "ffmpeg", "gn_replacement": "third_party/ffmpeg/BUILD.gn", "removed_source_trees": []}],
+        "libraries": [ffmpeg_unbundle],
     }
     preparation = {
         "schema": 1,
@@ -560,7 +574,7 @@ def main() -> None:
             "rust-target",
             *(["rust-toolchain"] if rust_toolchain else []),
             *(["native-host-tools"] if native_host_tools else []),
-            "ffmpeg-unbundle",
+            "ffmpeg-bundled" if args.arch == "arm64" else "ffmpeg-unbundle",
         ],
         "patch_count": len(patch_records) + len(local_records) + sum(1 for item in inherited if item["state"] == "apply"),
     }

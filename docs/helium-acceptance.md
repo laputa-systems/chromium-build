@@ -7,8 +7,10 @@ owner's Alpine dwl target.
 ## Current automated coverage
 
 `test-fast` and `test-staged` run `scripts/helium_test_fast.py` in an owned
-headless Sway session with Mesa llvmpipe. `scripts/qualify-package.py` binds a
-passing report to the archive digest, and archive installation requires that
+headless Sway session. On amd64 the browser renders with Mesa llvmpipe; on arm64
+it uses Chromium's in-tree ANGLE/SwiftShader, and the GPU information reports
+SwiftShader's vendor and renderer. `scripts/qualify-package.py` binds a passing
+report to the archive digest, and archive installation requires that
 `.acceptance.json` sidecar.
 
 For `helium-0.20.3.1-linux-x86_64-musl.tar.xz` the automated run covered:
@@ -21,7 +23,7 @@ For `helium-0.20.3.1-linux-x86_64-musl.tar.xz` the automated run covered:
 | sandbox-renderer | three live renderers with `NoNewPrivs=1` and `Seccomp=2` |
 | clean-shutdown | browser and owned children exited after `Browser.close` |
 
-From package revision 2 the same run first starts the browser with
+From package revision 2 onward the same run first starts the browser with
 `--headless=new --remote-debugging-port=0 --user-data-dir=<dir> about:blank`
 and no Wayland or X server, and the acceptance sidecar adds these checks:
 
@@ -35,6 +37,12 @@ and no Wayland or X server, and the acceptance sidecar adds these checks:
 
 The headless run refuses root and requires unprivileged user namespaces. No
 check may use `--no-sandbox`, `--single-process`, or `--no-zygote`.
+
+For package revision 3 the arm64 archive must also pass the repository's purity
+gate: extract it and run `check-purity.sh <dir> aarch64 <llvm-tools-dir>`. It
+must report `0 impure`, which proves every shipped ELF and archive names only
+musl's loader/libc or a library the package ships, carries no GCC `.comment`,
+and references no glibc, libgcc, or libstdc++ symbols.
 
 These checks are the whole automated package acceptance. Every other row
 below is not covered by the package path; some need new harness support and
@@ -65,7 +73,7 @@ may be complete only if every mandatory row for that artifact passed.
 | keyboard | focus the real browser and fixture input, send text with Wayland virtual-keyboard input, assert actual input/change events and final text | CDP `Runtime.evaluate` assignment or CDP keyboard dispatch alone cannot satisfy native Wayland input |
 | clipboard | copy a unique sentinel with `wl-copy`, paste with native keyboard into fixture input; copy selected browser text and require `wl-paste` to return it | permission errors, empty text, or setting clipboard only through a CDP override fails |
 | fonts | render existing serif/sans/monospace samples and verify distinct measured widths/families plus visible glyphs; inspect bundled fontconfig aliases | a single fallback face for every family fails |
-| software-graphics | CDP GPU information identifies Mesa llvmpipe/software rendering; browser renders the fixture without a passed-through GPU device | `--disable-gpu` or the compositor's pixman setting alone cannot pass |
+| software-graphics | CDP GPU information identifies software rendering and the browser renders the fixture without a passed-through GPU device: Mesa llvmpipe on amd64, ANGLE/SwiftShader on arm64 | `--disable-gpu`, the compositor's pixman setting alone, or a non-software renderer cannot pass |
 | hardware-graphics (target only) | on the Broadwell desktop, GPU information identifies Mesa iris, `vainfo` lists H.264/VP8 profiles, and `chrome://media-internals` selects `VaapiVideoDecoder` for an H.264 or VP8 fixture | llvmpipe, missing VA-API profiles, or a software decoder for the fixture fails; VP9/HEVC software fallback is expected |
 | media | existing pinned local media reaches the required playback state and decoded frames/audio-track observations; retain its dynamic-library audit | renaming the codec fixture or disabling media checks fails |
 | tls-trust | the normal verifier accepts the local chain after importing its CA into a disposable NSS store; rejects the same chain without that CA, a wrong hostname, and an expired leaf | no ignore-certificate switch, SPKI exception, CDP security override, or navigation through an interstitial may authorize success |
@@ -178,6 +186,10 @@ python3 scripts/test-functional.py --product helium --runtime-kind package \
     --output "$PWD/.work/tmp/helium-dwl-results" \
     --require-llvmpipe --require-media
 ```
+
+`--require-llvmpipe` is the amd64 software-rendering assertion. On arm64 use
+the same run without it and require CDP GPU information to name SwiftShader
+instead.
 
 Those options are the target contract, not current behavior. Until the harness
 implements them, leave the affected rows `not-executed` and use the manual

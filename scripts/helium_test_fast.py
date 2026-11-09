@@ -356,11 +356,12 @@ def run(args: argparse.Namespace) -> int:
         debug_port = port_socket.getsockname()[1]
         port_socket.close()
         environment = fixture.environment()
-        environment.update(
-            WAYLAND_DISPLAY=fixture.wayland_socket.name,
-            LIBGL_ALWAYS_SOFTWARE="1",
-            GALLIUM_DRIVER="llvmpipe",
-        )
+        environment.update(WAYLAND_DISPLAY=fixture.wayland_socket.name)
+        if os.environ.get("CHROMIUM_ARCH", "amd64") == "arm64":
+            angle_args = ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"]
+        else:
+            environment.update(LIBGL_ALWAYS_SOFTWARE="1", GALLIUM_DRIVER="llvmpipe")
+            angle_args = ["--use-gl=angle", "--use-angle=gl"]
         if library_dir.is_dir():
             environment["LD_LIBRARY_PATH"] = str(library_dir) + (
                 f":{environment['LD_LIBRARY_PATH']}" if environment.get("LD_LIBRARY_PATH") else ""
@@ -373,8 +374,7 @@ def run(args: argparse.Namespace) -> int:
             "--no-first-run",
             "--no-default-browser-check",
             "--enable-logging=stderr",
-            "--use-gl=angle",
-            "--use-angle=gl",
+            *angle_args,
             "--remote-debugging-address=127.0.0.1",
             f"--remote-debugging-port={debug_port}",
             "about:blank",

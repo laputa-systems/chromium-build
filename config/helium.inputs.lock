@@ -4,7 +4,7 @@
     "name": "helium",
     "version": "0.20.3.1",
     "platform_version": "1",
-    "package_revision": 2,
+    "package_revision": 3,
     "source_revision": "83027a19267e526f08e25a3af1a30b45ee7e3e2e",
     "core_revision": "2f81b9cafa38a95071e20de3f9cd6b0aca6d3c65"
   },
@@ -107,6 +107,59 @@
         "destination": "third_party/devtools-frontend/src/third_party/esbuild/esbuild",
         "chromium_pin": {"path": "third_party/devtools-frontend/src/DEPS", "contains": "version:3@0.28.2.chromium"},
         "version_output": "0.28.2"
+      }
+    }
+  },
+  "runtime_sources": {
+    "arm64": {
+      "nss": {
+        "version": "3.124",
+        "filename": "nss-3.124.tar.gz",
+        "url": "https://ftp.mozilla.org/pub/security/nss/releases/NSS_3_124_RTM/src/nss-3.124.tar.gz",
+        "size": 78530189,
+        "sha512": "9959977b3cbcb0306c8aeba2c059d4f3646b3144c6401fbc73c14aea364caa92331875354afa79c095b6482b29ae743228d35c1bd510c5124cad5e7c37c5daa2"
+      },
+      "nspr": {
+        "version": "4.38.2",
+        "filename": "nspr-4.38.2.tar.gz",
+        "url": "https://ftp.mozilla.org/pub/nspr/releases/v4.38.2/src/nspr-4.38.2.tar.gz",
+        "size": 1025394,
+        "sha512": "f17302b0973ab006f9e6af70199ac6bb40d6266f96ab4d6692f56c24979907a7f0a20cf9d926aa80084f2e0ce7dfd56de89a7547b5e7e8caafa7afa5eb0b7bd8"
+      },
+      "sqlite": {
+        "version": "3.53.4",
+        "filename": "sqlite-autoconf-3530400.tar.gz",
+        "url": "https://www.sqlite.org/2026/sqlite-autoconf-3530400.tar.gz",
+        "size": 3283177,
+        "sha512": "c24374e9393a943157f533f96e89e6c5743e5f5aad169d8393cff3088ca5ccbe5cc0561681ace49c349d0fe402298ee2624d319f422967247ce0792e3b3aa01e"
+      },
+      "expat": {
+        "version": "2.10.0",
+        "filename": "expat-2.10.0.tar.xz",
+        "url": "https://github.com/libexpat/libexpat/releases/download/R_2_10_0/expat-2.10.0.tar.xz",
+        "size": 543404,
+        "sha512": "bd61f361d823f67586dad246fa4d4abbe3d22f5a0f9a28401e7a2fc96753d5bae33fbe4068fae72f016998d0da9d8c92edc4abd2fe8a8e4aafc775a8ab547c44"
+      },
+      "xkbcommon": {
+        "version": "1.13.1",
+        "filename": "xkbcommon-1.13.1.tar.gz",
+        "url": "https://github.com/xkbcommon/libxkbcommon/archive/refs/tags/xkbcommon-1.13.1.tar.gz",
+        "size": 1234661,
+        "sha512": "450c33fe26af6b847cf7516685d0df63c2ba0126887e27595c40fe80e4d0487009aa6cdf38ff1270d595c7900cbf3c11e7aa4f9cff80fa361742b5ebb10d83bd"
+      },
+      "zlib": {
+        "version": "1.4",
+        "filename": "zlib-1.4.tar.gz",
+        "url": "https://zlib.net/zlib-1.4.tar.gz",
+        "size": 1507140,
+        "sha512": "13f02285da85956ff722d814695b96807aff7a511ebf4b6d98cf708c353920666093cc18b6653cd7992c8e75c103f7b4baf2de3a105c2db9dcd62bab2c940859"
+      },
+      "libffi": {
+        "version": "3.5.2",
+        "filename": "libffi-3.5.2.tar.gz",
+        "url": "https://github.com/libffi/libffi/releases/download/v3.5.2/libffi-3.5.2.tar.gz",
+        "size": 1423124,
+        "sha512": "76974a84e3aee6bbd646a6da2e641825ae0b791ca6efdc479b2d4cbcd3ad607df59cffcf5031ad5bd30822961a8c6de164ac8ae379d1804acd388b1975cdbf4d"
       }
     }
   },

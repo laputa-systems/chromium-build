@@ -12,7 +12,17 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 RESOLVE = ROOT / "scripts/resolve-output.py"
 VERIFY_ARGS = ROOT / "scripts/verify-gn-args.py"
+GENERATE_ARGS = ROOT / "scripts/generate-gn-args.py"
 HELIUM_PROFILE = ROOT / "config/profiles/helium-wayland-release.gn"
+PURE_ARM64_VALUES = {
+    "use_system_libffi": False,
+    "use_glib": False,
+    "use_gio": False,
+    "use_udev": False,
+    "use_system_minigbm": False,
+    "use_vaapi": False,
+    "enable_swiftshader": True,
+}
 
 
 def load_verify_args():
@@ -124,52 +134,71 @@ class VerifyArgsTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("GN arg", result.stderr)
 
+    def run_contract(self, root: Path, target_cpu: str) -> subprocess.CompletedProcess[str]:
+        verify_args = load_verify_args()
+        args_file = root / f"{target_cpu}-args.gn"
+        probe = root / f"{target_cpu}-probe.json"
+        subprocess.run(
+            [
+                sys.executable,
+                str(GENERATE_ARGS),
+                "--source-root", str(ROOT),
+                "--profile", str(HELIUM_PROFILE),
+                "--target-cpu", target_cpu,
+                "--clang-major", "24",
+                "--use-alsa", "false" if target_cpu == "arm64" else "true",
+                "--args-output", str(args_file),
+                "--probe-output", str(probe),
+            ],
+            check=True,
+        )
+        values = verify_args.parse_args(args_file)
+        canonical = root / f"{target_cpu}-canonical.gn"
+        canonical.write_text(
+            "\n".join(f"{name} = {gn_value(value)}" for name, value in values.items()) + "\n",
+            encoding="utf-8",
+        )
+        effective = root / f"{target_cpu}-effective.json"
+        effective.write_text(
+            json.dumps([
+                {"name": name, "current": {"value": gn_value(value)}}
+                for name, value in values.items()
+            ]) + "\n",
+            encoding="utf-8",
+        )
+        return subprocess.run(
+            [
+                sys.executable,
+                str(VERIFY_ARGS),
+                "--args", str(args_file),
+                "--canonical", str(canonical),
+                "--effective-json", str(effective),
+                "--probe", str(probe),
+                "--target-cpu", target_cpu,
+                "--clang-major", "24",
+                "--profile", "helium-wayland-release",
+                "--output", str(root / f"{target_cpu}-verify.json"),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
     def test_helium_profile_matches_the_effective_contract(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = self.run_contract(Path(directory), "x64")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_arm64_profile_matches_the_pure_runtime_contract(self):
         verify_args = load_verify_args()
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            profile = root / "profile.gn"
-            profile.write_text(
-                HELIUM_PROFILE.read_text(encoding="utf-8")
-                .replace("@TARGET_CPU@", "x64")
-                .replace("@CLANG_MAJOR@", "24")
-                .replace("@USE_ALSA@", "true"),
-                encoding="utf-8",
-            )
-            values = verify_args.parse_args(profile)
-            canonical = root / "canonical.gn"
-            canonical.write_text(
-                "\n".join(f"{name} = {gn_value(value)}" for name, value in values.items()) + "\n",
-                encoding="utf-8",
-            )
-            effective = root / "effective.json"
-            effective.write_text(
-                json.dumps([
-                    {"name": name, "current": {"value": gn_value(value)}}
-                    for name, value in values.items()
-                ]) + "\n",
-                encoding="utf-8",
-            )
-            probe = root / "probe.json"
-            probe.write_text('{"arguments": {}}\n', encoding="utf-8")
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(VERIFY_ARGS),
-                    "--args", str(profile),
-                    "--canonical", str(canonical),
-                    "--effective-json", str(effective),
-                    "--probe", str(probe),
-                    "--target-cpu", "x64",
-                    "--clang-major", "24",
-                    "--profile", "helium-wayland-release",
-                    "--output", str(root / "verify.json"),
-                ],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-        self.assertEqual(result.returncode, 0, result.stderr)
+            result = self.run_contract(root, "arm64")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            values = verify_args.parse_args(root / "arm64-args.gn")
+        for name, expected in PURE_ARM64_VALUES.items():
+            self.assertEqual(values.get(name), expected, name)
+        self.assertFalse(values.get("use_alsa"))
 
 
 if __name__ == "__main__":

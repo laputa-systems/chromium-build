@@ -50,10 +50,18 @@ def main():
     args = parser.parse_args()
 
     profile = args.profile.read_text(encoding="utf-8")
+    pure_arm64 = args.target_cpu == "arm64"
     rendered = (
         profile.replace("@TARGET_CPU@", args.target_cpu)
         .replace("@CLANG_MAJOR@", args.clang_major)
         .replace("@USE_ALSA@", args.use_alsa)
+        .replace("@USE_SYSTEM_LIBFFI@", "false" if pure_arm64 else "true")
+        .replace("@USE_GLIB@", "false" if pure_arm64 else "true")
+        .replace("@USE_GIO@", "false" if pure_arm64 else "true")
+        .replace("@USE_UDEV@", "false" if pure_arm64 else "true")
+        .replace("@USE_SYSTEM_MINIGBM@", "false" if pure_arm64 else "true")
+        .replace("@USE_VAAPI@", "false" if pure_arm64 else "true")
+        .replace("@ENABLE_SWIFTSHADER@", "true" if pure_arm64 else "false")
     )
     probe = {
         "schema": 1,
