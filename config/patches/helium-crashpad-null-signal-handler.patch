@@ -1,0 +1,23 @@
+diff --git a/third_party/crashpad/crashpad/client/crashpad_client_linux.cc b/third_party/crashpad/crashpad/client/crashpad_client_linux.cc
+--- a/third_party/crashpad/crashpad/client/crashpad_client_linux.cc
++++ b/third_party/crashpad/crashpad/client/crashpad_client_linux.cc
+@@ -766,13 +766,17 @@
+ // static
+ void CrashpadClient::SetFirstChanceExceptionHandler(
+     FirstChanceHandler handler) {
+-  DCHECK(SignalHandler::Get());
++  if (!SignalHandler::Get()) {
++    return;
++  }
+   SignalHandler::Get()->SetFirstChanceHandler(handler);
+ }
+ 
+ // static
+ void CrashpadClient::SetLastChanceExceptionHandler(LastChanceHandler handler) {
+-  DCHECK(SignalHandler::Get());
++  if (!SignalHandler::Get()) {
++    return;
++  }
+   SignalHandler::Get()->SetLastChanceExceptionHandler(handler);
+ }
+ 

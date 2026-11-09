@@ -92,6 +92,7 @@ LOCAL_PATCHES = (
     "musl-gpu-pwritev2-sandbox.patch",
     "musl-pwritev2-sandbox.patch",
     "musl-seccomp-sched-get.patch",
+    "helium-crashpad-null-signal-handler.patch",
     "musl-abseil-clang23-lifetime-capture.patch",
     "musl-abseil-clang23-unused-template.patch",
     "musl-clang23-unused-template-global.patch",
