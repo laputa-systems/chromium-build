@@ -26,7 +26,15 @@ class HTTPSRedirectHandler(urllib.request.HTTPRedirectHandler):
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
-def locked_inputs(lock):
+def architecture_inputs(lock, arch):
+    if "architecture_inputs" not in lock:
+        return {}
+    if arch not in lock["architecture_inputs"]:
+        raise RuntimeError(f"input lock has no architecture inputs for {arch!r}")
+    return lock["architecture_inputs"][arch]
+
+
+def locked_inputs(lock, arch):
     chromium = dict(lock["chromium"])
     chromium.update({
         "name": "chromium",
@@ -41,6 +49,9 @@ def locked_inputs(lock):
     ] + [
         dict(value, name=name)
         for name, value in lock.get("test_inputs", {}).items()
+    ] + [
+        dict(value, name=name)
+        for name, value in architecture_inputs(lock, arch).items()
     ]
 
 
@@ -145,7 +156,7 @@ def main():
     if identity["product"] != product:
         raise SystemExit(f"{args.lock} belongs to product {identity['product']}, not {product}")
     args.inputs_root.mkdir(parents=True, exist_ok=True)
-    items = locked_inputs(lock)
+    items = locked_inputs(lock, os.environ.get("CHROMIUM_ARCH", ""))
     with ThreadPoolExecutor(max_workers=min(4, len(items))) as executor:
         entries = list(executor.map(fetch_one, items, [args.inputs_root] * len(items)))
 

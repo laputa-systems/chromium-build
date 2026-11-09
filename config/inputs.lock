@@ -68,7 +68,6 @@
   "toolchain": {
     "distribution": "chromium-clang",
     "version": "24.0.0git",
-    "revision": "llvmorg-24-init-3796-g20e97c4b-2",
     "lld_version": "24.0.0",
     "root": "/opt/chromium-llvm",
     "clang_cfg_sha256": "234bdd941720eee7c052191816d7fa1ec0dd44e6f97f8119ab3f577fbf3eddc2",
@@ -82,6 +81,7 @@
         "linux_arch": "x86_64",
         "chromium_cpu": "x64",
         "target_triple": "x86_64-unknown-linux-musl",
+        "revision": "llvmorg-24-init-3796-g20e97c4b-2",
         "archive_filename": "clang-llvmorg-24-init-3796-g20e97c4b-2.tar.xz",
         "archive_size": 59131228,
         "archive_url": "https://commondatastorage.googleapis.com/chromium-browser-clang/Linux_x64/clang-llvmorg-24-init-3796-g20e97c4b-2.tar.xz",

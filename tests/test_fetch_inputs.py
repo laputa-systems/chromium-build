@@ -1,14 +1,16 @@
 """Permissions for verified inputs consumed by the unprivileged browser tests."""
 
 import hashlib
+import json
 import runpy
 import tempfile
 import unittest
 from pathlib import Path
 
-FETCH_ONE = runpy.run_path(
-    str(Path(__file__).resolve().parents[1] / "scripts/fetch-inputs.py")
-)["fetch_one"]
+ROOT = Path(__file__).resolve().parents[1]
+FETCH = runpy.run_path(str(ROOT / "scripts/fetch-inputs.py"))
+FETCH_ONE = FETCH["fetch_one"]
+LOCKED_INPUTS = FETCH["locked_inputs"]
 
 
 class FetchInputsTest(unittest.TestCase):
@@ -29,3 +31,17 @@ class FetchInputsTest(unittest.TestCase):
 
             self.assertEqual(FETCH_ONE(item, root)["action"], "reused")
             self.assertEqual(archive.stat().st_mode & 0o444, 0o444)
+
+    def test_only_arm64_helium_fetches_native_host_tools(self):
+        lock = json.loads((ROOT / "config/helium.inputs.lock").read_text(encoding="utf-8"))
+        arm64 = {item["name"]: item for item in LOCKED_INPUTS(lock, "arm64")}
+        amd64 = {item["name"] for item in LOCKED_INPUTS(lock, "amd64")}
+
+        self.assertEqual(arm64["rust_toolchain"]["destination"], "third_party/rust-toolchain")
+        self.assertTrue(arm64["rust_toolchain"]["filename"].endswith("-aarch64-linux-musl.tar.xz"))
+        self.assertEqual(set(arm64) - amd64, {"rust_toolchain", "typescript_native"})
+
+    def test_architecture_inputs_reject_an_unlisted_architecture(self):
+        lock = json.loads((ROOT / "config/helium.inputs.lock").read_text(encoding="utf-8"))
+        with self.assertRaisesRegex(RuntimeError, "no architecture inputs"):
+            LOCKED_INPUTS(lock, "")

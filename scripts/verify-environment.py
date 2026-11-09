@@ -32,6 +32,22 @@ def loopback_only() -> bool:
     )
 
 
+def verify_host_runtime(arch: str) -> None:
+    host_linker = os.environ.get("RUST_HOST_LINKER", "")
+    glibc_loaders = sorted(str(path) for root in (Path("/lib"), Path("/lib64")) if root.is_dir() for path in root.glob("ld-linux*"))
+    gnu_library_roots = sorted(str(path) for path in Path("/usr/lib").glob("*-linux-gnu"))
+    if arch == "amd64":
+        if glibc_loaders != ["/lib64/ld-linux-x86-64.so.2"]:
+            raise ScriptFailure(f"build-only glibc loader is missing or unexpected: {glibc_loaders}")
+        if host_linker != "/opt/chromium-build/scripts/rust-host-linker":
+            raise ScriptFailure(f"RUST_HOST_LINKER is {host_linker!r}, expected the glibc host linker")
+        return
+    if glibc_loaders or gnu_library_roots or Path("/opt/chromium-glibc").exists():
+        raise ScriptFailure(f"{arch} builder carries a glibc runtime: {glibc_loaders + gnu_library_roots}")
+    if host_linker:
+        raise ScriptFailure(f"RUST_HOST_LINKER must be unset on {arch}, got {host_linker!r}")
+
+
 def verify_ccache_hit(ccache: Path, cc: str, cxx: str) -> None:
     """Prove both GN compilers are selected and served by the mounted cache."""
     with tempfile.TemporaryDirectory(prefix="chromium-ccache-gate-a-") as directory:
@@ -130,7 +146,7 @@ def main() -> None:
         raise ScriptFailure("Clang config hash differs from lock")
     atomic_write(metadata / "toolchain-config-sha256", "\n".join(config_hashes) + "\n")
     atomic_write(metadata / "toolchain-configs", "".join((llvm_root / "bin" / name).read_text(encoding="utf-8") for name in ("clang.cfg", "clang++.cfg")))
-    if (llvm_root / "cr_build_revision").read_text(encoding="utf-8").strip() != toolchain["revision"]:
+    if (llvm_root / "cr_build_revision").read_text(encoding="utf-8").strip() != arch_toolchain["revision"]:
         raise ScriptFailure("Clang revision stamp differs from the lock")
     if not (work / "src/buildtools/third_party/libc++/__config_site").is_file():
         raise ScriptFailure("prepared Chromium libc++ configuration is missing")
@@ -141,9 +157,7 @@ def main() -> None:
         raise ScriptFailure("missing compiler-rt builtins for the musl target")
     if not (resource_dir / f"lib/linux/libclang_rt.builtins-{expected_linux}.a").is_file():
         raise ScriptFailure("missing Chromium GN compiler-rt builtins path")
-    expected_loader = "/lib64/ld-linux-x86-64.so.2"
-    if not Path(expected_loader).is_file():
-        raise ScriptFailure("build-only glibc loader is missing")
+    verify_host_runtime(arch)
     ccache = Path(os.environ.get("CCACHE_BIN", "/usr/bin/ccache"))
     require_file(ccache, "missing ccache")
     ccache_maxsize = os.environ.get("CCACHE_MAXSIZE", "")

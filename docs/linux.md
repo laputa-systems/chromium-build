@@ -42,14 +42,54 @@ commands and does not wrap link commands.
 
 ### Helium Rust toolchain
 
-Helium uses Chromium's bundled Rust 1.100 toolchain and Crubit instead of the
-Alpine Rust packages. The target ABI is `x86_64-unknown-linux-musl`; the target
-standard library and Crubit bindings are compiled in-tree. Rust host tools,
-build scripts, and procedural macros are glibc host binaries, so they link
-against the Debian runtime already copied for the compiler through
+Helium uses Chromium's pinned Rust 1.100 toolchain and Crubit instead of the
+Alpine Rust packages. The target standard library and Crubit bindings are
+compiled in-tree for the musl target. Alpine Rust, Cargo, rust-src, and
+rustfmt are not part of the Helium package world. The toolchain must sit at
+`third_party/rust-toolchain`: Chromium disables Crubit, which Blink's fonts
+need, when `rust_sysroot_absolute` points elsewhere.
+
+On linux/arm64 the toolchain is native aarch64 musl, and the builder carries no
+glibc, libgcc, or libstdc++ for it. Chromium publishes its Rust toolchain only
+for x86_64 glibc hosts, so `scripts/build-rust-toolchain.sh` rebuilds the same
+pinned Rust, Crubit, and bindgen revisions on an aarch64 musl host against
+llvm-prebuilt-musl's GCC-free LLVM and its `-dev` package. Its `profiler_builtins`
+links LLVM 23.1.5's compiler-rt profile runtime, built by the same clang, because
+Chromium's host standard library copy expects that crate. The archive also
+carries a native `clang-format` from the same LLVM release, which Crubit runs on
+the headers it generates. rustc, clang, and
+lld then share LLVM 23.1.5. The resulting archive is the `rust_toolchain` entry
+under `architecture_inputs.arm64` in `config/helium.inputs.lock`. `fetch`
+verifies its size and SHA-512 like any other input. `prepare` checks that
+`tools/rust/update_rust.py` pins the same Rust revision and that the archive's
+`VERSION` matches the toolchain Chromium pins. It then replaces
+`third_party/rust-toolchain` with the archive and requires the installed
+`rustc -vV` to report the locked commit, the `aarch64-unknown-linux-musl` host,
+and the locked LLVM version. Host build tools, proc macros, and the browser
+all link with the same musl clang.
+
+The Linux overlay is an x86_64 tree, so `prepare` on arm64 also deletes every
+ELF file built for another architecture and the unused Debian glibc sysroots.
+Anything that would have needed emulation then fails as a missing file. The
+host tools the arm64 build does run are native: Alpine's `node` at Chromium's
+`node-linux-x64` path, the npm `@typescript/typescript-linux-arm64` compiler
+pinned as `typescript_native` at the version Chromium's TypeScript package
+records, and the toolchain archive's `clang-format` at
+`buildtools/linux64-format/clang-format`. Gate A fails if an arm64 builder has a glibc
+loader, a `*-linux-gnu` library directory, `/opt/chromium-glibc`, or a
+`RUST_HOST_LINKER`.
+
+To produce a new archive after a Chromium Rust roll, run
+`scripts/build-rust-toolchain.sh <prepared-src> <llvm-prefix> <out-dir>` in an
+arm64 Alpine container with network access. `<llvm-prefix>` is the compiler
+package with its `-dev` package extracted over it. Publish the archive and pin
+its URL, size, SHA-512, and Rust revision in the lock.
+
+On amd64 the toolchain is still Chromium's downloaded x86_64 glibc build.
+Its host tools, build scripts, and procedural macros are glibc host binaries.
+They link against the Debian runtime copied into the amd64 image through
 `/opt/chromium-glibc` and `scripts/rust-host-linker`. The browser and every
-shipped shared object still target musl. Alpine Rust, Cargo, rust-src, and
-rustfmt are not part of the Helium package world.
+shipped shared object target musl on both architectures.
 
 The Helium Wayland fixture owns a headless Sway session with the pixman
 renderer and Mesa llvmpipe for the browser. `scripts/helium_wayland.py

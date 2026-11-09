@@ -191,8 +191,7 @@ case "$ARCH" in
     amd64)
         platform=linux/amd64
         base_image=alpine@sha256:d56c381f961d307a21b3ca004cf1e3910f106644aefb1f43e654c8a56c4fd395
-        glibc_triplet=x86_64-linux-gnu
-        ld_linux=ld-linux-x86-64.so.2
+        rust_host_linker=/opt/chromium-build/scripts/rust-host-linker
         if [ "$PRODUCT" = helium ]; then
             llvm_url=https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-23.1.5-c4f9b08/clang%2Bllvm-23.1.5-x86_64-linux-musl.tar.xz
             llvm_sha256=8039dfa9e5b2ee53b04c1dcf94d65bd76c27842b0d4128c5a7bc6ba21d345fec
@@ -208,13 +207,12 @@ case "$ARCH" in
     arm64)
         platform=linux/arm64
         base_image=alpine@sha256:e7a1a92a5bfeee40966aea60f0796b0e7917cc35591542701834f03a68fa3d18
-        glibc_triplet=x86_64-linux-gnu
-        ld_linux=ld-linux-x86-64.so.2
+        rust_host_linker=
         if [ "$PRODUCT" = helium ]; then
-            llvm_url=https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-23.1.5-c4f9b08/clang%2Bllvm-23.1.5-aarch64-linux-musl.tar.xz
-            llvm_sha256=7055513530fc60361e29d01d5c849d356b25e9e38124811a420970941dd32979
-            llvm_size=95146512
-            llvm_revision=llvm-musl-23.1.5-c4f9b08
+            llvm_url=https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-23.1.5-69be0e1/clang%2Bllvm-23.1.5-aarch64-linux-musl.tar.xz
+            llvm_sha256=1653e4d6d9a8756dbd3a3cc1d7bd7f55a9b7faacfadbb160da89eb30c60b16c3
+            llvm_size=93574152
+            llvm_revision=llvm-musl-23.1.5-69be0e1
         else
             fail 'Chromium 153 publishes no native Linux arm64 LLVM 24 archive; the Chromium backend currently supports amd64 only (Helium uses the laputa LLVM 23 musl toolchain for arm64)'
         fi
@@ -303,8 +301,7 @@ if [ "$command_name" = image ]; then
         --build-arg LLVM_SHA256="$llvm_sha256"
         --build-arg LLVM_SIZE="$llvm_size"
         --build-arg LLVM_REVISION="$llvm_revision"
-        --build-arg GLIBC_TRIPLET="$glibc_triplet"
-        --build-arg LD_LINUX="$ld_linux"
+        --build-arg RUST_HOST_LINKER="$rust_host_linker"
         --build-arg CCACHE_MAXSIZE="$CCACHE_MAXSIZE"
         --build-arg PRODUCT="$PRODUCT"
     )

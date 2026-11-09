@@ -28,7 +28,7 @@
  
      if (toolchain_has_rust) {
 +      rust_linker = invoker.cxx
-+      if (defined(invoker.rust_host_linker)) {
++      if (defined(invoker.rust_host_linker) && invoker.rust_host_linker != "") {
 +        rust_linker = invoker.rust_host_linker
 +      }
        rustc_wrapper_path =

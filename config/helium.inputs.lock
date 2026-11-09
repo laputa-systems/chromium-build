@@ -74,6 +74,28 @@
       "sha512": "76c47baee157744ed78242b8cf9991dcd51383cb7a2e5274acd9e2c4d373839f70f8879c0c8c0ee9e6acd0a46810780c3200ec599dbf81ff84fbe3f45c48bf9b"
     }
   },
+  "architecture_inputs": {
+    "amd64": {},
+    "arm64": {
+      "rust_toolchain": {
+        "revision": "1edd55dcfcd573872c727fa3e086369a71661ee0",
+        "filename": "rust-toolchain-1edd55dcfcd573872c727fa3e086369a71661ee0-aarch64-linux-musl.tar.xz",
+        "url": "https://github.com/laputa-systems/chromium-build/releases/download/rust-toolchain-1edd55dcfcd5-aarch64-linux-musl/rust-toolchain-1edd55dcfcd573872c727fa3e086369a71661ee0-aarch64-linux-musl.tar.xz",
+        "size": 242825052,
+        "sha512": "c81271746c60ce73a079febf8905eb3cedf9a2692c319c6120d25d755ad24145ebcf1d3ad20c5d061eaac6378c01a6c4376cda36c0286d962e61d3cdcb4fe377",
+        "destination": "third_party/rust-toolchain"
+      },
+      "typescript_native": {
+        "version": "7.0.2",
+        "filename": "typescript-linux-arm64-7.0.2.tgz",
+        "url": "https://registry.npmjs.org/@typescript/typescript-linux-arm64/-/typescript-linux-arm64-7.0.2.tgz",
+        "size": 8900516,
+        "sha512": "421e1e538ff2df20e39df8e3c8f62284c8f9fce0c8966b7e073bb5ece23e7e24910d6e7b4265394a237addec4f44d24f294cdc73520d6b535776b27e32a1e351",
+        "member": "package/lib/tsc",
+        "destination": "third_party/typescript/linux-amd64/src/lib/tsc"
+      }
+    }
+  },
   "source_identity": {
     "schema": 1,
     "product": "helium",
@@ -99,20 +121,21 @@
   "toolchain": {
     "distribution": "laputa-llvm-musl",
     "version": "23.1.5",
-    "revision": "llvm-musl-23.1.5-c4f9b08",
     "lld_version": "23.1.5",
     "root": "/opt/chromium-llvm",
     "clang_cfg_sha256": "6270475bd096eb2dc9f625a5f3ceed7c4e66f3d5ad1a1acf64177d46fa281b33",
     "clangxx_cfg_sha256": "dbf00ec9e9186ecad10671ae2cc06b5d5369872f5024969fbd318c4b2e539d66",
     "host_runtime": {
       "image": "debian@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251",
-      "purpose": "build-only glibc loader and libraries for Chromium bundled Rust host tools"
+      "architectures": ["amd64"],
+      "purpose": "build-only glibc loader and libraries for Chromium's bundled x86_64 Rust host tools"
     },
     "architectures": {
       "amd64": {
         "linux_arch": "x86_64",
         "chromium_cpu": "x64",
         "target_triple": "x86_64-unknown-linux-musl",
+        "revision": "llvm-musl-23.1.5-c4f9b08",
         "archive_filename": "clang+llvm-23.1.5-x86_64-linux-musl.tar.xz",
         "archive_size": 101884956,
         "archive_url": "https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-23.1.5-c4f9b08/clang%2Bllvm-23.1.5-x86_64-linux-musl.tar.xz",
@@ -122,10 +145,11 @@
         "linux_arch": "aarch64",
         "chromium_cpu": "arm64",
         "target_triple": "aarch64-unknown-linux-musl",
+        "revision": "llvm-musl-23.1.5-69be0e1",
         "archive_filename": "clang+llvm-23.1.5-aarch64-linux-musl.tar.xz",
-        "archive_size": 95146512,
-        "archive_url": "https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-23.1.5-c4f9b08/clang%2Bllvm-23.1.5-aarch64-linux-musl.tar.xz",
-        "archive_sha256": "7055513530fc60361e29d01d5c849d356b25e9e38124811a420970941dd32979"
+        "archive_size": 93574152,
+        "archive_url": "https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-23.1.5-69be0e1/clang%2Bllvm-23.1.5-aarch64-linux-musl.tar.xz",
+        "archive_sha256": "1653e4d6d9a8756dbd3a3cc1d7bd7f55a9b7faacfadbb160da89eb30c60b16c3"
       }
     }
   },

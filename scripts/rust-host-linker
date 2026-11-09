@@ -1,28 +1,5 @@
 #!/bin/sh
-# Rust host build tools link for the x86_64 glibc host (run under QEMU on
-# arm64). The target toolchain's --target (from LDFLAGS) and aarch64
-# compiler-rt archive (from clang/BUILD.gn) are wrong-arch inputs for these
-# links, so strip them and pin the x86_64 glibc target. --no-default-config
-# drops clang.cfg's musl CRT paths; the x86_64 CRT/builtins come from the
-# sysroot and /opt/chromium-x86crt (GCC objects).
-n=$#
-i=1
-while [ "$i" -le "$n" ]; do
-  arg=$1
-  shift
-  case "$arg" in
-    --target=*) ;;
-    *libclang_rt.builtins*-aarch64.a) ;;
-    *) set -- "$@" "$arg" ;;
-  esac
-  i=$((i + 1))
-done
 exec /opt/chromium-llvm/bin/clang "$@" \
-  --no-default-config \
-  -fuse-ld=lld \
-  --rtlib=libgcc \
-  --unwindlib=none \
-  -B/opt/chromium-x86crt \
   --target=x86_64-unknown-linux-gnu \
   --sysroot=/opt/chromium-glibc \
   -L/opt/chromium-glibc/lib
