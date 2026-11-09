@@ -42,6 +42,7 @@ ozone_platform_headless = false
 ozone_platform_x11 = false
 use_xkbcommon = true
 use_gtk = false
+use_pangocairo = false
 use_qt6 = false
 use_dbus = false
 use_libpci = false
