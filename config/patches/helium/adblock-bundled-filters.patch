@@ -1,6 +1,6 @@
 --- a/components/helium_adblock/resources/BUILD.gn
 +++ b/components/helium_adblock/resources/BUILD.gn
-@@ -0,0 +1,82 @@
+@@ -0,0 +1,86 @@
 +# Copyright 2026 The Helium Authors
 +# Use of this source code is governed by a BSD-style license that can be
 +# found in the LICENSE file.
@@ -78,6 +78,10 @@
 +
 +  group("adblock_desktop_assets") {
 +    public_deps = [
++      ":adblock_desktop_catalog",
++      ":adblock_desktop_resources",
++    ]
++    data_deps = [
 +      ":adblock_desktop_catalog",
 +      ":adblock_desktop_resources",
 +    ]
