@@ -240,6 +240,21 @@
     "helium-remove-onboarding.patch",
     "helium-disable-autoupdates.patch",
     "helium-partitionalloc-musl-ifunc.patch",
-    "helium-devtools-product.patch"
+    "helium-devtools-product.patch",
+    "adblock-rust-engine.patch",
+    "adblock-rust-gn.patch",
+    "adblock-buildflags.patch",
+    "adblock-filter-sources.patch",
+    "adblock-engine-bridge.patch",
+    "adblock-core-api.patch",
+    "adblock-engine-lifecycle.patch",
+    "adblock-service.patch",
+    "adblock-service-filtering.patch",
+    "adblock-service-refresh.patch",
+    "adblock-bundled-filters.patch",
+    "adblock-chrome-runtime.patch",
+    "adblock-chrome-network.patch",
+    "adblock-blink-cosmetic-filtering.patch",
+    "adblock-review-fixes.patch"
   ]
 }

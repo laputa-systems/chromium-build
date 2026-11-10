@@ -372,6 +372,22 @@ def main() -> None:
     for patch in local_paths:
         record = apply_patch(args.source, patch, args.metadata / "patches/local")
         local_records.append({"project": "local", **record})
+    filters = lock["adblock_inputs"]["helium_filters"]
+    run([
+        python,
+        str(Path(__file__).with_name("setup-helium-adblock.py")),
+        "vendor",
+        "--source",
+        str(args.source),
+        "--inputs",
+        str(args.inputs),
+        "--filters",
+        filters["filename"],
+        "--filters-sha256",
+        filters["sha256"],
+        "--record",
+        str(args.metadata / "helium-adblock.json"),
+    ])
 
     inherited = []
     roots = {

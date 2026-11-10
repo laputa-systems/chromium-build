@@ -121,6 +121,48 @@ element hiding), WebTransport, and CNAME uncloaking.
 counterpart that also proves uBlock is absent, with the pref-off build as the
 negative control.
 
+## Forward-port in this repository
+
+`config/patches/helium/adblock-*.patch` carry the experiment refreshed for
+Chromium 156, applied as local patches after Helium's own series
+(`config/helium.patch-disposition.json`). The three failing hunks were
+redone by hand, so every patch applies with no offset or fuzz. Two departures
+from the experiment:
+
+- `adblock-desktop-settings` is left out; it only applied with fuzz 2 in six
+  places, and nothing else depends on it. Blocking is controlled by the
+  `helium.adblock.enabled` pref until the settings page is ported.
+- `smallvec` in the workspace lockfile is 1.16.1, the version Chromium 156
+  vendors (the experiment locked 155's 1.16.0).
+
+The 41 crates and the `helium-filters` archive are `adblock_inputs` in
+`config/helium.inputs.lock`, downloaded only by `fetch` and checked by size
+and SHA-512. In `prepare`, `scripts/setup-helium-adblock.py vendor` checks
+each crate against the workspace `Cargo.lock`, extracts it into
+`third_party/rust/helium/chromium_crates_io/vendor/<name>-<epoch>`, and
+unpacks the filter lists into `third_party/helium_filters`, with no network
+and no cargo.
+
+The GN files gnrt generates for that workspace are committed as
+`adblock-rust-gn.patch`, as Chromium commits its own generated crate files,
+because the builder cannot run gnrt: Chromium's x86-64 Rust toolchain ships a
+glibc `cargo` that needs `libcurl-gnutls`, and the pruned tree lacks gnrt's
+own dependencies. When the crate set changes, regenerate the patch with
+`setup-helium-adblock.py generate` on a prepared tree, given a working musl
+`cargo` (mounted over `third_party/rust-toolchain/bin/cargo`) and a gnrt
+binary built from that tree's `tools/crates/gnrt`.
+
+`enable_native_adblock` stays false in every profile, so the patched code is
+compiled out and packages are unchanged until a profile turns it on.
+
+Checked on 2026-11-10: `fetch` and `prepare` on a fresh work volume (50
+inputs, 4 minutes, offline), Gate C complete, and the prepared adblock tree
+identical to the one gnrt generated. With `enable_native_adblock = true` on a
+copy of the last release build, the Rust engine and all 41 crates, the
+`components/helium_adblock` libraries, `//chrome/browser/helium_adblock`, and
+the patched browser and renderer objects compile with the pinned musl
+toolchain; Ninja needed 494 steps before the `chrome` link.
+
 ## A first compile
 
 The work volume keeps the last official ThinLTO build in

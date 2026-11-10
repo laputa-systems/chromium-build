@@ -51,6 +51,9 @@ def locked_inputs(lock, arch):
         for name, value in lock.get("test_inputs", {}).items()
     ] + [
         dict(value, name=name)
+        for name, value in lock.get("adblock_inputs", {}).items()
+    ] + [
+        dict(value, name=name)
         for name, value in architecture_inputs(lock, arch).items()
     ]
 
