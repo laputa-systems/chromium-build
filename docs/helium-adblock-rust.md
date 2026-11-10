@@ -199,8 +199,46 @@ host, 7 runs each):
 
 Native blocking beats uBlock everywhere except Speedometer, and costs 20
 percent of Speedometer and about 18 percent of page load against no
-blocker. Where that goes (the per-request async engine hop, cosmetic
-filtering's renderer agent) is not measured yet.
+blocker. The next section finds most of the Speedometer cost.
+
+## Generic hiding as one native stylesheet
+
+The renderer agent created an isolated world in every frame to run
+`cosmetic_filter.js`, which collected class and id names and asked the
+browser which generic rules matched them. An isolated world in a frame
+slows the page's own DOM bindings, and that was most of the Speedometer
+cost. Variants built on the same tree (Nanos, Linux amd64):
+
+| Variant | What runs in the renderer | Speedometer 3.1 |
+| --- | --- | --- |
+| base | no blocker | 25.2–26.1 |
+| N | isolated world in every frame (the experiment as ported) | 21.5–22.9 |
+| C2 | page hide rules as a native user sheet; isolated world only for procedural rules | 23.8–25.0 |
+| C4 | C2 plus every generic class and id rule in one shared sheet | 23.8–24.9 |
+
+C4 is `adblock-native-cosmetic-css.patch`. The engine builds the generic
+sheet (30,045 selectors, about 1.2 MB of CSS, 28 ms on the default lists)
+when it loads. Each renderer process requests it once by id, keeps one
+copy, and inserts it into every document as a user stylesheet along with
+the page's own hide rules. Blink indexes class and id selectors by hash, so
+matching stays cheap. A page whose exceptions remove generic rules gets a
+filtered sheet in its cosmetic resources instead. Generic elements are
+hidden at first paint; N hid them only after its script's round trip.
+adblock-rust has no API that lists its generic rules, so
+`adblock-crates/adblock-0.13.2.patch` adds
+`Engine::generic_class_id_selectors()`, and prepare applies crate patches
+after vendoring.
+
+The generic sheet costs no Speedometer score or memory beyond the spread:
+C4 and C2 score alike, and VMM RSS 30 s after ready is 660–689 MiB for C4
+and 667–678 MiB for C2. Base is 505–511 MiB. The engine costs the 160–180
+MiB, and N measures 579–669 MiB. The C4 rounds shared the host with
+another agent's Firecracker VMs, so the Speedometer figures need a quiet
+rerun before they count.
+
+Two costs remain. About 6 percent of Speedometer against base, which C2
+shows too and is most likely the URL loader proxy's async engine hop per
+request. And the engine's memory.
 
 ## A first compile
 
