@@ -196,24 +196,9 @@ def add_file(
     files[destination] = source
 
 
-def runtime_deps_candidates(out: Path) -> tuple[Path, ...]:
-    return (
-        out / "helium.runtime_deps",
-        out / "chrome.runtime_deps",
-        out / "obj/chrome/chrome.runtime_deps",
-    )
-
-
 def ensure_runtime_deps(chrome: Path, runtime_deps: Path) -> None:
-    if runtime_deps.is_file():
-        return
     out = chrome.parent
     source_root = find_source_root(chrome, None)
-    for candidate in runtime_deps_candidates(out):
-        if candidate.is_file():
-            if candidate.resolve() != runtime_deps.resolve():
-                shutil.copy2(candidate, runtime_deps)
-            return
     args_file = out / "args.gn"
     if not args_file.is_file():
         raise RuntimeError(f"cannot regenerate {runtime_deps.name}: {args_file} is missing")
@@ -257,12 +242,11 @@ def ensure_runtime_deps(chrome: Path, runtime_deps: Path) -> None:
     if restored.returncode:
         detail = (restored.stderr or restored.stdout).strip()
         raise RuntimeError(f"gn regeneration after runtime deps failed: {detail}")
-    for candidate in runtime_deps_candidates(out):
-        if candidate.is_file():
-            if candidate.resolve() != runtime_deps.resolve():
-                shutil.copy2(candidate, runtime_deps)
-            return
-    raise RuntimeError(f"gn did not produce the required runtime dependency file: {runtime_deps}")
+    generated = out / "obj/chrome/chrome.runtime_deps"
+    if not generated.is_file():
+        raise RuntimeError(f"gn did not write {generated} for //chrome:chrome")
+    if generated.resolve() != runtime_deps.resolve():
+        shutil.copy2(generated, runtime_deps)
 
 
 def system_library(name: str, directories: tuple[Path, ...]) -> Path | None:
