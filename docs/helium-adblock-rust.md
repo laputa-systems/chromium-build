@@ -166,6 +166,42 @@ copy of the last release build, the Rust engine and all 41 crates, the
 the patched browser and renderer objects compile with the pinned musl
 toolchain; Ninja needed 494 steps before the `chrome` link.
 
+## First native build (2026-11-10)
+
+A copy of the last release build volume with the series applied and
+`enable_native_adblock = true` built in 494 Ninja steps and 14 minutes,
+ThinLTO link included (ccache 0 hits of 500, all new or header-affected
+files). Packaged as an `r7` candidate (the lock's `package_revision` raised
+only in a throwaway image) it passed `test-fast`, all eleven acceptance
+checks, and qualified. Two packaging bugs surfaced and are fixed: the asset
+group was not a data dependency, so the catalog was never staged
+(`adblock-bundled-filters.patch`), and `stage-runtime` reused a stale
+`runtime_deps` after an incremental build.
+
+In a bctl Nanos session with `helium.adblock.enabled` set and uBlock
+disabled, requests to `ad.doubleclick.net` and `google-analytics.com` from
+an http page fail with `ERR_BLOCKED_BY_CLIENT`, and an ordinary request
+does not. Requests from `about:blank` and `data:` documents are not
+filtered (uBlock filtered them). The first boot also exposed a hydrogen
+page-cache deadlock (a write from a file mapping at a mid-page offset),
+fixed in hydrogen `d103587c`.
+
+Against the same bctl tree with no blocker (Nanos, Linux amd64, quiet
+host, 7 runs each):
+
+| | No blocker | Native | uBlock (2026-11-10, earlier tree) |
+| --- | --- | --- | --- |
+| Cold `up` | 938 ms | 1070 ms | 5193 ms |
+| VMM RSS 30 s after ready | 515 MiB | 683 MiB | 1696 MiB |
+| VMM idle CPU | 0.30 % | 0.32 % | 7.6 % |
+| Speedometer 3.1 | 28.2 | 22.6 | 24.1 |
+| News site LCP / load event | 152 / 82 ms | 180 / 98 ms | 232 / 148 ms |
+
+Native blocking beats uBlock everywhere except Speedometer, and costs 20
+percent of Speedometer and about 18 percent of page load against no
+blocker. Where that goes (the per-request async engine hop, cosmetic
+filtering's renderer agent) is not measured yet.
+
 ## A first compile
 
 The work volume keeps the last official ThinLTO build in
