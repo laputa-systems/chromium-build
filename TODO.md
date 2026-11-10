@@ -1,5 +1,5 @@
 Prefix: CHB
-Next: 9
+Next: 10
 
 ### CHB-2 · P2 · restore the DevTools frontend after the first lean package
 
@@ -54,3 +54,13 @@ Next: 9
 - **Recommendation:** Extend the Helium harness with the remaining rows from `docs/helium-acceptance.md`, reusing the Chromium fixture and CDP transport where it fits and the compositor input path for keyboard and clipboard. Keep the negative controls, reject certificate and sandbox bypasses, and bind each result to the archive digest. Add the rows to `scripts/qualify-package.py` only when they actually pass.
 - **Fix with:** CHB-7
 - **Effort:** L
+
+### CHB-9 · P2 · forward-port Helium's native adblock-rust experiment
+
+- **Area:** Build
+- **Where:** `docs/helium-adblock-rust.md`, `scripts/prepare-helium.py`, `config/helium.inputs.lock`, `imputnet/helium` branch `adblock-rust` (`88f7dda1`)
+- **Problem:** bctl disables Helium's bundled uBlock Origin because its per-profile filter compile cost about 4 s of startup and 850 MiB of VM memory, so packaged Helium blocks no ads. Helium's experimental native integration of the `adblock` crate is based on Chromium 155; our pin is 156. 13 of its 15 patches apply to our tree; three hunks need mechanical refreshes, and nothing has been compiled. Its crate vendoring downloads during setup, which our offline `prepare` phase forbids.
+- **Recommendation:** Move the 41 crate downloads and `helium-filters` into `fetch` with lockfile checksums, refresh the three hunks, add the series behind `ENABLE_ADBLOCK` in `prepare-helium.py`, and prove it compiles incrementally on the existing `out/helium-wayland-release` before a full package build. Then measure in bctl: first-load blocking, startup and memory against uBlock's numbers.
+- **Fix with:** none
+- **Effort:** L
+

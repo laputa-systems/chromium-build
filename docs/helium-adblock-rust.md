@@ -1,0 +1,90 @@
+# Native adblock (adblock-rust) for Helium: audit
+
+The goal is content blocking in Helium without uBlock Origin's per-profile
+filter compile, which cost bctl's Nanos sessions about 4 s of `up`, 850 MiB of
+VMM memory and most of their idle CPU (`~/d/bctl/docs/performance.md`, Results
+on Nanos). bctl now starts Helium with uBlock disabled and blocks no ads.
+
+Helium has an experimental native integration of Brave's `adblock` crate. This
+note records what it contains and how far it is from our pin. Nothing here has
+been compiled yet.
+
+## The experiment
+
+- Branch `adblock-rust` of `imputnet/helium`, one commit `88f7dda1`
+  (2026-10-10), titled "helium/core: adblock-rust (EXPERIMENT, DO NOT USE OR
+  MERGE)". Its base is `aec023c7` (Chromium 155.0.8059.39); on 2026-11-10 it
+  was 84 commits behind Helium `main` (Chromium 157.0.8103.50).
+- Our pin, `helium_core` `2f81b9ca` in `config/helium.inputs.lock` (Chromium
+  156.0.8078.79), is 69 commits ahead of that base and 15 behind `main`.
+- It adds 15 patches under `patches/helium/core/adblock/` (about 9,000 lines),
+  `devutils/setup_adblock.py`, and a `helium_filters` entry in `deps.ini`
+  (bundled lists from `imputnet/helium-filters` release `202608241612`, pinned
+  by SHA-256, unpacked to `third_party/helium_filters`). The other 21 files it
+  touches are context refreshes of existing Helium patches.
+- It is opt-in: `ENABLE_ADBLOCK=1` makes `setup_adblock.py` set the GN arg
+  `enable_native_adblock = true`. uBlock Origin stays in `deps.ini` as a
+  separate component.
+
+## How it fits into Chromium
+
+| Patch group | What it does |
+| --- | --- |
+| `adblock-rust-engine`, `adblock-buildflags` | A second Rust third-party workspace, `//third_party/rust/helium`, with its own `Cargo.toml`/`Cargo.lock` under `components/helium_adblock/rs/crates`, built by a patched `gnrt` (crate path and rustc metadata prefixes, build-script name prefix) and `build/rust/cargo_crate.gni` |
+| `adblock-engine-bridge`, `adblock-core-api`, `adblock-engine-lifecycle`, `adblock-filter-sources`, `adblock-service*` | `components/helium_adblock`: the Rust bridge, engine lifecycle, filter sources and subscriptions, refresh |
+| `adblock-bundled-filters` | Ships the `helium_filters` lists as resources |
+| `adblock-chrome-runtime`, `adblock-chrome-network` | Per-profile service, and request blocking through a `URLLoaderFactory` proxy installed from `ChromeContentBrowserClient` (browser process, so headless sessions are covered) |
+| `adblock-blink-cosmetic-filtering` | Cosmetic (element hiding) filtering in the renderer |
+| `adblock-desktop-settings` | Settings UI on the privacy page |
+| `adblock-review-fixes` | Follow-up fixes across the above |
+
+The engine is `adblock` 0.13.2 with features `css-validation` and
+`full-regex-handling`. Its lockfile resolves 77 packages: 36 come from crates
+Chromium already vendors through `[patch.crates-io]` path overrides, and 41
+come from crates.io (`adblock`, `regex`, `selectors`, `cssparser`,
+`flatbuffers`, `serde`, `url`, `phf*` and others). `gnrt_config.toml` already
+declares the build-script outputs of `serde`, `serde_core` and `selectors`,
+and allows `unsafe` only where those crates need it.
+
+## Against our pin
+
+Applied in order to the 33 files they touch from the prepared Chromium 156
+tree in the `helium-0.20.3.1-headless-work-amd64` volume (read-only copy, no
+build):
+
+- 13 of the 15 patches apply cleanly, some with offsets or fuzz.
+- `adblock-blink-cosmetic-filtering`: 1 of 5 hunks fails in
+  `chrome/renderer/chrome_content_renderer_client.cc`, a removed trailing
+  blank line whose context moved.
+- `adblock-desktop-settings`: one hunk each fails in
+  `chrome/browser/resources/settings/BUILD.gn` and
+  `privacy_page/privacy_page.ts`, list insertions whose neighbouring lines
+  changed between 155 and 156.
+
+All three are mechanical. Whether the new code compiles against Chromium 156's
+interfaces (the URL loader proxy, profile keyed services, the renderer
+client) is not known until it is built.
+
+## What our build needs that Helium's does not
+
+- **Network only in `fetch`.** `setup_adblock.py` runs `gnrt vendor`, which
+  downloads crates. Here `fetch` must download the 41 crates (and
+  `helium-filters`) and pin them by the lockfile's checksums in
+  `config/helium.inputs.lock`, and `prepare` must vendor from those files
+  offline.
+- **`prepare-helium.py`** unpacks only `search_engines_data` and
+  `ublock_origin` from `deps.ini`; it must add `helium_filters`, apply the
+  adblock series, and run the workspace setup with `ENABLE_ADBLOCK=1`.
+- **musl and the pinned Rust 1.100 toolchain.** The crates are pure Rust
+  apart from build scripts; nothing in the list links C, but the build is
+  unproven on our musl target.
+- **Licences.** `adblock` is MPL-2.0; the patches are GPL-3.0 (Helium). Both
+  must enter the package's licence notices.
+
+## A first compile
+
+The work volume keeps the last official ThinLTO build in
+`out/helium-wayland-release` (9.4 GiB, built through ccache). Applying the
+series there and running Ninja would recompile only the changed and new
+files, but `chrome` is re-linked with ThinLTO, which is the expensive step.
+That is the cheapest proof that the forward-port compiles; it is not done.
