@@ -152,8 +152,11 @@ own dependencies. When the crate set changes, regenerate the patch with
 `cargo` (mounted over `third_party/rust-toolchain/bin/cargo`) and a gnrt
 binary built from that tree's `tools/crates/gnrt`.
 
-`enable_native_adblock` stays false in every profile, so the patched code is
-compiled out and packages are unchanged until a profile turns it on.
+`enable_native_adblock` stays false in every profile, so the blocker is
+compiled out. A few hunks are not behind the flag (a new
+`ISOLATED_WORLD_ID_HELIUM_ADBLOCK` value, a reserved grit range in
+`resource_ids.spec`, gnrt template variables), so the next package differs
+from the last one and goes through the usual qualification.
 
 Checked on 2026-11-10: `fetch` and `prepare` on a fresh work volume (50
 inputs, 4 minutes, offline), Gate C complete, and the prepared adblock tree
