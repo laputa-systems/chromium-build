@@ -38,6 +38,20 @@ been compiled yet.
 | `adblock-desktop-settings` | Settings UI on the privacy page |
 | `adblock-review-fixes` | Follow-up fixes across the above |
 
+C++ reaches the engine through a `cxx` bridge (`adblock-engine-bridge`). A
+WebSocket wrapper sits beside the URL loader proxy (`adblock-review-fixes`,
+`helium_adblock_websocket.cc`). WebTransport is not intercepted, there is no
+CNAME uncloaking (Helium's uBlock build has it), and the commit adds no tests.
+Blocking can be switched off per profile with the pref
+`helium.adblock.enabled`.
+
+Every request whose match is not cached waits for an asynchronous call to the
+engine's worker sequence before its loader starts
+(`HeliumAdBlockService::MatchRequest` posts `AdBlockEngineWorker::MatchRequest`
+and fills `match_cache_`; cosmetic resources use a second cache). The engine's
+own matching is fast; this hop is what to measure, end to end, against
+uBlock's in-process `webRequest` path.
+
 The engine is `adblock` 0.13.2 with features `css-validation` and
 `full-regex-handling`. Its lockfile resolves 77 packages: 36 come from crates
 Chromium already vendors through `[patch.crates-io]` path overrides, and 41
@@ -80,6 +94,32 @@ client) is not known until it is built.
   unproven on our musl target.
 - **Licences.** `adblock` is MPL-2.0; the patches are GPL-3.0 (Helium). Both
   must enter the package's licence notices.
+
+## Builds to compare
+
+uBlock and the native engine must not both be active, or neither measurement
+means anything. The experiment keeps uBlock in `deps.ini`, so the native build
+must also drop the `ublock_origin` component and the patches that load it.
+Three configurations then need only two packages:
+
+| Configuration | Package |
+| --- | --- |
+| uBlock | the current package |
+| native | a build with the adblock series and no uBlock |
+| no blocker | the native build with `helium.adblock.enabled` false |
+
+A build-time `ublock | native | none` selector would cost a full ThinLTO
+build per value and is not needed for the comparison. Measure, on the same
+Chromium revision, list snapshot, pages and host: cold start, first-load
+blocking, browser and renderer RSS, idle CPU, page-load p50 and p95, and the
+per-request delay of the proxy.
+
+Gaps to close before the native build replaces uBlock: tests (first-party
+context through nested frames and workers, redirects, scriptlets, dynamic
+element hiding), WebTransport, and CNAME uncloaking.
+`docs/helium-acceptance.md`'s `bundled-ublock` check needs a native
+counterpart that also proves uBlock is absent, with the pref-off build as the
+negative control.
 
 ## A first compile
 
