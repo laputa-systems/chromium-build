@@ -1,0 +1,774 @@
+diff -ruN a/chrome/browser/helium_adblock/helium_adblock_cosmetic_filter_host.cc b/chrome/browser/helium_adblock/helium_adblock_cosmetic_filter_host.cc
+--- a/chrome/browser/helium_adblock/helium_adblock_cosmetic_filter_host.cc
++++ b/chrome/browser/helium_adblock/helium_adblock_cosmetic_filter_host.cc
+@@ -18,21 +18,6 @@
+ namespace helium_adblock {
+ namespace {
+ 
+-constexpr size_t kMaximumSelectorValues = 4096;
+-constexpr size_t kMaximumSelectorLength = 1024;
+-
+-bool IsValidSelectorInput(const std::vector<std::string>& values) {
+-  if (values.size() > kMaximumSelectorValues) {
+-    return false;
+-  }
+-  for (const std::string& value : values) {
+-    if (value.size() > kMaximumSelectorLength) {
+-      return false;
+-    }
+-  }
+-  return true;
+-}
+-
+ HeliumAdBlockService* GetService(
+     content::RenderFrameHost& render_frame_host) {
+   Profile* profile =
+@@ -86,24 +71,18 @@
+           std::move(callback)));
+ }
+ 
+-void HeliumAdBlockCosmeticFilterHost::GetGenericSelectors(
+-    const std::vector<std::string>& classes,
+-    const std::vector<std::string>& ids,
+-    const std::vector<std::string>& exceptions,
+-    GetGenericSelectorsCallback callback) {
++void HeliumAdBlockCosmeticFilterHost::GetGenericHideSheet(
++    GetGenericHideSheetCallback callback) {
+   const GURL url = GetDocumentURL(render_frame_host());
+-  if (!service_ || !url.SchemeIsHTTPOrHTTPS() ||
+-      !IsValidSelectorInput(classes) || !IsValidSelectorInput(ids) ||
+-      !IsValidSelectorInput(exceptions)) {
+-    std::move(callback).Run({});
++  if (!service_ || !url.SchemeIsHTTPOrHTTPS()) {
++    std::move(callback).Run(std::string(), std::string());
+     return;
+   }
+-  service_->GetGenericSelectors(
+-      url, classes, ids, exceptions, off_the_record_,
++  service_->GetGenericHideSheet(
++      url, off_the_record_,
+       base::BindOnce(
+-          [](GetGenericSelectorsCallback callback,
+-             std::vector<std::string> selectors) {
+-            std::move(callback).Run(selectors);
++          [](GetGenericHideSheetCallback callback, GenericHideSheet sheet) {
++            std::move(callback).Run(std::move(sheet.id), std::move(sheet.css));
+           },
+           std::move(callback)));
+ }
+diff -ruN a/chrome/browser/helium_adblock/helium_adblock_cosmetic_filter_host.h b/chrome/browser/helium_adblock/helium_adblock_cosmetic_filter_host.h
+--- a/chrome/browser/helium_adblock/helium_adblock_cosmetic_filter_host.h
++++ b/chrome/browser/helium_adblock/helium_adblock_cosmetic_filter_host.h
+@@ -6,7 +6,6 @@
+ #define CHROME_BROWSER_HELIUM_ADBLOCK_HELIUM_ADBLOCK_COSMETIC_FILTER_HOST_H_
+ 
+ #include <string>
+-#include <vector>
+ 
+ #include "base/memory/raw_ptr.h"
+ #include "chrome/common/helium_adblock.mojom.h"
+@@ -36,10 +35,7 @@
+ 
+   // chrome::mojom::HeliumAdBlockCosmeticFilterHost:
+   void GetDocumentResources(GetDocumentResourcesCallback callback) override;
+-  void GetGenericSelectors(const std::vector<std::string>& classes,
+-                           const std::vector<std::string>& ids,
+-                           const std::vector<std::string>& exceptions,
+-                           GetGenericSelectorsCallback callback) override;
++  void GetGenericHideSheet(GetGenericHideSheetCallback callback) override;
+ 
+  private:
+   HeliumAdBlockCosmeticFilterHost(
+diff -ruN a/chrome/common/helium_adblock.mojom b/chrome/common/helium_adblock.mojom
+--- a/chrome/common/helium_adblock.mojom
++++ b/chrome/common/helium_adblock.mojom
+@@ -8,8 +8,8 @@
+ interface HeliumAdBlockCosmeticFilterHost {
+   GetDocumentResources() => (string resources);
+ 
+-  GetGenericSelectors(array<string> classes,
+-                      array<string> ids,
+-                      array<string> exceptions) =>
+-      (array<string> selectors);
++  // The engine's generic class and id hide rules as one stylesheet. A document's
++  // resources name the sheet they expect in `generic_hide_sheet`, so a renderer
++  // asks only when its copy has a different `id`.
++  GetGenericHideSheet() => (string id, string css);
+ };
+diff -ruN a/chrome/renderer/helium_adblock_agent.cc b/chrome/renderer/helium_adblock_agent.cc
+--- a/chrome/renderer/helium_adblock_agent.cc
++++ b/chrome/renderer/helium_adblock_agent.cc
+@@ -8,18 +8,19 @@
+ 
+ #include "base/functional/bind.h"
+ #include "base/json/json_reader.h"
++#include "base/no_destructor.h"
+ #include "chrome/common/chrome_isolated_world_ids.h"
+ #include "chrome/grit/renderer_resources.h"
+ #include "content/public/renderer/render_frame.h"
+ #include "content/public/renderer/v8_value_converter.h"
+ #include "gin/converter.h"
+-#include "gin/function_template.h"
+ #include "gin/try_catch.h"
+ #include "third_party/blink/public/platform/browser_interface_broker_proxy.h"
+ #include "third_party/blink/public/platform/scheduler/web_agent_group_scheduler.h"
+ #include "third_party/blink/public/platform/web_isolated_world_info.h"
+ #include "third_party/blink/public/platform/web_security_origin.h"
+ #include "third_party/blink/public/platform/web_string.h"
++#include "third_party/blink/public/web/web_css_origin.h"
+ #include "third_party/blink/public/web/web_document.h"
+ #include "third_party/blink/public/web/web_local_frame.h"
+ #include "third_party/blink/public/web/web_script_source.h"
+@@ -31,6 +32,37 @@
+ namespace {
+ 
+ constexpr size_t kMaximumInjectedScriptSize = 1024 * 1024;
++constexpr std::string_view kHideDeclaration = "{display:none!important}\n";
++
++struct GenericHideSheet {
++  std::string id;
++  blink::WebString css;
++};
++
++GenericHideSheet& RendererGenericHideSheet() {
++  static base::NoDestructor<GenericHideSheet> sheet;
++  return *sheet;
++}
++
++void InsertUserStyleSheet(blink::WebLocalFrame& frame,
++                          const blink::WebString& css) {
++  if (!css.IsEmpty()) {
++    frame.GetDocument().InsertStyleSheet(css, nullptr,
++                                         blink::WebCssOrigin::kUser);
++  }
++}
++
++std::string HideSelectorsCss(const base::ListValue& selectors) {
++  std::string css;
++  for (const base::Value& selector : selectors) {
++    if (const std::string* text = selector.GetIfString();
++        text && !text->empty()) {
++      css += *text;
++      css += kHideDeclaration;
++    }
++  }
++  return css;
++}
+ 
+ void EnsureIsolatedWorldInitialized() {
+   static bool initialized = false;
+@@ -69,42 +101,6 @@
+                      weak_ptr_factory_.GetWeakPtr()));
+ }
+ 
+-void HeliumAdBlockAgent::DidCreateScriptContext(
+-    v8::Local<v8::Context> context,
+-    int world_id) {
+-  if (world_id != ISOLATED_WORLD_ID_HELIUM_ADBLOCK) {
+-    return;
+-  }
+-  v8::Isolate* isolate =
+-      render_frame()->GetWebFrame()->GetAgentGroupScheduler()->Isolate();
+-  v8::HandleScope handle_scope(isolate);
+-  gin::TryCatch try_catch(isolate);
+-  try_catch.SetVerbose(true);
+-  v8::Context::Scope context_scope(context);
+-  v8::Local<v8::Object> native = v8::Object::New(isolate);
+-  v8::Local<v8::Function> get_generic_selectors;
+-  if (!gin::CreateFunctionTemplate(
+-           isolate,
+-           base::BindRepeating(
+-               &HeliumAdBlockAgent::RequestGenericSelectors,
+-               weak_ptr_factory_.GetWeakPtr()))
+-           ->GetFunction(context)
+-           .ToLocal(&get_generic_selectors)) {
+-    return;
+-  }
+-  if (!native
+-           ->CreateDataProperty(
+-               context, gin::StringToSymbol(isolate, "getGenericSelectors"),
+-               get_generic_selectors)
+-           .FromMaybe(false)) {
+-    return;
+-  }
+-  context->Global()
+-      ->CreateDataProperty(
+-          context, gin::StringToSymbol(isolate, "heliumAdBlockNative"), native)
+-      .Check();
+-}
+-
+ void HeliumAdBlockAgent::OnDestruct() {
+   delete this;
+ }
+@@ -120,16 +116,6 @@
+                      weak_ptr_factory_.GetWeakPtr()));
+ }
+ 
+-void HeliumAdBlockAgent::RequestGenericSelectors(
+-    std::vector<std::string> classes,
+-    std::vector<std::string> ids,
+-    std::vector<std::string> exceptions) {
+-  GetHost()->GetGenericSelectors(
+-      std::move(classes), std::move(ids), std::move(exceptions),
+-      base::BindOnce(&HeliumAdBlockAgent::OnGenericSelectors,
+-                     weak_ptr_factory_.GetWeakPtr()));
+-}
+-
+ chrome::mojom::HeliumAdBlockCosmeticFilterHost*
+ HeliumAdBlockAgent::GetHost() {
+   if (!host_.is_bound()) {
+@@ -166,6 +152,26 @@
+     InjectPageScript(*injected_script);
+   }
+ 
++  if (const base::ListValue* selectors = data->FindList("hide_selectors")) {
++    InsertUserStyleSheet(*frame,
++                         blink::WebString::FromUtf8(HideSelectorsCss(*selectors)));
++  }
++  if (const std::string* css = data->FindString("generic_hide_css")) {
++    InsertUserStyleSheet(*frame, blink::WebString::FromUtf8(*css));
++  } else if (const std::string* id = data->FindString("generic_hide_sheet")) {
++    if (*id == RendererGenericHideSheet().id) {
++      InsertUserStyleSheet(*frame, RendererGenericHideSheet().css);
++    } else {
++      GetHost()->GetGenericHideSheet(
++          base::BindOnce(&HeliumAdBlockAgent::OnGenericHideSheet,
++                         weak_ptr_factory_.GetWeakPtr()));
++    }
++  }
++
++  base::ListValue* procedural = data->FindList("procedural_actions");
++  if (!procedural || procedural->empty()) {
++    return;
++  }
+   EnsureIsolatedWorldInitialized();
+   std::string runtime_script =
+       ui::ResourceBundle::GetSharedInstance().LoadDataResourceString(
+@@ -177,16 +183,19 @@
+       ISOLATED_WORLD_ID_HELIUM_ADBLOCK,
+       blink::WebScriptSource(blink::WebString::FromUtf8(runtime_script)),
+       blink::BackForwardCacheAware::kAllow);
+-  CallRuntime("onCosmetic", std::move(*parsed));
++  CallRuntime("onProcedural", base::Value(std::move(*procedural)));
+ }
+ 
+-void HeliumAdBlockAgent::OnGenericSelectors(
+-    const std::vector<std::string>& selectors) {
+-  base::ListValue values;
+-  for (const std::string& selector : selectors) {
+-    values.Append(selector);
++void HeliumAdBlockAgent::OnGenericHideSheet(const std::string& id,
++                                            const std::string& css) {
++  GenericHideSheet& sheet = RendererGenericHideSheet();
++  if (id != sheet.id) {
++    sheet.id = id;
++    sheet.css = blink::WebString::FromUtf8(css);
++  }
++  if (blink::WebLocalFrame* frame = render_frame()->GetWebFrame()) {
++    InsertUserStyleSheet(*frame, sheet.css);
+   }
+-  CallRuntime("onGeneric", base::Value(std::move(values)));
+ }
+ 
+ void HeliumAdBlockAgent::CallRuntime(std::string_view method,
+diff -ruN a/chrome/renderer/helium_adblock_agent.h b/chrome/renderer/helium_adblock_agent.h
+--- a/chrome/renderer/helium_adblock_agent.h
++++ b/chrome/renderer/helium_adblock_agent.h
+@@ -9,7 +9,6 @@
+ #include <optional>
+ #include <string>
+ #include <string_view>
+-#include <vector>
+ 
+ #include "base/memory/weak_ptr.h"
+ #include "base/one_shot_event.h"
+@@ -41,16 +40,11 @@
+ 
+   // content::RenderFrameObserver:
+   void DidCommitProvisionalLoad(ui::PageTransition transition) override;
+-  void DidCreateScriptContext(v8::Local<v8::Context> context,
+-                              int world_id) override;
+   void OnDestruct() override;
+ 
+   chrome::mojom::HeliumAdBlockCosmeticFilterHost* GetHost();
+-  void RequestGenericSelectors(std::vector<std::string> classes,
+-                               std::vector<std::string> ids,
+-                               std::vector<std::string> exceptions);
+   void OnDocumentResources(const std::string& resources);
+-  void OnGenericSelectors(const std::vector<std::string>& selectors);
++  void OnGenericHideSheet(const std::string& id, const std::string& css);
+   void ApplyRules();
+   void CallRuntime(std::string_view method, base::Value argument);
+   void InjectPageScript(std::string script);
+diff -ruN a/chrome/renderer/resources/helium_adblock/cosmetic_filter.js b/chrome/renderer/resources/helium_adblock/cosmetic_filter.js
+--- a/chrome/renderer/resources/helium_adblock/cosmetic_filter.js
++++ b/chrome/renderer/resources/helium_adblock/cosmetic_filter.js
+@@ -5,26 +5,14 @@
+ (() => {
+   'use strict';
+ 
+-  const native = globalThis.heliumAdBlockNative;
+-  if (globalThis.__heliumAdBlockRuntime ||
+-      typeof native?.getGenericSelectors !== 'function') {
++  if (globalThis.__heliumAdBlockRuntime) {
+     return;
+   }
+ 
+-  const MAX_TRACKED_VALUES = 4096;
+-  const MAX_VALUE_LENGTH = 1024;
+-  const MAX_COLLECTED_ELEMENTS = 5000;
+   const MAX_PROCEDURAL_RULES = 500;
+   const MAX_PROCEDURAL_ELEMENTS = 2000;
+-  let exceptions = [];
+-  let generichide = false;
+-  let genericTimer = 0;
+   let proceduralTimer = 0;
+   let proceduralRules = [];
+-  const knownClasses = new Set();
+-  const knownIds = new Set();
+-  const pendingClasses = [];
+-  const pendingIds = [];
+   const cosmeticStyleSheet = new CSSStyleSheet();
+ 
+   function addStyle(selectors, declarations) {
+@@ -300,47 +288,6 @@
+     }, 100);
+   }
+ 
+-  function queueValue(known, pending, value) {
+-    if (!value || value.length > MAX_VALUE_LENGTH || known.has(value) ||
+-        known.size >= MAX_TRACKED_VALUES) {
+-      return;
+-    }
+-    known.add(value);
+-    pending.push(value);
+-  }
+-
+-  function collect(root) {
+-    let count = 0;
+-    const collectElement = element => {
+-      queueValue(knownIds, pendingIds, element.id);
+-      for (const className of element.classList) {
+-        queueValue(knownClasses, pendingClasses, className);
+-      }
+-    };
+-    if (root instanceof Element) {
+-      collectElement(root);
+-      ++count;
+-    }
+-    for (const element of root.querySelectorAll('[id],[class]')) {
+-      collectElement(element);
+-      if (++count >= MAX_COLLECTED_ELEMENTS) {
+-        break;
+-      }
+-    }
+-  }
+-
+-  function scheduleGeneric() {
+-    if (generichide || genericTimer ||
+-        (!pendingClasses.length && !pendingIds.length)) {
+-      return;
+-    }
+-    genericTimer = window.setTimeout(() => {
+-      genericTimer = 0;
+-      native.getGenericSelectors(
+-          pendingClasses.splice(0), pendingIds.splice(0), exceptions);
+-    }, 100);
+-  }
+-
+   function parseProceduralRules(encodedRules) {
+     const rules = [];
+     for (const encoded of Array.from(encodedRules || [])
+@@ -367,61 +314,23 @@
+   }
+ 
+   function observeDocument() {
+-    if (generichide && !proceduralRules.length) {
+-      return;
+-    }
+-    new MutationObserver(records => {
+-      for (const record of records.slice(0, 200)) {
+-        if (!generichide && record.type === 'attributes' &&
+-            record.target instanceof Element) {
+-          collect(record.target);
+-        }
+-        if (record.type === 'childList') {
+-          for (const node of Array.from(record.addedNodes).slice(0, 200)) {
+-            if (node instanceof Element && !generichide) {
+-              collect(node);
+-            }
+-          }
+-        }
+-      }
+-      scheduleGeneric();
+-      scheduleProcedural();
+-    }).observe(document, {
+-      attributes: !generichide,
+-      attributeFilter: !generichide ? ['class', 'id'] : undefined,
++    new MutationObserver(scheduleProcedural).observe(document, {
+       childList: true,
+       subtree: true,
+     });
+   }
+ 
+   const runtime = {
+-    onCosmetic(resources) {
++    onProcedural(encodedRules) {
+       try {
+-        exceptions = Array.isArray(resources.exceptions) ?
+-            resources.exceptions.filter(
+-                value => typeof value === 'string' &&
+-                    value.length <= MAX_VALUE_LENGTH)
+-                .slice(0, MAX_TRACKED_VALUES) :
+-            [];
+-        generichide = !!resources.generichide;
+-        addStyle(
+-            Array.from(resources.hide_selectors || []),
+-            'display:none!important');
+-        proceduralRules =
+-            parseProceduralRules(resources.procedural_actions || []);
++        proceduralRules = parseProceduralRules(encodedRules);
+         applyProcedural();
+-        if (!generichide) {
+-          collect(document);
+-          scheduleGeneric();
++        if (proceduralRules.length) {
++          observeDocument();
+         }
+-        observeDocument();
+       } catch {
+       }
+     },
+-
+-    onGeneric(selectors) {
+-      addStyle(selectors, 'display:none!important');
+-    },
+   };
+ 
+   Object.defineProperty(globalThis, '__heliumAdBlockRuntime', {
+diff -ruN a/components/helium_adblock/core/adblock_engine_worker.cc b/components/helium_adblock/core/adblock_engine_worker.cc
+--- a/components/helium_adblock/core/adblock_engine_worker.cc
++++ b/components/helium_adblock/core/adblock_engine_worker.cc
+@@ -278,26 +278,12 @@
+   return static_cast<std::string>(result.value);
+ }
+ 
+-std::vector<std::string> AdBlockEngineWorker::GenericSelectors(
+-    std::vector<std::string> classes,
+-    std::vector<std::string> ids,
+-    std::vector<std::string> exceptions) const {
++GenericHideSheet AdBlockEngineWorker::CurrentGenericHideSheet() const {
+   if (!engine_) {
+     return {};
+   }
+-  StringListResult result =
+-      (*engine_)->generic_selectors(classes, ids, exceptions);
+-  if (!result.success) {
+-    DLOG(ERROR) << "helium-adblock: generic selector query failed: "
+-                << static_cast<std::string>(result.error);
+-    return {};
+-  }
+-  std::vector<std::string> selectors;
+-  selectors.reserve(result.value.size());
+-  for (const rust::String& selector : result.value) {
+-    selectors.push_back(static_cast<std::string>(selector));
+-  }
+-  return selectors;
++  return {static_cast<std::string>((*engine_)->generic_hide_sheet_id()),
++          static_cast<std::string>((*engine_)->generic_hide_css())};
+ }
+ 
+ }  // namespace helium_adblock
+diff -ruN a/components/helium_adblock/core/adblock_engine_worker.h b/components/helium_adblock/core/adblock_engine_worker.h
+--- a/components/helium_adblock/core/adblock_engine_worker.h
++++ b/components/helium_adblock/core/adblock_engine_worker.h
+@@ -62,10 +62,7 @@
+                                   std::string request_type,
+                                   std::string method) const;
+   std::string DocumentCosmeticResources(GURL url) const;
+-  std::vector<std::string> GenericSelectors(
+-      std::vector<std::string> classes,
+-      std::vector<std::string> ids,
+-      std::vector<std::string> exceptions) const;
++  GenericHideSheet CurrentGenericHideSheet() const;
+ 
+  private:
+   DownloadApplyResult ApplyDownload(
+diff -ruN a/components/helium_adblock/core/adblock_types.h b/components/helium_adblock/core/adblock_types.h
+--- a/components/helium_adblock/core/adblock_types.h
++++ b/components/helium_adblock/core/adblock_types.h
+@@ -52,6 +52,13 @@
+   std::string failure_category;
+ };
+ 
++// The engine's generic class and id hide rules as one user stylesheet. `id`
++// changes whenever `css` does, so a renderer can keep one copy per process.
++struct GenericHideSheet {
++  std::string id;
++  std::string css;
++};
++
+ struct NetworkMatchResult {
+   bool blocked = false;
+   std::string redirect;
+diff -ruN a/components/helium_adblock/core/helium_adblock_service.h b/components/helium_adblock/core/helium_adblock_service.h
+--- a/components/helium_adblock/core/helium_adblock_service.h
++++ b/components/helium_adblock/core/helium_adblock_service.h
+@@ -82,7 +82,7 @@
+ 
+   using MatchCallback = base::OnceCallback<void(NetworkMatchResult)>;
+   using StringCallback = base::OnceCallback<void(std::string)>;
+-  using StringListCallback = base::OnceCallback<void(std::vector<std::string>)>;
++  using GenericHideSheetCallback = base::OnceCallback<void(GenericHideSheet)>;
+   void MatchRequest(const GURL& url,
+                     const GURL& document_url,
+                     std::string request_type,
+@@ -92,12 +92,9 @@
+   void GetDocumentCosmeticResources(const GURL& url,
+                                     bool off_the_record,
+                                     StringCallback callback);
+-  void GetGenericSelectors(const GURL& url,
+-                           std::vector<std::string> classes,
+-                           std::vector<std::string> ids,
+-                           std::vector<std::string> exceptions,
++  void GetGenericHideSheet(const GURL& url,
+                            bool off_the_record,
+-                           StringListCallback callback);
++                           GenericHideSheetCallback callback);
+ 
+   // Called by the embedder when the incognito session ends; drops
+   // session-scoped site exceptions.
+diff -ruN a/components/helium_adblock/core/helium_adblock_service_filtering.cc b/components/helium_adblock/core/helium_adblock_service_filtering.cc
+--- a/components/helium_adblock/core/helium_adblock_service_filtering.cc
++++ b/components/helium_adblock/core/helium_adblock_service_filtering.cc
+@@ -120,19 +120,15 @@
+           weak_ptr_factory_.GetWeakPtr(), url.spec(), std::move(callback)));
+ }
+ 
+-void HeliumAdBlockService::GetGenericSelectors(
++void HeliumAdBlockService::GetGenericHideSheet(
+     const GURL& url,
+-    std::vector<std::string> classes,
+-    std::vector<std::string> ids,
+-    std::vector<std::string> exceptions,
+     bool off_the_record,
+-    StringListCallback callback) {
++    GenericHideSheetCallback callback) {
+   if (!IsEnabledForURL(url, off_the_record)) {
+     std::move(callback).Run({});
+     return;
+   }
+-  worker_.AsyncCall(&AdBlockEngineWorker::GenericSelectors)
+-      .WithArgs(std::move(classes), std::move(ids), std::move(exceptions))
++  worker_.AsyncCall(&AdBlockEngineWorker::CurrentGenericHideSheet)
+       .Then(std::move(callback));
+ }
+ 
+diff -ruN a/components/helium_adblock/rs/src/lib.rs b/components/helium_adblock/rs/src/lib.rs
+--- a/components/helium_adblock/rs/src/lib.rs
++++ b/components/helium_adblock/rs/src/lib.rs
+@@ -4,6 +4,7 @@
+ 
+ use std::collections::HashSet;
+ use std::fmt::Display;
++use std::hash::{DefaultHasher, Hash, Hasher};
+ use std::sync::OnceLock;
+ 
+ use adblock::lists::{
+@@ -13,7 +14,7 @@
+ use adblock::resources::{PermissionMask, Resource};
+ use adblock::url_parser::ResolvesDomain;
+ use adblock::Engine as InnerEngine;
+-use cxx::{let_cxx_string, CxxString, CxxVector};
++use cxx::let_cxx_string;
+ 
+ pub struct FilterSet {
+     inner: InnerFilterSet,
+@@ -21,6 +22,55 @@
+ 
+ pub struct Engine {
+     inner: InnerEngine,
++    generic_hide: GenericHideSheet,
++}
++
++#[derive(Default)]
++struct GenericHideSheet {
++    id: String,
++    css: String,
++    selectors: HashSet<String>,
++}
++
++const HIDE_DECLARATION: &str = "{display:none!important}\n";
++
++fn hide_css<'a>(selectors: impl IntoIterator<Item = &'a str>) -> String {
++    let mut css = String::new();
++    for selector in selectors {
++        css.push_str(selector);
++        css.push_str(HIDE_DECLARATION);
++    }
++    css
++}
++
++impl GenericHideSheet {
++    fn of(engine: &InnerEngine) -> Self {
++        let mut ordered = engine.generic_class_id_selectors();
++        ordered.sort_unstable();
++        ordered.dedup();
++        let css = hide_css(ordered.iter().map(String::as_str));
++        let mut hasher = DefaultHasher::new();
++        css.hash(&mut hasher);
++        Self {
++            id: format!("{:016x}", hasher.finish()),
++            css,
++            selectors: ordered.into_iter().collect(),
++        }
++    }
++
++    fn without(&self, exceptions: &HashSet<String>) -> Option<String> {
++        if exceptions.iter().all(|exception| !self.selectors.contains(exception)) {
++            return None;
++        }
++        let mut kept: Vec<&str> = self
++            .selectors
++            .iter()
++            .filter(|selector| !exceptions.contains(*selector))
++            .map(String::as_str)
++            .collect();
++        kept.sort_unstable();
++        Some(hide_css(kept))
++    }
+ }
+ 
+ #[allow(unsafe_op_in_unsafe_fn)]
+@@ -52,12 +102,8 @@
+             method: &str,
+         ) -> MatchResult;
+         fn document_cosmetic_resources(self: &Engine, url: &str) -> StringResult;
+-        fn generic_selectors(
+-            self: &Engine,
+-            classes: &CxxVector<CxxString>,
+-            ids: &CxxVector<CxxString>,
+-            exceptions: &CxxVector<CxxString>,
+-        ) -> StringListResult;
++        fn generic_hide_sheet_id(self: &Engine) -> &str;
++        fn generic_hide_css(self: &Engine) -> &str;
+         fn load_resources_json(
+             self: &mut Engine,
+             resources_json: &str,
+@@ -98,12 +144,6 @@
+         error: String,
+     }
+ 
+-    struct StringListResult {
+-        success: bool,
+-        value: Vec<String>,
+-        error: String,
+-    }
+-
+     struct MatchResult {
+         blocked: bool,
+         has_redirect: bool,
+@@ -173,14 +213,15 @@
+ }
+ 
+ pub fn engine_from_filter_set(filter_set: Box<FilterSet>) -> Box<Engine> {
+-    Box::new(Engine {
+-        inner: InnerEngine::new_with_filter_set(filter_set.inner),
+-    })
++    let inner = InnerEngine::new_with_filter_set(filter_set.inner);
++    let generic_hide = GenericHideSheet::of(&inner);
++    Box::new(Engine { inner, generic_hide })
+ }
+ 
+ pub fn new_engine() -> Box<Engine> {
+     Box::new(Engine {
+         inner: InnerEngine::default(),
++        generic_hide: GenericHideSheet::default(),
+     })
+ }
+ 
+@@ -191,7 +232,10 @@
+ 
+     pub fn deserialize(&mut self, serialized: &[u8]) -> ffi::OperationResult {
+         match self.inner.deserialize(serialized) {
+-            Ok(()) => operation_success(),
++            Ok(()) => {
++                self.generic_hide = GenericHideSheet::of(&self.inner);
++                operation_success()
++            }
+             Err(error) => operation_error(error),
+         }
+     }
+@@ -230,7 +274,23 @@
+     }
+ 
+     pub fn document_cosmetic_resources(&self, url: &str) -> ffi::StringResult {
+-        match serde_json::to_string(&self.inner.url_cosmetic_resources(url)) {
++        let resources = self.inner.url_cosmetic_resources(url);
++        let generic_hide = (!resources.generichide).then(|| {
++            (
++                self.generic_hide.id.clone(),
++                self.generic_hide.without(&resources.exceptions),
++            )
++        });
++        let serialized = serde_json::to_value(&resources).and_then(|mut value| {
++            if let (Some((id, filtered)), Some(object)) = (generic_hide, value.as_object_mut()) {
++                object.insert("generic_hide_sheet".into(), id.into());
++                if let Some(css) = filtered {
++                    object.insert("generic_hide_css".into(), css.into());
++                }
++            }
++            serde_json::to_string(&value)
++        });
++        match serialized {
+             Ok(value) => ffi::StringResult {
+                 success: true,
+                 value,
+@@ -244,41 +304,12 @@
+         }
+     }
+ 
+-    pub fn generic_selectors(
+-        &self,
+-        classes: &CxxVector<CxxString>,
+-        ids: &CxxVector<CxxString>,
+-        exceptions: &CxxVector<CxxString>,
+-    ) -> ffi::StringListResult {
+-        let parse =
+-            |values: &CxxVector<CxxString>| -> Result<Vec<String>, std::str::Utf8Error> {
+-                values
+-                    .iter()
+-                    .map(|value| value.to_str().map(str::to_owned))
+-                    .collect()
+-            };
+-        let result = (|| {
+-            let classes = parse(classes)?;
+-            let ids = parse(ids)?;
+-            let exceptions: HashSet<String> =
+-                parse(exceptions)?.into_iter().collect();
+-            Ok::<_, std::str::Utf8Error>(
+-                self.inner
+-                    .hidden_class_id_selectors(&classes, &ids, &exceptions),
+-            )
+-        })();
+-        match result {
+-            Ok(value) => ffi::StringListResult {
+-                success: true,
+-                value,
+-                error: String::new(),
+-            },
+-            Err(error) => ffi::StringListResult {
+-                success: false,
+-                value: Vec::new(),
+-                error: error.to_string(),
+-            },
+-        }
++    pub fn generic_hide_sheet_id(&self) -> &str {
++        &self.generic_hide.id
++    }
++
++    pub fn generic_hide_css(&self) -> &str {
++        &self.generic_hide.css
+     }
+ 
+     pub fn load_resources_json(&mut self, resources_json: &str) -> ffi::OperationResult {

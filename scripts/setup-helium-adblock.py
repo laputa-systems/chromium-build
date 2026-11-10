@@ -2,7 +2,8 @@
 """Vendor Helium's native adblock crates and filter lists from locked inputs, or regenerate their GN files.
 
 `vendor` runs in prepare without network: it checks every crate against the workspace Cargo.lock, extracts
-it where gnrt's generated BUILD.gn files expect it, and unpacks the bundled filter lists. `generate` is a
+it where gnrt's generated BUILD.gn files expect it, applies our `<name>-<version>.patch` for that crate if
+there is one, and unpacks the bundled filter lists. `generate` is a
 developer step for a changed crate set: it needs a working cargo and a gnrt binary, and its output is
 committed as config/patches/helium/adblock-rust-gn.patch.
 """
@@ -59,13 +60,24 @@ def safe_members(archive: tarfile.TarFile, top: str | None) -> list[tarfile.TarI
     return members
 
 
-def vendor_crates(source: Path, inputs: Path) -> list[dict[str, str]]:
+def apply_crate_patch(patch: Path, destination: Path) -> None:
+    result = subprocess.run(["patch", "--batch", "--forward", "--fuzz=0", "-p1", "-d", str(destination), "-i", str(patch)],
+                            capture_output=True, text=True)
+    if result.returncode != 0:
+        raise SystemExit(f"{patch.name} does not apply to {destination.name}:\n{result.stdout}{result.stderr}")
+
+
+def vendor_crates(source: Path, inputs: Path, crate_patches: Path) -> list[dict[str, str]]:
     lock_text = (source / WORKSPACE_SOURCE / "Cargo.lock").read_text(encoding="utf-8")
     config = tomllib.loads((source / WORKSPACE_SOURCE / "gnrt_config.toml").read_text(encoding="utf-8"))
     vendor = source / WORKSPACE / "vendor"
     vendor.mkdir(parents=True, exist_ok=True)
+    packages = registry_packages(lock_text)
+    patches = {patch.stem: patch for patch in sorted(crate_patches.glob("*.patch"))}
+    if stale := sorted(set(patches) - {f"{p['name']}-{p['version']}" for p in packages}):
+        raise SystemExit(f"crate patches {stale} match no crate in Cargo.lock")
     records = []
-    for package in registry_packages(lock_text):
+    for package in packages:
         name, version = package["name"], package["version"]
         crate = inputs / f"{name}-{version}.crate"
         if not crate.is_file():
@@ -86,8 +98,12 @@ def vendor_crates(source: Path, inputs: Path) -> list[dict[str, str]]:
                 shutil.rmtree(target)
             elif target.exists():
                 target.unlink()
+        record = {"name": name, "version": version, "sha256": digest, "path": str(destination.relative_to(source))}
+        if patch := patches.get(top):
+            apply_crate_patch(patch, destination)
+            record["patch"] = patch.name
         (destination / ".cargo-checksum.json").write_text('{"files":{}}', encoding="utf-8")
-        records.append({"name": name, "version": version, "sha256": digest, "path": str(destination.relative_to(source))})
+        records.append(record)
     return records
 
 
@@ -104,10 +120,10 @@ def unpack_filters(source: Path, filters: Path, expected_sha256: str) -> str:
     return digest
 
 
-def vendor(source: Path, inputs: Path, filters: str, filters_sha256: str) -> dict:
+def vendor(source: Path, inputs: Path, filters: str, filters_sha256: str, crate_patches: Path) -> dict:
     return {
         "filters": {"path": FILTERS, "archive": filters, "sha256": unpack_filters(source, inputs / filters, filters_sha256)},
-        "crates": vendor_crates(source, inputs),
+        "crates": vendor_crates(source, inputs, crate_patches),
         "network": "none",
     }
 
@@ -201,13 +217,14 @@ def main() -> None:
         command.add_argument("--inputs", type=Path, required=True)
         command.add_argument("--filters", required=True)
         command.add_argument("--filters-sha256", required=True)
+        command.add_argument("--crate-patches", type=Path, required=True)
         command.add_argument("--record", type=Path, required=True)
         if name == "generate":
             command.add_argument("--gnrt", type=Path, required=True)
     args = parser.parse_args()
 
     source = args.source.resolve()
-    record = vendor(source, args.inputs, args.filters, args.filters_sha256)
+    record = vendor(source, args.inputs, args.filters, args.filters_sha256, args.crate_patches)
     if args.command == "generate":
         record["engine"] = f"adblock-{generate(source, args.gnrt)}"
     args.record.parent.mkdir(parents=True, exist_ok=True)

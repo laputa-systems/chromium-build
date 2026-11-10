@@ -1,0 +1,51 @@
+diff -ruN a/src/cosmetic_filter_cache.rs b/src/cosmetic_filter_cache.rs
+--- a/src/cosmetic_filter_cache.rs
++++ b/src/cosmetic_filter_cache.rs
+@@ -222,6 +222,31 @@
+         selectors
+     }
+ 
++    /// Returns every generic class and id hide selector, so an embedder can apply them all as one
++    /// stylesheet instead of reporting the classes and ids each page uses. Hostname exceptions are
++    /// not applied; they are in each page's `UrlSpecificResources`.
++    pub fn generic_class_id_selectors(&self) -> Vec<String> {
++        let cosmetic_filters = self.filter_data_context.memory.root().cosmetic_filters();
++        let classes = cosmetic_filters
++            .simple_class_rules()
++            .iter()
++            .filter(|class| !class.is_empty())
++            .map(|class| format!(".{class}"));
++        let ids = cosmetic_filters
++            .simple_id_rules()
++            .iter()
++            .filter(|id| !id.is_empty())
++            .map(|id| format!("#{id}"));
++        let complex = cosmetic_filters
++            .complex_class_rules_values()
++            .iter()
++            .chain(cosmetic_filters.complex_id_rules_values().iter())
++            .flat_map(|values| values.data().iter())
++            .filter(|selector| !selector.is_empty())
++            .map(str::to_owned);
++        classes.chain(ids).chain(complex).collect()
++    }
++
+     /// Any rules that can't be handled by `hidden_class_id_selectors` are returned by
+     /// `hostname_cosmetic_resources`. As soon as a page navigation is committed, this method
+     /// should be queried to get the initial set of cosmetic filtering operations to apply to the
+diff -ruN a/src/engine.rs b/src/engine.rs
+--- a/src/engine.rs
++++ b/src/engine.rs
+@@ -374,6 +374,12 @@
+             .hidden_class_id_selectors(classes, ids, exceptions)
+     }
+ 
++    /// Returns every generic class and id hide selector; see
++    /// `CosmeticFilterCache::generic_class_id_selectors`.
++    pub fn generic_class_id_selectors(&self) -> Vec<String> {
++        self.cosmetic_cache.generic_class_id_selectors()
++    }
++
+     /// Returns a set of cosmetic filter resources required for a particular url. Once this has
+     /// been called, all CSS ids and classes on a page should be passed to
+     /// `hidden_class_id_selectors` to obtain any stylesheets consisting of generic rules (if the

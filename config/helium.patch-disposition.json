@@ -255,6 +255,7 @@
     "adblock-chrome-runtime.patch",
     "adblock-chrome-network.patch",
     "adblock-blink-cosmetic-filtering.patch",
-    "adblock-review-fixes.patch"
+    "adblock-review-fixes.patch",
+    "adblock-native-cosmetic-css.patch"
   ]
 }

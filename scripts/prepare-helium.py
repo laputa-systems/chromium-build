@@ -385,6 +385,8 @@ def main() -> None:
         filters["filename"],
         "--filters-sha256",
         filters["sha256"],
+        "--crate-patches",
+        str(args.patches / "helium/adblock-crates"),
         "--record",
         str(args.metadata / "helium-adblock.json"),
     ])
