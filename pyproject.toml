@@ -3,7 +3,7 @@ name = "chromium-build"
 version = "0.1.0"
 description = "Chromium build orchestration"
 requires-python = ">=3.15"
-dependencies = []
+dependencies = ["laputa-buildlib==0.1.0"]
 
 [tool.uv]
 environments = ["sys_platform == 'darwin'", "sys_platform == 'linux'"]

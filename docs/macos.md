@@ -77,6 +77,10 @@ writes `SHA256SUMS`, and publishes a pre-release tagged `release-<commit>`.
 `macos-26-smoke.yml` runs the same build and keeps the zip as a seven-day
 workflow artifact without publishing.
 
+`release_assets.py` and `sources_lock.py` import `laputa-buildlib` (pinned in `pyproject.toml`
+and `uv.lock`), so they run under `uv run`; the release job installs uv for that step. The
+archive is created by `buildlib.release.create_archive` with every mtime 0 and root ownership.
+
 `sources.lock.json` pins every download with a SHA-256. After `update-lock` or
 any edit of an input lock, run `python3 scripts/sources_lock.py write --fetch`
 and commit the result. The Rust nightly that `rustup` installs and the
