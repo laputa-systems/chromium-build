@@ -53,6 +53,11 @@ class WorkflowTests(unittest.TestCase):
         self.assertNotRegex(job_block(text, "build"), r"contents:\s*write")
         self.assertRegex(job_block(text, "release"), r"contents:\s*write")
 
+    def test_release_assets_run_in_the_locked_environment(self):
+        build = job_block(read_workflow("release.yml"), "build")
+        self.assertIn("uv run --frozen --no-dev python scripts/release_assets.py macos", build)
+        self.assertLess(build.index("astral-sh/setup-uv@"), build.index("release_assets.py"))
+
     def test_release_checks_the_commit_before_compiling(self):
         build = job_block(read_workflow("release.yml"), "build")
         self.assertIn("rev-parse HEAD", build)

@@ -11,6 +11,8 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+from buildlib import locks
+
 ROOT = Path(__file__).resolve().parents[1]
 SOURCES_LOCK = "sources.lock.json"
 LOCKS = {
@@ -32,7 +34,6 @@ ROLES = {
     "toolchain": "toolchain",
 }
 FIELD_ORDER = ("name", "version", "url", "sha256", "sha512", "size", "role", "target", "lock")
-SHA256 = re.compile(r"[0-9a-f]{64}")
 SHA512 = re.compile(r"[0-9a-f]{128}")
 
 
@@ -158,27 +159,21 @@ def write(root, fetch):
 
 def check(root):
     path = root / SOURCES_LOCK
-    document = read_json(path)
+    try:
+        inputs = locks.load_sources(path).inputs
+    except locks.LockError as error:
+        return [str(error.reason)]
+    if not inputs:
+        return ["inputs must be a non-empty list"]
     problems = []
-    if document.get("schema_version") != 1:
-        problems.append("schema_version must be 1")
-    inputs = document.get("inputs")
-    if not isinstance(inputs, list) or not inputs:
-        return problems + ["inputs must be a non-empty list"]
-    names = [entry.get("name") for entry in inputs]
-    if len(set(names)) != len(names):
-        problems.append("input names are not unique")
-    if names != sorted(names, key=str):
+    names = [entry.name for entry in inputs]
+    if names != sorted(names):
         problems.append("inputs are not sorted by name")
     for entry in inputs:
-        label = entry.get("name")
-        if not isinstance(entry.get("sha256"), str) or not SHA256.fullmatch(entry["sha256"]):
-            problems.append(f"{label}: sha256 is not lowercase hex")
-        if entry.get("sha512") is not None and not SHA512.fullmatch(entry["sha512"]):
-            problems.append(f"{label}: sha512 is not lowercase hex")
-        if not isinstance(entry.get("url"), str):
-            problems.append(f"{label}: url is missing")
-    recorded = {entry.get("name"): entry for entry in inputs}
+        sha512 = entry.extra.get("sha512")
+        if sha512 is not None and not SHA512.fullmatch(sha512):
+            problems.append(f"{entry.name}: sha512 is not lowercase hex")
+    recorded = {entry["name"]: entry for entry in read_json(path)["inputs"]}
     derived = {entry["name"]: entry for entry in derive(root)}
     for name in sorted(set(derived) - set(recorded)):
         problems.append(f"{name}: pinned by {derived[name]['lock']} but absent from {SOURCES_LOCK}")

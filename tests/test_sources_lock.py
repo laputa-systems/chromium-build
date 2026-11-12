@@ -22,12 +22,21 @@ class SourcesLockTests(unittest.TestCase):
     def test_sources_lock_matches_the_input_locks(self):
         self.assertEqual(sources_lock.check(ROOT), [])
 
-    def test_every_input_is_hashed_and_fetched_over_https(self):
-        document = json.loads((ROOT / "sources.lock.json").read_text(encoding="utf-8"))
-        self.assertEqual(document["schema_version"], 1)
-        for entry in document["inputs"]:
-            self.assertRegex(entry["sha256"], r"^[0-9a-f]{64}$", entry["name"])
-            self.assertTrue(entry["url"].startswith("https://"), entry["name"])
+    def test_an_unpinned_or_insecure_input_is_reported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            copy_inputs(root)
+            path = root / sources_lock.SOURCES_LOCK
+            document = json.loads(path.read_text(encoding="utf-8"))
+            name = document["inputs"][0]["name"]
+            document["inputs"][0]["sha256"] = "ABC"
+            path.write_text(json.dumps(document), encoding="utf-8")
+            self.assertEqual(sources_lock.check(root), [f"input {name!r}: sha256 must be 64 lowercase hex digits"])
+            document["inputs"][0]["sha256"] = "0" * 64
+            document["inputs"][0]["url"] = "http://example.com/input"
+            path.write_text(json.dumps(document), encoding="utf-8")
+            (problem,) = sources_lock.check(root)
+            self.assertIn("https://", problem)
 
     def test_a_changed_digest_in_an_input_lock_is_reported(self):
         with tempfile.TemporaryDirectory() as directory:

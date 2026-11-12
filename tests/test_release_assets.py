@@ -10,6 +10,7 @@ from pathlib import Path
 
 import macos_backend
 import release_assets
+from buildlib import hashing
 
 TARGET = "aarch64-apple-darwin"
 REVISION = "0123456789abcdef0123456789abcdef01234567"
@@ -64,7 +65,7 @@ class ReleaseAssetsTests(unittest.TestCase):
                     "version": version,
                     "target": TARGET,
                     "source_revision": REVISION,
-                    "sources_lock_sha256": release_assets.sha256_file(release_assets.SOURCES_LOCK),
+                    "sources_lock_sha256": hashing.sha256_file(release_assets.SOURCES_LOCK),
                     "acceptance": "skipped",
                     "payload_sha256": fingerprint,
                     "xcode": "26",
@@ -72,6 +73,8 @@ class ReleaseAssetsTests(unittest.TestCase):
             )
             with tarfile.open(output / f"{stem}.tar.xz", "r:xz") as bundle:
                 names = bundle.getnames()
+                members = bundle.getmembers()
+            self.assertEqual({(member.uid, member.gid, member.mtime) for member in members}, {(0, 0, 0)})
             self.assertIn(f"{stem}/Chromium.app/Contents/MacOS/Chromium", names)
             self.assertIn(f"{stem}/Chromium.app/Contents/Current", names)
 
@@ -84,8 +87,15 @@ class ReleaseAssetsTests(unittest.TestCase):
                 release_assets.assemble_macos(work, work / "assets", REVISION)
 
     def test_revision_must_be_a_full_commit(self):
-        with self.assertRaisesRegex(SystemExit, "full lowercase commit"):
-            release_assets.assemble_macos(Path("/nonexistent"), Path("/nonexistent"), "main")
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory)
+            (work / "metadata").mkdir()
+            (work / "release").mkdir()
+            (work / "metadata/package-macos.json").write_text(json.dumps({"status": "complete"}), encoding="utf-8")
+            (work / "release/release-manifest.json").write_text("{}", encoding="utf-8")
+            with self.assertRaisesRegex(SystemExit, "full lowercase commit"):
+                release_assets.assemble_macos(work, work / "assets", "main")
+            self.assertFalse((work / "assets").exists())
 
 
 if __name__ == "__main__":
