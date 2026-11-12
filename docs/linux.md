@@ -105,6 +105,9 @@ session.
 fonts under `/work/package/<profile>`. `install` verifies that package and
 copies it to the host prefix. `make release-linux` runs the resumable
 headless-release path through installation.
+`make build TARGET=x86_64-unknown-linux-musl` is `make release-linux`, and
+`make verify TARGET=x86_64-unknown-linux-musl` runs `test-staged`. Pass
+`NINJA_TARGET` to `make build-target`.
 
 ## Helium desktop package
 

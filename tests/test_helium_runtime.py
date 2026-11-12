@@ -11,7 +11,8 @@ import sys
 import tarfile
 import tempfile
 import unittest
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+from typing import cast
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
@@ -273,7 +274,7 @@ class RuntimeCollectionTests(unittest.TestCase):
 class ElfAuditTests(unittest.TestCase):
     def test_parser_rejects_missing_header_fields(self):
         with self.assertRaisesRegex(linux_runtime.RuntimeAuditError, "readelf output has no"):
-            linux_runtime.parse_readelf(Path("x"), Path("x"), "Class: ELF64\n")
+            linux_runtime.parse_readelf(Path("x"), PurePosixPath("x"), "Class: ELF64\n")
 
     def test_musl_runtime_passes(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -381,7 +382,7 @@ class ElfAuditTests(unittest.TestCase):
             shutil.move(str(shared), lib / "libavcodec.so.62")
             report = linux_runtime.audit_tree(root, HOST_ARCH)
         self.assertEqual(report["status"], "complete")
-        self.assertIn("lib/libavcodec.so.62", report["ffmpeg_gnu_closure"])
+        self.assertIn("lib/libavcodec.so.62", cast(list[str], report["ffmpeg_gnu_closure"]))
 
     def test_escaping_file_symlink_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:

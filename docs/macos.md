@@ -58,6 +58,31 @@ directory. Use `status` and the work root's JSON phase reports to determine
 which phases passed. A CI package skips local Shadowdriver acceptance and does
 not establish consumer acceptance.
 
+`make build TARGET=aarch64-apple-darwin` runs `fetch`, `prepare`, `configure`,
+`build`, `stage-runtime`, `test-staged` (skipped when `MACOS_SKIP_ACCEPTANCE` is
+set), and `package`; `make verify TARGET=aarch64-apple-darwin` runs
+`verify-release`.
+
+## Releases
+
+`.github/workflows/release.yml` is dispatched by hand on the default branch. Its
+build job runs the phases above with acceptance skipped, then
+`scripts/release_assets.py macos` repacks the signed `Chromium.app` from the
+`package` zip into `chromium-<version>-aarch64-apple-darwin.tar.xz`, proves that
+the archive reproduces the packaged bundle and passes `codesign --verify --deep
+--strict`, and writes `chromium-<version>-aarch64-apple-darwin.manifest.json`.
+The manifest adds `acceptance`, `payload_sha256`, and the toolchain identity to
+the standard fields. The release job checks the asset names and manifest,
+writes `SHA256SUMS`, and publishes a pre-release tagged `release-<commit>`.
+`macos-26-smoke.yml` runs the same build and keeps the zip as a seven-day
+workflow artifact without publishing.
+
+`sources.lock.json` pins every download with a SHA-256. After `update-lock` or
+any edit of an input lock, run `python3 scripts/sources_lock.py write --fetch`
+and commit the result. The Rust nightly that `rustup` installs and the
+`depot_tools` commit are pinned in `config/macos.inputs.lock` only, because they
+are not digest-addressed downloads.
+
 ## Native automation compatibility
 
 The macOS-only overlay is documented in

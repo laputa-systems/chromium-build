@@ -29,6 +29,7 @@ from browser_test_support import (
     WebSocket,
     pid_is_alive,
     process_group_pids,
+    record_process_group,
     terminate_process,
 )
 from helium_wayland import FIXTURE_SIZE, HeadlessSway, verify_png
@@ -266,7 +267,7 @@ def load_instance(args: argparse.Namespace, output: Path, environment: dict, ind
         with log_path.open("w", encoding="utf-8") as log:
             process = subprocess.Popen(command, env=headless_environment_for(environment, profile), stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
         process_group = os.getpgid(process.pid)
-        process._chromium_process_group = process_group
+        record_process_group(process, process_group)
         port = urllib.parse.urlparse(wait_devtools_line(log_path, process, 30)).port
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/json/version", timeout=10) as response:
             version_info = json.load(response)
@@ -356,7 +357,7 @@ def run_headless(args: argparse.Namespace, output: Path, environment: dict, devt
         with log_path.open("w", encoding="utf-8") as log:
             process = subprocess.Popen(command, env=environment, stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
         process_group = os.getpgid(process.pid)
-        process._chromium_process_group = process_group
+        record_process_group(process, process_group)
         endpoint = wait_devtools_line(log_path, process, 30)
         port = urllib.parse.urlparse(endpoint).port
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/json/version", timeout=10) as response:
@@ -478,7 +479,6 @@ def run(args: argparse.Namespace) -> int:
         debug_port = port_socket.getsockname()[1]
         port_socket.close()
         environment = fixture.environment()
-        environment.update(WAYLAND_DISPLAY=fixture.wayland_socket.name)
         if os.environ.get("CHROMIUM_ARCH", "amd64") == "arm64":
             angle_args = ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"]
         else:
@@ -511,7 +511,7 @@ def run(args: argparse.Namespace) -> int:
                 stderr=log,
                 start_new_session=True,
             )
-        process._chromium_process_group = os.getpgid(process.pid)
+        record_process_group(process, os.getpgid(process.pid))
         version_info = wait_cdp(debug_port, process, 30)
         browser = version_info.get("Browser", "")
         if browser != f"Helium/{product_version}":

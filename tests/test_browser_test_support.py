@@ -5,12 +5,14 @@ import base64
 import hashlib
 import json
 import os
+import socket
 import stat
 import sys
 import tempfile
 import time
 import unittest
 from pathlib import Path
+from typing import cast
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
@@ -117,7 +119,7 @@ class BrowserTestSupportTests(unittest.TestCase):
     def test_websocket_sends_masked_short_extended_and_large_frames(self):
         sock = FakeSocket()
         websocket = object.__new__(support.WebSocket)
-        websocket.sock = sock
+        websocket.sock = cast(socket.socket, sock)
         for size in (125, 126, 65536):
             websocket._send_frame(1, b"x" * size)
 
@@ -149,7 +151,7 @@ class BrowserTestSupportTests(unittest.TestCase):
             + websocket_frame(0, message[split:])
         )
         websocket = object.__new__(support.WebSocket)
-        websocket.sock = sock
+        websocket.sock = cast(socket.socket, sock)
         websocket.buffer = b""
         value = websocket.receive()
         self.assertEqual(value, {"id": 7, "result": {"ok": True}})
@@ -162,7 +164,7 @@ class BrowserTestSupportTests(unittest.TestCase):
             (websocket_frame(2, b"x"), "binary"),
         ):
             websocket = object.__new__(support.WebSocket)
-            websocket.sock = FakeSocket(frame)
+            websocket.sock = cast(socket.socket, FakeSocket(frame))
             websocket.buffer = b""
             with self.subTest(message=message), self.assertRaises(support.CdpError):
                 websocket.receive()

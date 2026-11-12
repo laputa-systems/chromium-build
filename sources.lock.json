@@ -1,0 +1,752 @@
+{
+  "schema_version": 1,
+  "inputs": [
+    {
+      "name": "helium/adblock_inputs/crate-adblock-0.13.2",
+      "version": "0.13.2",
+      "url": "https://static.crates.io/crates/adblock/adblock-0.13.2.crate",
+      "sha256": "77420e48225975c472eaea1b7c767af6caebea02d910043b0af7a1271d47ec9c",
+      "sha512": "c868bdf15bca7b3411285c500aec07dd141f176068243d52cde5ef7cae16da55689e94318837ef87413c02c79e8fdba35556cc0527e76f68b648bd0ee1ed1e23",
+      "size": 143622,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-aho-corasick-1.1.4",
+      "version": "1.1.4",
+      "url": "https://static.crates.io/crates/aho-corasick/aho-corasick-1.1.4.crate",
+      "sha256": "ddd31a130427c27518df266943a5308ed92d4b226cc639f5a8f1002816174301",
+      "sha512": "c77e35191b00546f5e499fab154170cedd619599e7250f92db9fba0a41c833eb426f214e58b00c5c39f8757406b33492b3241cb8cb233ce384ad0683c3ee4b62",
+      "size": 184015,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-arrayvec-0.7.8",
+      "version": "0.7.8",
+      "url": "https://static.crates.io/crates/arrayvec/arrayvec-0.7.8.crate",
+      "sha256": "d3fb67a6e08acf24fdeccbac2cb6ac4305825bd1f117462e0e6f2f193345ad56",
+      "sha512": "fdf282ec313d44e88a27c0b5816c3e41062181800dda07408f2c5e5a439bc511fb16bf6611f143a2b6b6e1f6deba2d09f568def2e055cf6e5360fdf5f3944822",
+      "size": 33260,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-bitflags-2.13.0",
+      "version": "2.13.0",
+      "url": "https://static.crates.io/crates/bitflags/bitflags-2.13.0.crate",
+      "sha256": "b4388bee8683e3d04af747c73422af53102d2bd24d9eadb6cbc100baef4b43f8",
+      "sha512": "5a93a30662effe056132d33cd0b25670feedfe69e927b7e77ea1a417f68104988459f1c3a73eec1752eac08f44ae5333496526e1a96dfb3e7144deca1a94d19f",
+      "size": 51280,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-cssparser-0.35.0",
+      "version": "0.35.0",
+      "url": "https://static.crates.io/crates/cssparser/cssparser-0.35.0.crate",
+      "sha256": "4e901edd733a1472f944a45116df3f846f54d37e67e68640ac8bb69689aca2aa",
+      "sha512": "62bdae0d003714378046967f83fab37d0012ee618607684e0ce3e0e872f65a4b7e63a725cb0d6380bbacb20de5c5095377e2f97b3d4737376b61e4299e8eca97",
+      "size": 54145,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-cssparser-macros-0.6.1",
+      "version": "0.6.1",
+      "url": "https://static.crates.io/crates/cssparser-macros/cssparser-macros-0.6.1.crate",
+      "sha256": "13b588ba4ac1a99f7f2964d24b3d896ddc6bf847ee3855dbd4366f058cfcd331",
+      "sha512": "21d2f8bcaad0a8fff865b23bb2b59dcc5165f8861c4b9d7d70e9f302b58e2cc5ef8555bcab97889bfe81889a2b27863c755494baa64a52c65cd74687fe58b124",
+      "size": 7914,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-derive_more-2.1.1",
+      "version": "2.1.1",
+      "url": "https://static.crates.io/crates/derive_more/derive_more-2.1.1.crate",
+      "sha256": "d751e9e49156b02b44f9c1815bcb94b984cdcc4396ecc32521c739452808b134",
+      "sha512": "cb4de4ead185ad40c6e9e0fe316f16ada2070d5ebc336dcb73dfd8def87605d8ef9beb454c9202096aa4da8da0c32307fd02054f290722b561d6fff83bb91dff",
+      "size": 88632,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-derive_more-impl-2.1.1",
+      "version": "2.1.1",
+      "url": "https://static.crates.io/crates/derive_more-impl/derive_more-impl-2.1.1.crate",
+      "sha256": "799a97264921d8623a957f6c3b9011f3b5492f557bbb7a5a19b7fa6d06ba8dcb",
+      "sha512": "07a6d6c5be2968ee0bc6847ba5bb4809a80a769743868068a71d72fc376516724df5855edb6ebc2ef569ac8f79bf632f34ca30640fa54f030d58ce301de44b89",
+      "size": 99094,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-dtoa-1.0.11",
+      "version": "1.0.11",
+      "url": "https://static.crates.io/crates/dtoa/dtoa-1.0.11.crate",
+      "sha256": "4c3cf4824e2d5f025c7b531afcb2325364084a16806f6d47fbc1f5fbd9960590",
+      "sha512": "c2c1596688a6a0d74e2c8d6b67308d0d9cab89c2ba021556f7ca7e4de3a6156c7f2139b105e79a0e99bd06ca7c3b5e400f47ad9864d12ff0f58206eb978e19a0",
+      "size": 21122,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-dtoa-short-0.3.5",
+      "version": "0.3.5",
+      "url": "https://static.crates.io/crates/dtoa-short/dtoa-short-0.3.5.crate",
+      "sha256": "cd1511a7b6a56299bd043a9c167a6d2bfb37bf84a6dfceaba651168adfb43c87",
+      "sha512": "da4d7c318b7146775260de71be363fa257ce9b1f7fcee8f5213cf905211379c5f58496d2070a001fd74fd4570a7de2a1ddf4d02e617dae6977e7a1e29b8817f2",
+      "size": 8287,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-flatbuffers-25.12.19",
+      "version": "25.12.19",
+      "url": "https://static.crates.io/crates/flatbuffers/flatbuffers-25.12.19.crate",
+      "sha256": "35f6839d7b3b98adde531effaf34f0c2badc6f4735d26fe74709d8e513a96ef3",
+      "sha512": "218f7a9caf20a4c5a8312584db9e15f271d117efcab0248abfac3249f3390d4570d0e858552ee1fcd76fb70fb15972765e6c193e07b4a4db2d4bd22d0a57f3f8",
+      "size": 27421,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-form_urlencoded-1.2.2",
+      "version": "1.2.2",
+      "url": "https://static.crates.io/crates/form_urlencoded/form_urlencoded-1.2.2.crate",
+      "sha256": "cb4cb245038516f5f85277875cdaa4f7d2c9a0fa0468de06ed190163b1581fcf",
+      "sha512": "07d27d852504e146d586d007b090e53cbe740da140859dfb7d647c83c1b55265a83ea0a0e514587699b1dc6b6ffea2fc913319bcc83b55ebe191801a3b429c8a",
+      "size": 9347,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-idna-1.1.0",
+      "version": "1.1.0",
+      "url": "https://static.crates.io/crates/idna/idna-1.1.0.crate",
+      "sha256": "3b0875f23caa03898994f6ddc501886a45c7d3d62d04d2d90788d47be1b1e4de",
+      "sha512": "1d49993145fe694f33f7c71ebe62face416f2229b12690cec23ae2e4be2fc1c5aa5ad5651d815ab70057b68edc450ef6004306a775b920b8773c221c0fe6c106",
+      "size": 148747,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-idna_adapter-1.2.2",
+      "version": "1.2.2",
+      "url": "https://static.crates.io/crates/idna_adapter/idna_adapter-1.2.2.crate",
+      "sha256": "cb68373c0d6620ef8105e855e7745e18b0d00d3bdb07fb532e434244cdb9a714",
+      "sha512": "c80655c107506022fe6b6d69af7ca2418b070ee66150d743b662e656a2ae04d4ea7b41f7f182fda9fedfa2626e70db30734f8e9af18d23ee39da0c2d4a21949a",
+      "size": 10444,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-new_debug_unreachable-1.0.6",
+      "version": "1.0.6",
+      "url": "https://static.crates.io/crates/new_debug_unreachable/new_debug_unreachable-1.0.6.crate",
+      "sha256": "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086",
+      "sha512": "73a61acbc9b20b3595925360827ba8798f3338471b291fa37c72a1c9505b3ec9f688808fcaac9a2eb494e5f3ea5331d30545d5f21f89559111bec6126ac90b48",
+      "size": 2582,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-percent-encoding-2.3.2",
+      "version": "2.3.2",
+      "url": "https://static.crates.io/crates/percent-encoding/percent-encoding-2.3.2.crate",
+      "sha256": "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220",
+      "sha512": "495b4aac88a7a46420811671d6bd82817e4eb2fe51d5068d11c5b50d0d927895d54c855cb07d4f4ad5a2d42b22f9419ad0183c14781dbfa240804fd49761035a",
+      "size": 11583,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-phf-0.11.3",
+      "version": "0.11.3",
+      "url": "https://static.crates.io/crates/phf/phf-0.11.3.crate",
+      "sha256": "1fd6780a80ae0c52cc120a26a1a42c1ae51b247a253e4e06113d23d2c2edd078",
+      "sha512": "20a834481bc43ac8c560b00e337294d3c14d1fe359e7f78ed08166b096305e40277f4cd3c179a740911b5c241aeb4e263afa1a50d37f383ef63da113bd6270a9",
+      "size": 23231,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-phf_codegen-0.11.3",
+      "version": "0.11.3",
+      "url": "https://static.crates.io/crates/phf_codegen/phf_codegen-0.11.3.crate",
+      "sha256": "aef8048c789fa5e851558d709946d6d79a8ff88c0440c587967f8e94bfb1216a",
+      "sha512": "e86c3b73de198aa0ac67beb6eeebb88865f77d075b9d7f290eb9b73bfdd6728d9479f796d56e4f3358226ee88b877d848017cd951a14804534e4cb656eed209e",
+      "size": 13741,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-phf_generator-0.11.3",
+      "version": "0.11.3",
+      "url": "https://static.crates.io/crates/phf_generator/phf_generator-0.11.3.crate",
+      "sha256": "3c80231409c20246a13fddb31776fb942c38553c51e871f8cbd687a4cfb5843d",
+      "sha512": "52998e20648b6ecd1eaafa407f7da4667fa829d48fe0c9f8f718377cc86a232a6261fc2f831ffc7051b62dbdb880654b1207ac314e57b23d2b70f634d07c2115",
+      "size": 15431,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-phf_macros-0.11.3",
+      "version": "0.11.3",
+      "url": "https://static.crates.io/crates/phf_macros/phf_macros-0.11.3.crate",
+      "sha256": "f84ac04429c13a7ff43785d75ad27569f2951ce0ffd30a3321230db2fc727216",
+      "sha512": "331d3392dfd3e48eab0e65c3daca469c3abaf902989ed912e394175876f36c14d06fd1ba4ed03e01234608faf1189743e6dcde75eccdf2f4fe0dc8ffb15e720f",
+      "size": 18436,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-phf_shared-0.11.3",
+      "version": "0.11.3",
+      "url": "https://static.crates.io/crates/phf_shared/phf_shared-0.11.3.crate",
+      "sha256": "67eabc2ef2a60eb7faa00097bd1ffdb5bd28e62bf39990626a582201b7a754e5",
+      "sha512": "34bc3c0dff5568f0276777614d92d87882ca6be9e3d405c1e7de90ac16ec52a12acc30ea9ab2033074d0e988fa514247f37de1a21a3727de0ef43f42f477e27e",
+      "size": 15199,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-precomputed-hash-0.1.1",
+      "version": "0.1.1",
+      "url": "https://static.crates.io/crates/precomputed-hash/precomputed-hash-0.1.1.crate",
+      "sha256": "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c",
+      "sha512": "a118a98286a47e2f0cf35d2678d0325c18b9b7d5bdf40ceadc16483b282307fd1498434d5bdfa25477a4f420d97c34d786e42e9fa70431b788b4b8fde9718e05",
+      "size": 1640,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-rand-0.8.7",
+      "version": "0.8.7",
+      "url": "https://static.crates.io/crates/rand/rand-0.8.7.crate",
+      "sha256": "22f6172bdec972074665ed81ed53b71da00bfc44b65a753cfde883ec4c702a1a",
+      "sha512": "95939e1185d9aaac5d7fc3020e5337fb9b937ea78dbd71ebc9e0b12ec833025dd75c7b56dc9ad8fa67ac3c80add7bf586ef726fa2df615bda5d0cfbe33b31724",
+      "size": 84123,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-rand_core-0.6.4",
+      "version": "0.6.4",
+      "url": "https://static.crates.io/crates/rand_core/rand_core-0.6.4.crate",
+      "sha256": "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c",
+      "sha512": "36c67eb845aa2ccca49d6d680f28d418229bbc5a050729e487fe6b9f9f384fdd7b8d67fc6508b90b79ffb3c26688e72feceb3ecae57d3d7f59338aeb62296f79",
+      "size": 22666,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-regex-1.12.4",
+      "version": "1.12.4",
+      "url": "https://static.crates.io/crates/regex/regex-1.12.4.crate",
+      "sha256": "f1292b7759ae1cb9ec195452d1390a074f0cd8541ab7a5a8c31cd6db45d4a6ba",
+      "sha512": "d925acd772c27005cbf5dbc964d9537d9c01804b3258a155393d04ce1bddc9c145fa63ff4ec895d8270426ca81d551cd333f00a0050df2e4acb8ee807a691203",
+      "size": 153468,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-regex-automata-0.4.14",
+      "version": "0.4.14",
+      "url": "https://static.crates.io/crates/regex-automata/regex-automata-0.4.14.crate",
+      "sha256": "6e1dd4122fc1595e8162618945476892eefca7b88c52820e74af6262213cae8f",
+      "sha512": "58f8e7c41f71c1df50fc2f4e70ea7f5ab762170494497541b9a09076058f94a799b6fc4da13c40fc26a2f1a0b650b499cb9830338152e96a24e3a32b4994a5e0",
+      "size": 618012,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-rustc-hash-2.1.3",
+      "version": "2.1.3",
+      "url": "https://static.crates.io/crates/rustc-hash/rustc-hash-2.1.3.crate",
+      "sha256": "6b1e7f9a428571be2dc5bc0505c13fb6bf936822b894ec87abf8a08a4e51742d",
+      "sha512": "d44c38f6775b77b5841a644c53a68c09a2f98541aafd809d385b854f385bbba86399aa4fc76bb3dfadd2cba64ec688db22bd353e1ae4de81e0f6e9d36f0cf629",
+      "size": 14811,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-rustc_version-0.4.1",
+      "version": "0.4.1",
+      "url": "https://static.crates.io/crates/rustc_version/rustc_version-0.4.1.crate",
+      "sha256": "cfcb3a22ef46e85b45de6ee7e79d063319ebb6594faafcf1c225ea92ab6e9b92",
+      "sha512": "7aa8a487ca7411b6d23cae62f7568fa3474a7b1fd1589621071be3428a550ed3b7c4ad68277a8f86849e5900397d7d0e9d678f5d423742a045dc7c660fa6c598",
+      "size": 12245,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-seahash-4.1.0",
+      "version": "4.1.0",
+      "url": "https://static.crates.io/crates/seahash/seahash-4.1.0.crate",
+      "sha256": "1c107b6f4780854c8b126e228ea8869f4d7b71260f962fefb57b996b8959ba6b",
+      "sha512": "4d9111dd2e491c7f6d49e0b79a3c23628c02d6603ac46e88ed137ca737830003b549ccb38087679de2cf0b02a53065b89f8d79e0ac9ddb66844d970cc6383f8b",
+      "size": 31976,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-selectors-0.32.0",
+      "version": "0.32.0",
+      "url": "https://static.crates.io/crates/selectors/selectors-0.32.0.crate",
+      "sha256": "09975d3195f34dce9c7b381cb0f00c3c13381d4d3735c0f1a9c894b283b302ab",
+      "sha512": "ebec412b4196d2cd71190588d11cb15ce996ad5506e0a5fe9e0e665e810ff1050603b18eed6e97b2b7e65f8c92c84b8065b9021a1b05d1859705cf318940ef50",
+      "size": 68397,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-semver-1.0.28",
+      "version": "1.0.28",
+      "url": "https://static.crates.io/crates/semver/semver-1.0.28.crate",
+      "sha256": "8a7852d02fc848982e0c167ef163aaff9cd91dc640ba85e263cb1ce46fae51cd",
+      "sha512": "bb44373e60fccb83bc95e4277ea0abdd756a3f77b3334cf6d6b5fceac086910661ab94eb326cdc8fefce0c09220933bdf03bfd142c1594a92c9c1e4e931114b7",
+      "size": 33064,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-serde-1.0.229",
+      "version": "1.0.229",
+      "url": "https://static.crates.io/crates/serde/serde-1.0.229.crate",
+      "sha256": "4148590afebada386688f18773da617792bf2ef03ffc1e4cbd2b1d45b023e0ba",
+      "sha512": "589b7523ecb57fe2003cbc4eb36adb07f663ce9c8620a7880a63630360c3d36e77388a270878493df0c383c1266ff855aebce424227a1c9da42f0fe4adaeeb30",
+      "size": 83669,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-serde_core-1.0.229",
+      "version": "1.0.229",
+      "url": "https://static.crates.io/crates/serde_core/serde_core-1.0.229.crate",
+      "sha256": "67dca2c9c51e58a4791a4b1ed58308b39c64224d349a935ab5039aa360942a48",
+      "sha512": "23122dd8663f6b4cecc8e6affe8b7a010abdd31428461c033a5db330bb7c2872c8a7e91ce0884923b640bea801a64044fff6ef532b260c05f31cb426b2518e66",
+      "size": 63100,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-serde_json-1.0.150",
+      "version": "1.0.150",
+      "url": "https://static.crates.io/crates/serde_json/serde_json-1.0.150.crate",
+      "sha256": "e8014e44b4736ed0538adeecded0fce2a272f22dc9578a7eb6b2d9993c74cfb9",
+      "sha512": "f980f8f4ccc122db36b82de4ecb9aafccec7162f7fe49e6c7c58e2d26d49d36c650af33c7f0d66b057f0d2870daed0cf85d4567b10b64b1a9e10b7df61e1921b",
+      "size": 155574,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-servo_arc-0.4.3",
+      "version": "0.4.3",
+      "url": "https://static.crates.io/crates/servo_arc/servo_arc-0.4.3.crate",
+      "sha256": "170fb83ab34de17dc69aa7c67482b22218ddb85da56546f9bd6b929e32a05930",
+      "sha512": "3c62d8b22f3994800bb4fd072b2c020a7ccfdd9cd8c13feebf1d2861615a299a22e3ec2ff32363b70001256a7d3f2dbd17470ed718228e5d4f12a688ef394dbe",
+      "size": 17887,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-siphasher-1.0.3",
+      "version": "1.0.3",
+      "url": "https://static.crates.io/crates/siphasher/siphasher-1.0.3.crate",
+      "sha256": "8ee5873ec9cce0195efcb7a4e9507a04cd49aec9c83d0389df45b1ef7ba2e649",
+      "sha512": "dd0416e6fa8e835c25b10bf93c793c263679d64b8d56288313bf93b989e4a5b271065da11e9af266e9878db7dd73396852e2e9b164aea6c2ad837c8ff0f73bcc",
+      "size": 11643,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-stable_deref_trait-1.2.1",
+      "version": "1.2.1",
+      "url": "https://static.crates.io/crates/stable_deref_trait/stable_deref_trait-1.2.1.crate",
+      "sha256": "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596",
+      "sha512": "630721d3f8e9f3290efc250c42aba13e2325839e62167a2a611618c18c6aa58c08a53622db61a9aa920284570626b98df26b3c28009cf45b6ce1ec134b9c9f5c",
+      "size": 8186,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-syn-3.0.3",
+      "version": "3.0.3",
+      "url": "https://static.crates.io/crates/syn/syn-3.0.3.crate",
+      "sha256": "53e9bae58849f64dfa4f5d5ae372c8341f7305f82a3868709269343628b659a3",
+      "sha512": "59a74d28ae1cec8ee4402c20ec3b77aba8ff8fa3ddef7921509d25e4809474e6f9da86aa78245d8108ed7de6aaa9a0471dabf21ebbcb50a5365f60ad3bb1910b",
+      "size": 312999,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-thiserror-1.0.69",
+      "version": "1.0.69",
+      "url": "https://static.crates.io/crates/thiserror/thiserror-1.0.69.crate",
+      "sha256": "b6aaf5339b578ea85b50e080feb250a3e8ae8cfcdff9a461c9ec2904bc923f52",
+      "sha512": "ef50d2867d965da1dfb29d26faf6de273b5fadf78f95313f6caf44d68bfc610b9bd4b7544200b05bb0861231cfc84e961007f8db83c7905244c492037fd31899",
+      "size": 22198,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-thiserror-impl-1.0.69",
+      "version": "1.0.69",
+      "url": "https://static.crates.io/crates/thiserror-impl/thiserror-impl-1.0.69.crate",
+      "sha256": "4fee6c4efc90059e10f81e6d42c60a18f76588c3d74cb83a0b242a2b6c7504c1",
+      "sha512": "579eb796c8885feb01d27638862823acd96c79440655bb444c3445ac00121852603396ce7439aed617c0a0ac69f62102167fde5845411c906997574a46d6d9e3",
+      "size": 18365,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/crate-url-2.5.8",
+      "version": "2.5.8",
+      "url": "https://static.crates.io/crates/url/url-2.5.8.crate",
+      "sha256": "ff67a8a4397373c3ef660812acab3268222035010ab8680ec4215f38ba3d0eed",
+      "sha512": "5848b47d63ae9c195fd5f82bd8333c53cb399f383240e84a606c486d3dbb37db4e268b01a147deb8cdf5bc534a4ebc7b11391e73f81dc3ea3ad7254507ac0c6c",
+      "size": 86512,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/adblock_inputs/helium_filters",
+      "version": "202608241612",
+      "url": "https://github.com/imputnet/helium-filters/releases/download/202608241612/helium-filters-202608241612.tar.gz",
+      "sha256": "9f745f31b37e8990fd57784f633c5c4f7c9ee7444ebe40743c2bd9f96ff17f8e",
+      "sha512": "98a176110278274d707daf0fc4785059cbe4621f4323c5a2668d3a27bbf7daa47ff17bd252e00208387cf9846d25e45a9ae32248baf8a93e9df26bf84e75da12",
+      "size": 9065099,
+      "role": "dependency",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/architecture_inputs/arm64/esbuild_native",
+      "version": "0.28.2",
+      "url": "https://registry.npmjs.org/@esbuild/linux-arm64/-/linux-arm64-0.28.2.tgz",
+      "sha256": "a96dbfa41d3ef5dbd1ef22b1c10d5187be9267e86093a870f06402a7ec931596",
+      "sha512": "a56e000b43f78adf1cedda3d315338a79d45cc7cdd33f4d9adeaeeae045c1c9d964dad55435088ab5f319dc7e9049c38a23922659aca5b6c8805604ff768fa52",
+      "size": 4283627,
+      "role": "toolchain",
+      "target": "aarch64-unknown-linux-musl",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/architecture_inputs/arm64/rust_toolchain",
+      "version": "1edd55dcfcd573872c727fa3e086369a71661ee0",
+      "url": "https://github.com/laputa-systems/chromium-build/releases/download/rust-toolchain-1edd55dcfcd5-aarch64-linux-musl/rust-toolchain-1edd55dcfcd573872c727fa3e086369a71661ee0-aarch64-linux-musl.tar.xz",
+      "sha256": "78709990ac69e2fbf165bee384aac4ab02c182a52444b42c671df164bcc4294f",
+      "sha512": "c81271746c60ce73a079febf8905eb3cedf9a2692c319c6120d25d755ad24145ebcf1d3ad20c5d061eaac6378c01a6c4376cda36c0286d962e61d3cdcb4fe377",
+      "size": 242825052,
+      "role": "toolchain",
+      "target": "aarch64-unknown-linux-musl",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/architecture_inputs/arm64/typescript_native",
+      "version": "7.0.2",
+      "url": "https://registry.npmjs.org/@typescript/typescript-linux-arm64/-/typescript-linux-arm64-7.0.2.tgz",
+      "sha256": "c83d931ac9dd7549cde6e71246aa9d6a9812843023df3e277fe3b5dcf41dd0ea",
+      "sha512": "421e1e538ff2df20e39df8e3c8f62284c8f9fce0c8966b7e073bb5ece23e7e24910d6e7b4265394a237addec4f44d24f294cdc73520d6b535776b27e32a1e351",
+      "size": 8900516,
+      "role": "toolchain",
+      "target": "aarch64-unknown-linux-musl",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/chromium",
+      "version": "156.0.8078.79",
+      "url": "https://tarballs.imput.net/chromium-156.0.8078.79/chromium-156.0.8078.79-base.tar.zst",
+      "sha256": "114d5110f0ac4248434e23cd97c50380dc49c438e6d9657d6b4e6542576c81af",
+      "sha512": "da9336d2e161f9133bdf120136e855a0e4fa0a2bd5d3f236b30187f18731c5d6803aa3f2b78f1510fa9dfc88c779e4f10bf9123b826b28c18ceef97e83cf3c30",
+      "size": 1983333568,
+      "role": "source",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/runtime_sources/arm64/expat",
+      "version": "2.10.0",
+      "url": "https://github.com/libexpat/libexpat/releases/download/R_2_10_0/expat-2.10.0.tar.xz",
+      "sha256": "c624ba2998fc65df1163a49641ff3f9ab73138b11641d92c86bee0fb01b1bc7f",
+      "sha512": "bd61f361d823f67586dad246fa4d4abbe3d22f5a0f9a28401e7a2fc96753d5bae33fbe4068fae72f016998d0da9d8c92edc4abd2fe8a8e4aafc775a8ab547c44",
+      "size": 543404,
+      "role": "runtime",
+      "target": "aarch64-unknown-linux-musl",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/runtime_sources/arm64/libffi",
+      "version": "3.5.2",
+      "url": "https://github.com/libffi/libffi/releases/download/v3.5.2/libffi-3.5.2.tar.gz",
+      "sha256": "f3a3082a23b37c293a4fcd1053147b371f2ff91fa7ea1b2a52e335676bac82dc",
+      "sha512": "76974a84e3aee6bbd646a6da2e641825ae0b791ca6efdc479b2d4cbcd3ad607df59cffcf5031ad5bd30822961a8c6de164ac8ae379d1804acd388b1975cdbf4d",
+      "size": 1423124,
+      "role": "runtime",
+      "target": "aarch64-unknown-linux-musl",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/runtime_sources/arm64/nspr",
+      "version": "4.38.2",
+      "url": "https://ftp.mozilla.org/pub/nspr/releases/v4.38.2/src/nspr-4.38.2.tar.gz",
+      "sha256": "e4092faeab77bdc9b32db1113e4215948ee768e26c4666db3b5a60b35f2c9105",
+      "sha512": "f17302b0973ab006f9e6af70199ac6bb40d6266f96ab4d6692f56c24979907a7f0a20cf9d926aa80084f2e0ce7dfd56de89a7547b5e7e8caafa7afa5eb0b7bd8",
+      "size": 1025394,
+      "role": "runtime",
+      "target": "aarch64-unknown-linux-musl",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/runtime_sources/arm64/nss",
+      "version": "3.124",
+      "url": "https://ftp.mozilla.org/pub/security/nss/releases/NSS_3_124_RTM/src/nss-3.124.tar.gz",
+      "sha256": "80da9f1cbcb267293b2248818d288bc02f874d6a34f1989a2828401d74a0bc9b",
+      "sha512": "9959977b3cbcb0306c8aeba2c059d4f3646b3144c6401fbc73c14aea364caa92331875354afa79c095b6482b29ae743228d35c1bd510c5124cad5e7c37c5daa2",
+      "size": 78530189,
+      "role": "runtime",
+      "target": "aarch64-unknown-linux-musl",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/runtime_sources/arm64/sqlite",
+      "version": "3.53.4",
+      "url": "https://www.sqlite.org/2026/sqlite-autoconf-3530400.tar.gz",
+      "sha256": "0e9483900e92cd5de8fd48d16bf9200145a61f7fd5be542a5ac81d8a9516eb9c",
+      "sha512": "c24374e9393a943157f533f96e89e6c5743e5f5aad169d8393cff3088ca5ccbe5cc0561681ace49c349d0fe402298ee2624d319f422967247ce0792e3b3aa01e",
+      "size": 3283177,
+      "role": "runtime",
+      "target": "aarch64-unknown-linux-musl",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/runtime_sources/arm64/xkbcommon",
+      "version": "1.13.1",
+      "url": "https://github.com/xkbcommon/libxkbcommon/archive/refs/tags/xkbcommon-1.13.1.tar.gz",
+      "sha256": "aeb951964c2f7ecc08174cb5517962d157595e9e3f38fc4a130b91dc2f9fec18",
+      "sha512": "450c33fe26af6b847cf7516685d0df63c2ba0126887e27595c40fe80e4d0487009aa6cdf38ff1270d595c7900cbf3c11e7aa4f9cff80fa361742b5ebb10d83bd",
+      "size": 1234661,
+      "role": "runtime",
+      "target": "aarch64-unknown-linux-musl",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/runtime_sources/arm64/zlib",
+      "version": "1.4",
+      "url": "https://zlib.net/zlib-1.4.tar.gz",
+      "sha256": "02dd159783677a749c04adbdd02b55b8a2bcc7e054f51b76b549199a916ad584",
+      "sha512": "13f02285da85956ff722d814695b96807aff7a511ebf4b6d98cf708c353920666093cc18b6653cd7992c8e75c103f7b4baf2de3a105c2db9dcd62bab2c940859",
+      "size": 1507140,
+      "role": "runtime",
+      "target": "aarch64-unknown-linux-musl",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/source_inputs/alpine",
+      "version": "0a7d119de30703ac470c1a0b2935c0136e5b3c5e",
+      "url": "https://gitlab.alpinelinux.org/alpine/aports/-/archive/0a7d119de30703ac470c1a0b2935c0136e5b3c5e/aports-0a7d119de30703ac470c1a0b2935c0136e5b3c5e.tar.gz",
+      "sha256": "c2a67ce3738b1f186066e81ed4b181e7517aad6f60ea4b08ad2d71d361e9ec98",
+      "sha512": "6477d59c46e7ac8a3c9a87effa2a2126813de2271a6eb61c10fcc03cd221964a1d6755663d8612e6c41746c340627955e8a3057f1af926545ff57cde0d05986f",
+      "size": 14270402,
+      "role": "source",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/source_inputs/copium",
+      "version": "a887c5e7de6a9c768c5875625d1af814d60dc378",
+      "url": "https://codeberg.org/selfisekai/copium/archive/a887c5e7de6a9c768c5875625d1af814d60dc378.tar.gz",
+      "sha256": "a05152cd5006d7a845e0f53bcfba75e52a09cdaf3478649c9fe8948854b9fa75",
+      "sha512": "76c47baee157744ed78242b8cf9991dcd51383cb7a2e5274acd9e2c4d373839f70f8879c0c8c0ee9e6acd0a46810780c3200ec599dbf81ff84fbe3f45c48bf9b",
+      "size": 24220,
+      "role": "source",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/source_inputs/helium_core",
+      "version": "2f81b9cafa38a95071e20de3f9cd6b0aca6d3c65",
+      "url": "https://github.com/imputnet/helium/archive/2f81b9cafa38a95071e20de3f9cd6b0aca6d3c65.tar.gz",
+      "sha256": "e5cb9d48f8bd8de2f253d3a500600b53c9b22e1e0bf612d37f9e2c91618ba851",
+      "sha512": "b207dbe614f8afb1ba9241c4e29ad882ec07b218b5f03271fc02fc971335d02d1d99d783c65845dd04140fb85476c4bbfbe5d74354d270d3492c11852f6a1e68",
+      "size": 2750899,
+      "role": "source",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/source_inputs/helium_linux",
+      "version": "83027a19267e526f08e25a3af1a30b45ee7e3e2e",
+      "url": "https://github.com/imputnet/helium-linux/archive/83027a19267e526f08e25a3af1a30b45ee7e3e2e.tar.gz",
+      "sha256": "165f92e7f945116b5c6fbec08b1c306447abe3d89cc71f055675e5e40437e284",
+      "sha512": "b7b67d8e5d1c0a10f17e2d2419303c1ad2d7eeef89b18af6978dbda84ce7294d7aa76e0acc43c1f53cd351c35042fa240f48fc0b34e38e3d3fa8e76eaced61bd",
+      "size": 2015138,
+      "role": "source",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/source_inputs/linux_overlay",
+      "version": "156.0.8078.79",
+      "url": "https://tarballs.imput.net/chromium-156.0.8078.79/chromium-156.0.8078.79-linux-x64.tar.zst",
+      "sha256": "372a08accf4fef2717959b5f06e1da4f6ca991033ce6848cab63c4ebab37e459",
+      "sha512": "47141b7d106929b0e02051bd11ec6327aa819a0995732b4401ba8d2e9f13f8fc99fd4b139b93c4937317e0567838f9fbd383eafc06fd1a51fef57f68a5086d22",
+      "size": 1198388088,
+      "role": "source",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/source_inputs/search_engines_data",
+      "version": "202609082320",
+      "url": "https://github.com/imputnet/helium-nonfree-assets/releases/download/202609082320/nonfree-search-engines-data-202609082320.tar.gz",
+      "sha256": "2a8d63af41454446d64bb5f19786d908419265f152adaff087132d8e0cda51a7",
+      "sha512": "860bcd73508c4e52d54f995de3cc7b18ea51edc45cd46329f845c3fde0a7d41aa8057d1d2f8824974783f675ba27131f7e3d89e2d8a40884a41b9ba417368640",
+      "size": 43698,
+      "role": "source",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/source_inputs/ublock_origin",
+      "version": "1.75.0",
+      "url": "https://github.com/imputnet/uBlock/releases/download/1.75.0/uBlock0_1.75.0.chromium.zip",
+      "sha256": "49214674f7c6c474e60da647c05bd28463b1f7a55b2a2b0a53e9d297ef7bf3c6",
+      "sha512": "a58338c4b6dcecbe02e461f4d082a3b6846e5b7d931c5e0a6855ef14f2026fdb33cf8b089569b1861af33020324fcd2479e48791fb98d714b28fe0a559b8fc17",
+      "size": 4653769,
+      "role": "source",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/toolchain/architectures/amd64",
+      "version": "llvm-musl-23.1.5-dc0d9b9",
+      "url": "https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-23.1.5-dc0d9b9/clang%2Bllvm-23.1.5-x86_64-linux-musl.tar.xz",
+      "sha256": "c43f18f143cc17f49814b6c5dda8a1122d17b6bcdff9848b6f77e97b33026dfe",
+      "size": 100671508,
+      "role": "toolchain",
+      "target": "x86_64-unknown-linux-musl",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "helium/toolchain/architectures/arm64",
+      "version": "llvm-musl-23.1.5-dc0d9b9",
+      "url": "https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-23.1.5-dc0d9b9/clang%2Bllvm-23.1.5-aarch64-linux-musl.tar.xz",
+      "sha256": "fe0a382993c36a04a505157b59503a7294db97e2ac9923e5630f8b393b78f118",
+      "size": 93784384,
+      "role": "toolchain",
+      "target": "aarch64-unknown-linux-musl",
+      "lock": "config/helium.inputs.lock"
+    },
+    {
+      "name": "linux/chromium",
+      "version": "153.0.8010.52",
+      "url": "https://github.com/chromium-linux-tarballs/chromium-tarballs/releases/download/153.0.8010.52/chromium-153.0.8010.52-linux.tar.xz",
+      "sha256": "3233497c752d44bf1c6ee654bc85ed506d75638e386309439730f62424c29a1b",
+      "sha512": "144667ff65b4018b9afd911bd9acfa83f8e396b984d03b5b0f5588c46f36989e5d523522b1cfb471d2cef0f29a60b7ea3e7ec21f3cae100ca65835be1c023d17",
+      "size": 1878470976,
+      "role": "source",
+      "target": "x86_64-unknown-linux-musl",
+      "lock": "config/inputs.lock"
+    },
+    {
+      "name": "linux/source_inputs/alpine",
+      "version": "4a3cc589c1e0ad0f7a26b519014e6322e1d5c419",
+      "url": "https://gitlab.alpinelinux.org/alpine/aports/-/archive/4a3cc589c1e0ad0f7a26b519014e6322e1d5c419/aports-4a3cc589c1e0ad0f7a26b519014e6322e1d5c419.tar.gz",
+      "sha256": "063a5c5e177346fa5283c75784d4b2f27da72f82decd14f9a8f6d26f487b803e",
+      "sha512": "0207cd32606a1bd343e3b3ea8925735d1e18fa5668da2dc9a936f8b033318245234b328b7c8ef68166a90a9e7cf781873f6360cba5d5778126e5451be0dd2029",
+      "size": 14268061,
+      "role": "source",
+      "target": "x86_64-unknown-linux-musl",
+      "lock": "config/inputs.lock"
+    },
+    {
+      "name": "linux/source_inputs/copium",
+      "version": "153.0",
+      "url": "https://codeberg.org/selfisekai/copium/archive/153.0.tar.gz",
+      "sha256": "e285480a5e72f1d249b1c852279fc888860f42826fa0e38b03ecdf419a7dbbcb",
+      "sha512": "6f8286defd231a589f4f042019a90595050c08821f8c1cfec843345ef724b4fc7233162f9a6da0857b838fccb8d36961eb28189ff0589abbe19e021dea64aff4",
+      "size": 30571,
+      "role": "source",
+      "target": "x86_64-unknown-linux-musl",
+      "lock": "config/inputs.lock"
+    },
+    {
+      "name": "linux/source_inputs/portablelinux",
+      "version": "effeae1d0728db00ed21cbf603af88e0fc38f97b",
+      "url": "https://github.com/ungoogled-software/ungoogled-chromium-portablelinux/archive/effeae1d0728db00ed21cbf603af88e0fc38f97b.tar.gz",
+      "sha256": "3cebad563abb2f5c9629b844067604b5fac3532d5a28eeff289f835448ab64a7",
+      "sha512": "ac297490b0eaa8a21451508888fb5ea168591e20c7110cf533026a8ab56eca3a29f3dbb177b63e224c3e7e5a1a3f76e9502c366dab24126cde6152efb6a3cc8a",
+      "size": 16799,
+      "role": "source",
+      "target": "x86_64-unknown-linux-musl",
+      "lock": "config/inputs.lock"
+    },
+    {
+      "name": "linux/source_inputs/ungoogled",
+      "version": "a638756eb14c8b6ce64b4b2a067afea5d4207bf4",
+      "url": "https://github.com/ungoogled-software/ungoogled-chromium/archive/a638756eb14c8b6ce64b4b2a067afea5d4207bf4.tar.gz",
+      "sha256": "c2f502c6d4a40ebb3cfac12e83676ee1efc47ed59e61a8cc00f1c4cf0577497b",
+      "sha512": "0b0bbeb1d213cc6ae1764ea628ae32fb2762419b4a554f0a4f6ba40d56df103e67ea0972cbbb5f4c0954fd6c22913badc081dcb6ebc87a3152b65f617a854efb",
+      "size": 671665,
+      "role": "source",
+      "target": "x86_64-unknown-linux-musl",
+      "lock": "config/inputs.lock"
+    },
+    {
+      "name": "linux/test_inputs/ublock_origin",
+      "version": "1.72.0",
+      "url": "https://github.com/gorhill/uBlock/releases/download/1.72.0/uBlock0_1.72.0.chromium.zip",
+      "sha256": "c2900bbe9a783e645389cdeb19be632a033ad11d8bee7a94b0d0c316a20a2b05",
+      "sha512": "ce98b58145bc1263ca919e9e329b2b402257d8b8eef325ec2b83392812f69ed62aba41866a3a7daecc166f2b5a18392467e9aae5af9d208b51cf1b02cc20d121",
+      "size": 4617915,
+      "role": "test",
+      "target": "x86_64-unknown-linux-musl",
+      "lock": "config/inputs.lock"
+    },
+    {
+      "name": "linux/toolchain/architectures/amd64",
+      "version": "llvmorg-24-init-3796-g20e97c4b-2",
+      "url": "https://commondatastorage.googleapis.com/chromium-browser-clang/Linux_x64/clang-llvmorg-24-init-3796-g20e97c4b-2.tar.xz",
+      "sha256": "86d53b33007a35695645e3867589a20f6f8aeedd146331e1a2ec8fd371e05ea2",
+      "size": 59131228,
+      "role": "toolchain",
+      "target": "x86_64-unknown-linux-musl",
+      "lock": "config/inputs.lock"
+    },
+    {
+      "name": "macos/chromium/source",
+      "version": "156.0.8078.47",
+      "url": "https://commondatastorage.googleapis.com/chromium-browser-official/chromium-156.0.8078.47.tar.xz",
+      "sha256": "fa9db61489d3470eaf0a1c2586b7b06348259c0ea6df3f448cbf80eb8178f644",
+      "sha512": "b6f02b7718ea746ee9b96615974dc9411d52216decbcc7a0219b5f900890593f305419eb1fbd12f3661a1d7ad2fa9156cf5ea767d4d1e17c5d8fb7795362ec1f",
+      "size": 4422608896,
+      "role": "source",
+      "target": "aarch64-apple-darwin",
+      "lock": "config/macos.inputs.lock"
+    },
+    {
+      "name": "macos/test_inputs/ublock_origin",
+      "version": "1.72.0",
+      "url": "https://github.com/gorhill/uBlock/releases/download/1.72.0/uBlock0_1.72.0.chromium.zip",
+      "sha256": "c2900bbe9a783e645389cdeb19be632a033ad11d8bee7a94b0d0c316a20a2b05",
+      "sha512": "ce98b58145bc1263ca919e9e329b2b402257d8b8eef325ec2b83392812f69ed62aba41866a3a7daecc166f2b5a18392467e9aae5af9d208b51cf1b02cc20d121",
+      "size": 4617915,
+      "role": "test",
+      "target": "aarch64-apple-darwin",
+      "lock": "config/macos.inputs.lock"
+    },
+    {
+      "name": "macos/ungoogled/source",
+      "version": "156.0.8078.47-1",
+      "url": "https://github.com/ungoogled-software/ungoogled-chromium/archive/0673f8701c94e5688c33ef8ce5e36602d311d246.tar.gz",
+      "sha256": "dd554b3d95abd7a2c55f9d78a37f3d2e9b59692d50ed016cb959d2ff148ce945",
+      "sha512": "b9b9df8f12c62749d1cf01fa50b27516eca2551eb01541fb3d8c72042d79814fd83d1b0134890e83c5f20263e3d8a436cf7ed9d48df6e54bdb12c3507aabec53",
+      "size": 679725,
+      "role": "source",
+      "target": "aarch64-apple-darwin",
+      "lock": "config/macos.inputs.lock"
+    },
+    {
+      "name": "toolchain/llvm-project-source",
+      "version": "23.1.5",
+      "url": "https://github.com/llvm/llvm-project/releases/download/llvmorg-23.1.5/llvm-project-23.1.5.src.tar.xz",
+      "sha256": "fb50b1eac93ddeb3aa8dab4cfe324dff74f4a9c2bdee6160c9e36188f8d06a6e",
+      "role": "toolchain",
+      "lock": "scripts/build-rust-toolchain.sh"
+    }
+  ]
+}

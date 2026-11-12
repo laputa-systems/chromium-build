@@ -42,7 +42,8 @@ def version_tuple(value: str) -> tuple[int, int, int]:
     match = re.search(r"(?<!\d)(\d+)\.(\d+)(?:\.(\d+))?", value)
     if not match:
         raise SystemExit(f"could not parse a version from {value!r}")
-    return tuple(int(match.group(index) or 0) for index in range(1, 4))  # type: ignore[return-value]
+    major, minor, patch = (int(match.group(index) or 0) for index in range(1, 4))
+    return major, minor, patch
 
 
 def claim_work_root(arguments: argparse.Namespace) -> None:
@@ -96,7 +97,8 @@ def verify_llvm(arguments: argparse.Namespace) -> None:
     require(result.returncode == 0, f"LLVM clang failed: {result.stderr.strip()}")
     output = result.stdout or result.stderr
     match = VERSION_RE.search(output)
-    require(match is not None, f"LLVM clang version is not parseable: {output.strip()}")
+    if match is None:
+        raise SystemExit(f"macOS CI policy check failed: LLVM clang version is not parseable: {output.strip()}")
     actual = tuple(int(match.group(index) or 0) for index in range(1, 4))
     minimum = version_tuple(arguments.minimum)
     require(actual >= minimum, f"LLVM {actual} is older than {minimum}")

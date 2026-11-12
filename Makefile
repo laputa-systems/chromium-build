@@ -1,3 +1,17 @@
+ifdef TARGET
+ifeq ($(TARGET),aarch64-apple-darwin)
+PLATFORM ?= macos
+ARCH ?= arm64
+else ifeq ($(TARGET),x86_64-unknown-linux-musl)
+PLATFORM ?= linux
+ARCH ?= amd64
+else ifeq ($(TARGET),aarch64-unknown-linux-musl)
+PLATFORM ?= linux
+ARCH ?= arm64
+else
+$(error unsupported TARGET $(TARGET); use aarch64-apple-darwin, x86_64-unknown-linux-musl, or aarch64-unknown-linux-musl)
+endif
+endif
 PLATFORM ?= linux
 PRODUCT ?= chromium
 ifeq ($(PLATFORM),macos)
@@ -33,14 +47,45 @@ DOCKER ?= docker
 .NOTPARALLEL:
 .PHONY: image fetch prepare gate-a gate-b gate-c gate-d gate-e gate-f gates
 .PHONY: release-linux package install
-.PHONY: bootstrap full-build resume-build build-target stage-runtime test-fast test-functional test-staged cache-stats resume-check graph-breakdown check-py lint
+.PHONY: bootstrap full-build resume-build build-target stage-runtime test-fast test-functional test-staged cache-stats resume-check graph-breakdown check-py lint test build verify clean
 .PHONY: macos-doctor macos-smoke-preflight macos-update-lock macos-fetch macos-prepare macos-configure macos-cache-stats macos-build macos-stage-runtime macos-test-staged
 
 check-py: lint
-	PYTHONPATH=scripts:tests uv run ty check scripts tests
 
 lint:
 	PYTHONPATH=scripts:tests uv run ruff check scripts tests
+	PYTHONPATH=scripts:tests uv run ty check scripts tests
+	uv run python scripts/sources_lock.py check
+
+test:
+	PYTHONPATH=scripts:tests uv run python -m unittest discover -s tests -p 'test_*.py'
+
+build:
+ifeq ($(PLATFORM),macos)
+	$(CHROMIUM_BUILD) fetch
+	$(CHROMIUM_BUILD) prepare
+	$(CHROMIUM_BUILD) configure
+	$(CHROMIUM_BUILD) build
+	$(CHROMIUM_BUILD) stage-runtime
+	@case "$$(printf %s "$${MACOS_SKIP_ACCEPTANCE:-0}" | tr A-Z a-z)" in 1|true|yes) ;; *) $(CHROMIUM_BUILD) test-staged ;; esac
+	$(CHROMIUM_BUILD) package
+else ifeq ($(PRODUCT),chromium)
+	$(MAKE) release-linux
+else
+	@echo 'make build supports PRODUCT=chromium; build helium with the steps in docs/linux.md' >&2; exit 2
+endif
+
+verify:
+ifeq ($(PLATFORM),macos)
+	$(CHROMIUM_BUILD) verify-release
+else
+	$(CHROMIUM_BUILD) test-staged
+endif
+
+clean:
+	rm -rf .venv .ruff_cache
+	find . -path './.git' -prune -o -path './.work' -prune -o -name __pycache__ -type d -prune -exec rm -rf {} +
+	rm -rf .work/macos-arm64/out .work/macos-arm64/stage .work/macos-arm64/release .work/macos-arm64/verify
 
 image:
 	$(CHROMIUM_BUILD) image
@@ -80,8 +125,8 @@ resume-build: gate-e gate-f
 	$(CHROMIUM_BUILD) build
 
 build-target:
-	@test -n "$(TARGET)" || (echo 'usage: make build-target TARGET=obj/path.o' >&2; exit 2)
-	$(CHROMIUM_BUILD) build-target "$(TARGET)"
+	@test -n "$(NINJA_TARGET)" || (echo 'usage: make build-target NINJA_TARGET=obj/path.o' >&2; exit 2)
+	$(CHROMIUM_BUILD) build-target "$(NINJA_TARGET)"
 
 stage-runtime:
 	$(CHROMIUM_BUILD) stage-runtime
