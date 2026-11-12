@@ -26,13 +26,33 @@ patch inventories, and phase reports define current behavior.
   `none` and `disabled` also turn compiler caching off.
 - Gate F's independent graph audit and generated evidence:
   [Gate F oracle](docs/gate-f-oracle.md).
+- Helium's acceptance matrix and the adblock-rust audit:
+  [Helium acceptance](docs/helium-acceptance.md),
+  [Helium adblock-rust](docs/helium-adblock-rust.md).
 
 The Makefile contains command shortcuts. `config/inputs.lock`,
-`config/packages.amd64.lock`, `config/macos.inputs.lock`, and the profile
-files are authoritative for pinned inputs.
+`config/helium.inputs.lock`, `config/packages.amd64.lock`,
+`config/macos.inputs.lock`, and the profile files are authoritative for pinned
+inputs. `sources.lock.json` lists every pinned download with its SHA-256 for the
+release contract and is derived from those locks: after changing one, run
+`python3 scripts/sources_lock.py write --fetch` and commit the result; `make lint`
+fails when the two disagree.
 
 ## Commands
 
 - Build and run browser acceptance with `./chromium-build`; use the platform
   guides for required flags and phase order.
-- Run the Python static checks with `make check-py`.
+- `make build`, `make verify`, `make lint`, `make test`, and `make clean` follow the
+  build-repository contract. `TARGET` is a Rust triple: `aarch64-apple-darwin` builds
+  the macOS app, `x86_64-unknown-linux-musl` runs `release-linux`, and
+  `aarch64-unknown-linux-musl` selects Helium's arm64 builder for the explicit steps.
+  `make build-target` takes the Ninja output as `NINJA_TARGET`. `make clean` removes
+  Python caches and the macOS stage, output, and release directories, and keeps
+  fetched inputs, source, and Docker volumes.
+- Run the Python static checks with `make check-py` (alias of `make lint`).
+- Releases: `.github/workflows/release.yml` publishes
+  `chromium-<version>-aarch64-apple-darwin.tar.xz` and its manifest from a manual dispatch.
+  `macos-26-smoke.yml` runs the same build without publishing. Linux builds run in
+  Docker on the maintainer's machine and are not released from CI.
+- The `rust-toolchain-<revision>-aarch64-linux-musl` GitHub releases are the input mirror
+  that `config/helium.inputs.lock` pins; they sit outside the release contract.

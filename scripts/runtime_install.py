@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+from collections.abc import Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -238,7 +239,7 @@ def validate_parent(path: Path, label: str) -> None:
         raise InstallError(f"{label} parent is a symlink: {parent}")
 
 
-def probe(path: Path, home: Path, environment: dict[str, str], probe_command: Path | None) -> None:
+def probe(path: Path, home: Path, environment: Mapping[str, str], probe_command: Path | None) -> None:
     command = [str(probe_command), str(path), "--version"] if probe_command else [str(path), "--version"]
     env = {
         key: value

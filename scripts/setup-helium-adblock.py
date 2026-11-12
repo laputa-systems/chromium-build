@@ -62,7 +62,7 @@ def safe_members(archive: tarfile.TarFile, top: str | None) -> list[tarfile.TarI
 
 def apply_crate_patch(patch: Path, destination: Path) -> None:
     result = subprocess.run(["patch", "--batch", "--forward", "--fuzz=0", "-p1", "-d", str(destination), "-i", str(patch)],
-                            capture_output=True, text=True)
+                            capture_output=True, text=True, check=False)
     if result.returncode != 0:
         raise SystemExit(f"{patch.name} does not apply to {destination.name}:\n{result.stdout}{result.stderr}")
 
@@ -147,7 +147,7 @@ def cargo_metadata(source: Path, environment: dict[str, str]) -> dict:
     result = subprocess.run(
         [sys.executable, str(source / "tools/crates/run_cargo.py"), "metadata", "--locked", "--offline",
          "--format-version", "1", "--manifest-path", str(workspace / "Cargo.toml")],
-        cwd=workspace, env=environment, capture_output=True, text=True,
+        cwd=workspace, env=environment, capture_output=True, text=True, check=False,
     )
     if result.returncode != 0:
         raise SystemExit(f"cargo metadata failed with exit {result.returncode}:\n{result.stderr}")

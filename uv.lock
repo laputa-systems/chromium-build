@@ -27,7 +27,7 @@ dev = [
 [package.metadata.requires-dev]
 dev = [
     { name = "ruff", specifier = "==0.17.4" },
-    { name = "ty", specifier = "==0.0.99" },
+    { name = "ty", specifier = "==0.0.101" },
     { name = "uv", specifier = "==0.13.7" },
 ]
 
@@ -44,13 +44,13 @@ wheels = [
 
 [[package]]
 name = "ty"
-version = "0.0.99"
+version = "0.0.101"
 source = { registry = "https://pypi.17166969.xyz/current/simple/" }
 wheels = [
-    { url = "https://pypi.17166969.xyz/current/wheels/ty-0.0.99-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:ff6957baa91b0da526c43d43fa9802526c94b168e412db0d2ca7ee1a19c0a9b1" },
-    { url = "https://pypi.17166969.xyz/current/wheels/ty-0.0.99-py3-none-macosx_11_0_arm64.whl", hash = "sha256:7cb88d3e7513dbf9d68c1e212999b7deb867fa3ac90efa8647c626e987f4cc26" },
-    { url = "https://pypi.17166969.xyz/current/wheels/ty-0.0.99-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:8480617183adff4381c63d5fcfa9318aa9adc39ba3dd5d243374f2ae1e5534e1" },
-    { url = "https://pypi.17166969.xyz/current/wheels/ty-0.0.99-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a95383fa343765ddbb1a2bc79038d89c9cfb12fdf3b829b69f7d95d47d8d9f1c" },
+    { url = "https://pypi.17166969.xyz/current/wheels/ty-0.0.101-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:940441c9a8bb46f669ad49de4f20d0856ab6e114db414a2ae4c9962c27d1f46b" },
+    { url = "https://pypi.17166969.xyz/current/wheels/ty-0.0.101-py3-none-macosx_11_0_arm64.whl", hash = "sha256:e185325fbd4dd9cabdc504c685f04f59b24f37dec96b2d9e8a8afab5731e1ea1" },
+    { url = "https://pypi.17166969.xyz/current/wheels/ty-0.0.101-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:88857d3cb6c9446c41dbb74ee58147e7fae5ce19de206f7dab73ffc0ce6849f9" },
+    { url = "https://pypi.17166969.xyz/current/wheels/ty-0.0.101-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e6d912d5593a6abc953b135c7d73d58dbeefb898d7306337ce16bbd88b01a616" },
 ]
 
 [[package]]

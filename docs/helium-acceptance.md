@@ -107,7 +107,7 @@ validate committed fixture dates before use. Never use wall-clock changes to
 make a certificate pass. Keep test keys confined to public test fixtures or
 scratch.
 
-The pinned Chromium 156 source's `docs/linux/cert_management.md` says the normal
+The pinned Chromium 156 source's Linux certificate-management guide (`cert_management.md`) says the normal
 NSS store is under `.local/share/pki/nssdb`, with legacy `.pki/nssdb` used if
 already present. Use a fresh isolated HOME so there is no legacy ambiguity.
 The harness must create and import only inside that HOME:

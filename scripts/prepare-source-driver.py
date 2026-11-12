@@ -7,6 +7,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -288,7 +289,7 @@ def prepare_helium(root: Path, work: Path, inputs: Path, metadata: Path, source:
         )
         print(f"Prepare: Helium source prepared at {source}")
     except BaseException:
-        print(f"Prepare: failed attempt preserved at {temp}", file=os.sys.stderr)
+        print(f"Prepare: failed attempt preserved at {temp}", file=sys.stderr)
         raise
     finally:
         shutil.rmtree(config, ignore_errors=True)
@@ -404,7 +405,7 @@ def main() -> None:
     source = Path(os.environ.get("CHROMIUM_SOURCE_ROOT", work / "src"))
     arch = os.environ.get("CHROMIUM_ARCH", "arm64")
     product = os.environ.get("CHROMIUM_PRODUCT", "chromium")
-    if "--update-integration" in os.sys.argv[1:]:
+    if "--update-integration" in sys.argv[1:]:
         update_integration(root, work, metadata, source, arch)
         return
     require_network("none", "preparation")

@@ -384,12 +384,19 @@ def process_group_pids(process_group):
     return [pid for pid, values in _process_table().items() if values["pgid"] == process_group]
 
 
+PROCESS_GROUP_ATTRIBUTE = "_chromium_process_group"
+
+
+def record_process_group(process, process_group):
+    setattr(process, PROCESS_GROUP_ATTRIBUTE, process_group)
+
+
 def terminate_process(process):
     if process is None:
         return {"status": "not-started", "ok": True, "survivors": []}
     root_pid = process.pid
     descendants = _descendant_pids(root_pid)
-    process_group = getattr(process, "_chromium_process_group", None)
+    process_group = getattr(process, PROCESS_GROUP_ATTRIBUTE, None)
     if process_group is None:
         try:
             process_group = os.getpgid(root_pid)
@@ -553,9 +560,9 @@ def launch_chromium(binary, profile_dir, args, log_path, *, pipe=False):
                 except OSError:
                     pass
     try:
-        process._chromium_process_group = os.getpgid(process.pid)
+        record_process_group(process, os.getpgid(process.pid))
     except OSError:
-        process._chromium_process_group = None
+        record_process_group(process, None)
     log.close()
     if pipe_transport is not None:
         return process, CdpConnection(pipe_transport)

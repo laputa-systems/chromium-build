@@ -376,7 +376,7 @@ class MacOSBackendTests(unittest.TestCase):
                 self.end_headers()
                 self.wfile.write(b"ok")
 
-            def log_message(self, *args):
+            def log_message(self, format, *args):
                 pass
 
         server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
@@ -408,7 +408,7 @@ class MacOSBackendTests(unittest.TestCase):
                 self.end_headers()
                 self.wfile.write(b"ok")
 
-            def log_message(self, *args):
+            def log_message(self, format, *args):
                 pass
 
         server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
@@ -618,7 +618,7 @@ class MacOSBackendTests(unittest.TestCase):
             ],
         ):
             candidate = backend.llvm_candidate(llvm, {}, "test")
-        self.assertIsNotNone(candidate)
+        assert candidate is not None
         self.assertEqual(candidate["tools"]["llvm-ar"], str(bin_dir / "llvm-ar"))
         (bin_dir / "llvm-strip").unlink()
         with mock.patch.object(backend, "command_output"):

@@ -30,11 +30,11 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import zipfile
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Generator, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 MIN_MACOS = (26, 0, 0)
 FULL_BUILD_MIN_FREE_GB = 80
@@ -107,7 +107,7 @@ class MacOSFailure(RuntimeError):
     """An expected native-build failure with an actionable message."""
 
 
-def fail(message: str) -> None:
+def fail(message: str) -> NoReturn:
     raise MacOSFailure(message)
 
 
@@ -186,7 +186,8 @@ def parse_version(value: str) -> tuple[int, int, int]:
     match = VERSION_RE.search(value)
     if not match:
         fail(f"could not parse a semantic tool version from: {value.strip()}")
-    return tuple(int(match.group(index) or 0) for index in range(1, 4))  # type: ignore[return-value]
+    major, minor, patch = (int(match.group(index) or 0) for index in range(1, 4))
+    return major, minor, patch
 
 
 def version_string(value: Sequence[int]) -> str:
@@ -481,7 +482,7 @@ class WorkLayout:
 
 
 @contextmanager
-def work_lock(layout: WorkLayout) -> Iterator[None]:
+def work_lock(layout: WorkLayout) -> Generator[None]:
     initialization_lock_dir = layout.repo_root / ".work" / ".locks"
     initialization_lock_dir.mkdir(parents=True, exist_ok=True)
     initialization_lock = initialization_lock_dir / "initialization.lock"
@@ -3405,7 +3406,7 @@ def path_is_forbidden_dependency(value: str, layout: WorkLayout) -> str | None:
 
 
 @contextmanager
-def macho_audit_path(path: Path, layout: WorkLayout) -> Iterator[Path]:
+def macho_audit_path(path: Path, layout: WorkLayout) -> Generator[Path]:
     """Give Apple's otool a safe alias for Mach-O names that look like archives."""
 
     if " (" not in str(path):

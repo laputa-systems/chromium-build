@@ -91,8 +91,8 @@ RUN set -eux; \
         mkdir -p "/opt/chromium-llvm/lib/clang/${clang_major}/lib/${linux_arch}-unknown-linux-musl"; \
         ln -sf "../linux/libclang_rt.builtins-${builtins_arch}.a" "/opt/chromium-llvm/lib/clang/${clang_major}/lib/${linux_arch}-unknown-linux-musl/libclang_rt.builtins.a"; \
         if [ "$TARGET_ARCH" = amd64 ]; then \
-            mkdir -p "/opt/chromium-llvm/lib/clang/${clang_major}/lib/${linux_arch}-unknown-linux-gnu"; \
-            ln -sf "../linux/libclang_rt.builtins-${builtins_arch}.a" "/opt/chromium-llvm/lib/clang/${clang_major}/lib/${linux_arch}-unknown-linux-gnu/libclang_rt.builtins.a"; \
+            mkdir -p "/opt/chromium-llvm/lib/clang/${clang_major}/lib/x86_64-unknown-linux-gnu"; \
+            ln -sf "../linux/libclang_rt.builtins-${builtins_arch}.a" "/opt/chromium-llvm/lib/clang/${clang_major}/lib/x86_64-unknown-linux-gnu/libclang_rt.builtins.a"; \
         fi; \
         test "$(/opt/chromium-llvm/bin/clang -dumpmachine)" = "${linux_arch}-unknown-linux-musl"; \
         /opt/chromium-llvm/bin/clang --version | grep -F 23.1.5; \

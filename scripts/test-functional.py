@@ -556,7 +556,7 @@ def run_tcp(binary, fixtures, server_url, https_url, fixture_hits, output, ubloc
         artifact = {
             "schema": 1,
             "status": "complete" if run_error is None and cleanup["ok"] else "failed",
-            "error": str(run_error) if run_error else None,
+            "error": None if run_error is None else str(run_error),
             "profile": str(profile),
             "log": str(log_path),
             "downloads": str(downloads),
@@ -634,7 +634,7 @@ def run_pipe(binary, server_url, output):
             {
                 "schema": 1,
                 "status": "complete" if run_error is None and cleanup["ok"] else "failed",
-                "error": str(run_error) if run_error else None,
+                "error": None if run_error is None else str(run_error),
                 "profile": str(profile),
                 "log": str(log_path),
                 "cleanup": cleanup,
