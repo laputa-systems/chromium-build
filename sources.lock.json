@@ -613,20 +613,20 @@
     },
     {
       "name": "helium/toolchain/architectures/amd64",
-      "version": "llvm-musl-23.1.5-dc0d9b9",
-      "url": "https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-23.1.5-dc0d9b9/clang%2Bllvm-23.1.5-x86_64-linux-musl.tar.xz",
-      "sha256": "c43f18f143cc17f49814b6c5dda8a1122d17b6bcdff9848b6f77e97b33026dfe",
-      "size": 100671508,
+      "version": "release-10dbf21a8bc2ec9a7f60d2f15eed2307c52c290f",
+      "url": "https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/release-10dbf21a8bc2ec9a7f60d2f15eed2307c52c290f/llvm-23.1.5-x86_64-unknown-linux-musl.tar.xz",
+      "sha256": "9e688c32a83b7a54628aa1881802cf435ad49911d2f5ba620e1d6941bb0499c2",
+      "size": 100747496,
       "role": "toolchain",
       "target": "x86_64-unknown-linux-musl",
       "lock": "config/helium.inputs.lock"
     },
     {
       "name": "helium/toolchain/architectures/arm64",
-      "version": "llvm-musl-23.1.5-dc0d9b9",
-      "url": "https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-23.1.5-dc0d9b9/clang%2Bllvm-23.1.5-aarch64-linux-musl.tar.xz",
-      "sha256": "fe0a382993c36a04a505157b59503a7294db97e2ac9923e5630f8b393b78f118",
-      "size": 93784384,
+      "version": "release-10dbf21a8bc2ec9a7f60d2f15eed2307c52c290f",
+      "url": "https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/release-10dbf21a8bc2ec9a7f60d2f15eed2307c52c290f/llvm-23.1.5-aarch64-unknown-linux-musl.tar.xz",
+      "sha256": "975da816c5519b62f6960b35ec0f862498c90abaccb06d9a100848bf02020e31",
+      "size": 93823420,
       "role": "toolchain",
       "target": "aarch64-unknown-linux-musl",
       "lock": "config/helium.inputs.lock"
