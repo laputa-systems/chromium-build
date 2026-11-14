@@ -40,7 +40,7 @@ jobs:
   build:
     name: Build (aarch64-apple-darwin)
     needs: preflight
-    runs-on: macos-latest
+    runs-on: xcode-27
     timeout-minutes: 360
     permissions:
       contents: read
