@@ -104,11 +104,16 @@ jobs:
           docker rm -v "$cid"
           docker run --rm --network=none \
             --security-opt seccomp=unconfined \
+            -e TMPDIR=/qual/tmp \
             --tmpfs /dev/shm:rw,nosuid,nodev,noexec,size=1g \
             --tmpfs /tmp:rw,nosuid,nodev,size=256m \
             -v "$qualify:/qual" \
             -v "$GITHUB_WORKSPACE:/repo:ro" \
             "$image" sh -euc "
+              qualify_owner=\$(stat -c '%u:%g' /qual)
+              trap 'chown -hR \"\$qualify_owner\" /qual' EXIT
+              chown 0:0 /qual
+              mkdir -m 1777 /qual/tmp
               python3 /repo/scripts/qualify-package.py --archive '/qual/$archive' --report /qual/test-fast.json
               python3 /repo/scripts/install-runtime.py --archive '/qual/$archive' --verify-extract /qual/extract
               mkdir /qual/host-headless && chown 100:101 /qual/host-headless
