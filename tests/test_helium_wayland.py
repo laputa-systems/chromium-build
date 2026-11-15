@@ -105,10 +105,10 @@ class FixtureTest(unittest.TestCase):
         fixture.prepare()
         fixture.start()
         result = subprocess.run(
-            [sys.executable, "-c", "import os; from pathlib import Path; "
+            [sys.executable, "-c", ("import os; from pathlib import Path; "
              "display = os.environ['WAYLAND_DISPLAY']; "
              "assert display == 'wayland-1'; "
-             "assert (Path(os.environ['XDG_RUNTIME_DIR']) / display).exists()"],
+             "assert (Path(os.environ['XDG_RUNTIME_DIR']) / display).exists()")],
             env=fixture.environment(), capture_output=True, text=True, check=False,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
