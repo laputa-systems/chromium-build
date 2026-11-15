@@ -81,6 +81,8 @@ class HeadlessSway:
             WLR_LIBINPUT_NO_DEVICES="1",
             WLR_HEADLESS_OUTPUTS="1",
         )
+        if self.wayland_socket is not None:
+            environment["WAYLAND_DISPLAY"] = self.wayland_socket.name
         return environment
 
     def prepare(self) -> None:
