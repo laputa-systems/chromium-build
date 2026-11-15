@@ -51,6 +51,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          cd "$RUNNER_TEMP"
           rm -rf -- "${GITHUB_WORKSPACE:?}"
           git clone --no-checkout --depth=1 --no-tags --filter=blob:none \
             "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" \
