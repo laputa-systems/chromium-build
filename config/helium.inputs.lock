@@ -190,8 +190,8 @@
     "version": "23.1.5",
     "lld_version": "23.1.5",
     "root": "/opt/chromium-llvm",
-    "clang_cfg_sha256": "6270475bd096eb2dc9f625a5f3ceed7c4e66f3d5ad1a1acf64177d46fa281b33",
-    "clangxx_cfg_sha256": "dbf00ec9e9186ecad10671ae2cc06b5d5369872f5024969fbd318c4b2e539d66",
+    "clang_cfg_sha256": "c229db2318937ef017eec2d5d3c746af712cfde35bc304d107740689e518ad5b",
+    "clangxx_cfg_sha256": "4e48721b71aa07596a47e464beaad72e977831f95b226976e33929917fb7ead9",
     "host_runtime": {
       "image": "debian@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251",
       "architectures": ["amd64"],
