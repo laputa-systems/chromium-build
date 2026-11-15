@@ -96,7 +96,7 @@ jobs:
           image="helium-builder:${product_version}-amd64"
           qualify="$RUNNER_TEMP/qualify"
           mkdir -p "$qualify"
-          cid="$(docker create "$image" true)"
+          cid="$(docker create -v "$CHROMIUM_WORK_VOLUME:/work:ro" "$image" true)"
           docker cp "$cid:/work/artifacts/$archive" "$qualify/$archive"
           docker cp "$cid:/work/artifacts/$archive.sha256" "$qualify/$archive.sha256"
           docker cp "$cid:/work/test-output/helium-wayland-release/test-fast.json" "$qualify/test-fast.json"
@@ -166,7 +166,7 @@ jobs:
           jq -e --arg digest "$digest" --arg archive "$archive" \
             '.schema == 1 and .status == "complete" and .product == "helium" and .architecture == "amd64"
              and .archive == $archive and .archive_sha256 == $digest
-             and ([.checks[], .host_headless.checks[]] | length > 0 and all)' \
+             and ([.checks[], .host_headless.checks[]] | length > 0 and all(. == true))' \
             "dist/$archive.acceptance.json" >/dev/null
           printf 'RELEASE_TAG=%s\nARCHIVE=%s\n' "${archive%-linux-*}" "$archive" >> "$GITHUB_ENV"
 
