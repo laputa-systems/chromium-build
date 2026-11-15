@@ -288,3 +288,9 @@ package has not run in the owner's dwl session, has not been installed live, and
 has not been exercised against Broadwell VA-API hardware.
 [Helium acceptance](helium-acceptance.md) defines the remaining observations
 and the target qualification procedure.
+
+The `release-linux` qualification container disables Docker’s outer seccomp
+filter so the unprivileged browser can create its user namespace. Network
+isolation remains enabled. Chromium still installs its own renderer seccomp
+filter and namespace sandbox, and the qualification report must prove both.
+The native host qualification command above needs no Docker exception.

@@ -102,6 +102,7 @@ jobs:
           docker cp "$cid:/work/test-output/helium-wayland-release/test-fast.json" "$qualify/test-fast.json"
           docker rm -v "$cid"
           docker run --rm --network=none \
+            --security-opt seccomp=unconfined \
             --tmpfs /dev/shm:rw,nosuid,nodev,noexec,size=1g \
             --tmpfs /tmp:rw,nosuid,nodev,size=256m \
             -v "$qualify:/qual" \
