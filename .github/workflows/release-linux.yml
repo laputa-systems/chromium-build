@@ -220,7 +220,7 @@ jobs:
             printf '## Verification\n\n'
             printf -- '- `sha256sum -c` against the attached `%s.sha256` sidecar (`%s`).\n' "$ARCHIVE" "$archive_sha"
             printf -- '- `%s.acceptance.json` binds the archive digest and the passing browser checks: product and executable identity, the Wayland window, page rendering, renderer sandboxing, clean shutdown, the headless path, and the headless load run with no crashed targets and no SIGSYS exits.\n' "$ARCHIVE"
-            printf '- `docs/linux.md` in this repository describes the qualification procedure these sidecars record.\n\n'
+            printf -- '- `docs/linux.md` in this repository describes the qualification procedure these sidecars record.\n\n'
             printf '## Install\n\n'
             printf '```sh\n'
             printf 'sha256sum -c %s.sha256\n' "$ARCHIVE"
