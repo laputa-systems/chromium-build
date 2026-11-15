@@ -1,0 +1,237 @@
+name: release-linux
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: "${{ github.workflow }}"
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash -euo pipefail {0}
+
+jobs:
+  preflight:
+    name: Validate release ref
+    runs-on: ubuntu-26.04-arm
+    permissions:
+      contents: read
+    outputs:
+      default_branch: ${{ steps.ref.outputs.default_branch }}
+    steps:
+      - name: Require the default branch
+        id: ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          default_branch=$(gh api "repos/$REPOSITORY" --jq '.default_branch')
+          if [[ "$EVENT_NAME" != workflow_dispatch || "$REF" != "refs/heads/$default_branch" ]]; then
+            echo "Release dispatch rejected: expected workflow_dispatch on refs/heads/$default_branch, got $EVENT_NAME on $REF" >&2
+            exit 1
+          fi
+          echo "default_branch=$default_branch" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build and qualify (x86_64 linux musl)
+    needs: preflight
+    runs-on: chromium-build-amd64
+    timeout-minutes: 1440
+    permissions:
+      contents: read
+    env:
+      CHROMIUM_WORK_VOLUME: helium-0.20.3.1-work-amd64-ci
+    steps:
+      - name: Clone the exact dispatched commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf -- "${GITHUB_WORKSPACE:?}"
+          git clone --no-checkout --depth=1 --no-tags --filter=blob:none \
+            "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" \
+            "$GITHUB_WORKSPACE"
+          git -C "$GITHUB_WORKSPACE" fetch --depth=1 origin "$GITHUB_SHA"
+          git -C "$GITHUB_WORKSPACE" checkout "$GITHUB_SHA"
+          test "$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD)" = "$GITHUB_SHA"
+
+      - name: Remove any previous CI work volume
+        shell: bash
+        run: |
+          set -euo pipefail
+          if docker volume inspect "$CHROMIUM_WORK_VOLUME" >/dev/null 2>&1; then
+            docker volume rm "$CHROMIUM_WORK_VOLUME"
+          fi
+
+      - name: Build and test Helium
+        working-directory: ${{ github.workspace }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          p='./chromium-build --product helium --profile helium-wayland-release'
+          $p image
+          $p fetch
+          $p prepare
+          $p poc
+          $p build
+          $p test-fast
+          $p build-target chrome_sandbox --jobs "$(nproc)"
+          $p stage-runtime
+          $p test-staged
+          $p package
+
+      - name: Qualify the archive
+        working-directory: ${{ github.workspace }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          product_version="$(jq -r '.product.version' config/helium.inputs.lock)"
+          package_revision="$(jq -r '.product.package_revision' config/helium.inputs.lock)"
+          version="${product_version}-r${package_revision}"
+          archive="helium-${version}-linux-x86_64-musl.tar.xz"
+          image="helium-builder:${product_version}-amd64"
+          qualify="$RUNNER_TEMP/qualify"
+          mkdir -p "$qualify"
+          cid="$(docker create "$image" true)"
+          docker cp "$cid:/work/artifacts/$archive" "$qualify/$archive"
+          docker cp "$cid:/work/artifacts/$archive.sha256" "$qualify/$archive.sha256"
+          docker cp "$cid:/work/test-output/helium-wayland-release/test-fast.json" "$qualify/test-fast.json"
+          docker rm -v "$cid"
+          docker run --rm --network=none \
+            --tmpfs /dev/shm:rw,nosuid,nodev,noexec,size=1g \
+            --tmpfs /tmp:rw,nosuid,nodev,size=256m \
+            -v "$qualify:/qual" \
+            -v "$GITHUB_WORKSPACE:/repo:ro" \
+            "$image" sh -euc "
+              python3 /repo/scripts/qualify-package.py --archive '/qual/$archive' --report /qual/test-fast.json
+              python3 /repo/scripts/install-runtime.py --archive '/qual/$archive' --verify-extract /qual/extract
+              mkdir /qual/host-headless && chown 100:101 /qual/host-headless
+              su chromium -s /bin/sh -c 'python3 /repo/scripts/helium_test_fast.py --headless-only --load-instances 3 --load-seconds 180 --helium /qual/extract/helium-wrapper --fixtures /repo/tests/fixtures --inputs-lock /repo/config/helium.inputs.lock --output /qual/host-headless'
+              python3 /repo/scripts/qualify-package.py --archive '/qual/$archive' --report /qual/test-fast.json --host-headless-report /qual/host-headless/test-fast.json
+            "
+          ls -l "$qualify"
+
+      - name: Upload the release assets
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: helium-linux-x86_64-musl
+          path: |
+            ${{ runner.temp }}/qualify/helium-*-linux-x86_64-musl.tar.xz
+            ${{ runner.temp }}/qualify/helium-*-linux-x86_64-musl.tar.xz.sha256
+            ${{ runner.temp }}/qualify/helium-*-linux-x86_64-musl.tar.xz.acceptance.json
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Create pre-release
+    needs: [preflight, build]
+    runs-on: ubuntu-26.04-arm
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: helium-linux-x86_64-musl
+          path: dist
+
+      - name: Verify release assets and write checksums
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          export LC_ALL=C
+          archive="$(find dist -mindepth 1 -maxdepth 1 -name '*.tar.xz' -printf '%f\n')"
+          if [[ ! "$archive" =~ ^helium-[0-9]+(\.[0-9]+){2,3}-r[0-9]+-linux-x86_64-musl\.tar\.xz$ ]]; then
+            echo "Unexpected archive name: $archive" >&2
+            exit 1
+          fi
+          expected=$(printf '%s\n' "$archive" "$archive.sha256" "$archive.acceptance.json" | sort)
+          actual=$(find dist -mindepth 1 -maxdepth 1 -printf '%f\n' | sort)
+          if [[ "$actual" != "$expected" ]]; then
+            echo "Unexpected release assets:" >&2
+            printf '%s\n' "$actual" >&2
+            exit 1
+          fi
+          test -s "dist/$archive"
+          (cd dist && sha256sum -c "$archive.sha256")
+          digest="$(sha256sum "dist/$archive" | cut -d' ' -f1)"
+          if [[ "$(cut -d' ' -f1 "dist/$archive.sha256")" != "$digest" ]]; then
+            echo "Archive checksum sidecar does not match the archive" >&2
+            exit 1
+          fi
+          jq -e --arg digest "$digest" --arg archive "$archive" \
+            '.schema == 1 and .status == "complete" and .product == "helium" and .architecture == "amd64"
+             and .archive == $archive and .archive_sha256 == $digest
+             and ([.checks[], .host_headless.checks[]] | length > 0 and all)' \
+            "dist/$archive.acceptance.json" >/dev/null
+          printf 'RELEASE_TAG=%s\nARCHIVE=%s\n' "${archive%-linux-*}" "$archive" >> "$GITHUB_ENV"
+
+      - name: Recheck release ref and tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF: ${{ github.ref }}
+          EVENT_NAME: ${{ github.event_name }}
+          REPOSITORY: ${{ github.repository }}
+          DEFAULT_BRANCH: ${{ needs.preflight.outputs.default_branch }}
+        run: |
+          default_branch=$(gh api "repos/$REPOSITORY" --jq '.default_branch')
+          if [[ "$EVENT_NAME" != workflow_dispatch || "$REF" != "refs/heads/$default_branch" || "$DEFAULT_BRANCH" != "$default_branch" ]]; then
+            echo "Release publication rejected: expected workflow_dispatch on refs/heads/$default_branch, got $EVENT_NAME on $REF" >&2
+            exit 1
+          fi
+          if response=$(gh api "repos/$REPOSITORY/git/ref/tags/$RELEASE_TAG" 2>&1); then
+            echo "Release publication rejected: tag $RELEASE_TAG already exists; inspect it before proceeding" >&2
+            exit 1
+          else
+            if [[ "$response" != *"HTTP 404"* ]]; then
+              printf 'Could not verify that tag %s is absent: %s\n' "$RELEASE_TAG" "$response" >&2
+              exit 1
+            fi
+          fi
+
+      - name: Create release tag at triggering SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          if response=$(gh api "repos/$REPOSITORY/git/refs" -f "ref=refs/tags/$RELEASE_TAG" -f "sha=$GITHUB_SHA" 2>&1); then
+            echo "Created $RELEASE_TAG at $GITHUB_SHA"
+          else
+            printf 'Could not create release tag %s at %s: %s\n' "$RELEASE_TAG" "$GITHUB_SHA" "$response" >&2
+            exit 1
+          fi
+
+      - name: Write release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="$RUNNER_TEMP/release-notes.md"
+          archive_sha="$(sha256sum "dist/$ARCHIVE" | cut -d' ' -f1)"
+          {
+            printf 'Native Linux amd64 browser package: Helium %s on musl, packaged as a relocatable archive.\n\n' "${RELEASE_TAG#helium-}"
+            printf 'Built and qualified by the `release-linux` workflow at `%s`. The `%s` tag is the package revision for this Helium version;\n' "$GITHUB_SHA" "${RELEASE_TAG##*-}"
+            printf 'the archive name carries the same suffix.\n\n'
+            printf '## Verification\n\n'
+            printf -- '- `sha256sum -c` against the attached `%s.sha256` sidecar (`%s`).\n' "$ARCHIVE" "$archive_sha"
+            printf -- '- `%s.acceptance.json` binds the archive digest and the passing browser checks: product and executable identity, the Wayland window, page rendering, renderer sandboxing, clean shutdown, the headless path, and the headless load run with no crashed targets and no SIGSYS exits.\n' "$ARCHIVE"
+            printf '- `docs/linux.md` in this repository describes the qualification procedure these sidecars record.\n\n'
+            printf '## Install\n\n'
+            printf '```sh\n'
+            printf 'sha256sum -c %s.sha256\n' "$ARCHIVE"
+            printf 'tar -xJf %s\n' "$ARCHIVE"
+            printf './%s/helium-wrapper --version\n' "${ARCHIVE%.tar.xz}"
+            printf '```\n\n'
+            printf 'This is a prerelease. The package passed its automated checks but has not yet been qualified on the target desktop (TODO CHB-7); automated host qualification is not target evidence.\n'
+          } > "$notes"
+
+      - name: Create pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --verify-tag \
+            --notes-file "$RUNNER_TEMP/release-notes.md" --title "$RELEASE_TAG" \
+            "dist/$ARCHIVE" "dist/$ARCHIVE.sha256" "dist/$ARCHIVE.acceptance.json"
