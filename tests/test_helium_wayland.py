@@ -99,8 +99,10 @@ class FixtureTest(unittest.TestCase):
 
     def test_browser_environment_selects_the_started_wayland_display(self):
         self.install_success()
-        fixture = HeadlessSway(self.output, *(str(self.bin / name) for name in
-            ("sway", "swaymsg", "grim", "wl-copy", "wl-paste")))
+        fixture = HeadlessSway(
+            self.output, str(self.bin / "sway"), str(self.bin / "swaymsg"),
+            str(self.bin / "grim"), str(self.bin / "wl-copy"), str(self.bin / "wl-paste"),
+        )
         self.addCleanup(fixture.stop)
         fixture.prepare()
         fixture.start()
