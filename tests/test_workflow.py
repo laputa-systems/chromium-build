@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Policy checks for the workflow files."""
 
+import json
 import os
 import re
 import subprocess
@@ -23,6 +24,28 @@ def job_block(text: str, job: str) -> str:
 
 
 class WorkflowTests(unittest.TestCase):
+    @unittest.skipUnless(os.environ.get("CHROMIUM_RELEASE_TEST_WORK_VOLUME"), "requires a packaged Helium CI volume and Docker runner")
+    def test_linux_release_qualifies_a_real_archive_and_returns_runner_ownership(self):
+        text = job_block(read_workflow("release-linux.yml"), "build")
+        step = text.split("      - name: Qualify the archive\n", 1)[1].split("      - name:", 1)[0]
+        script = textwrap.dedent(step.split("        run: |\n", 1)[1])
+        workspace = WORKFLOWS.parents[1]
+        with tempfile.TemporaryDirectory(prefix="release-qualification-", dir=os.environ["RUNNER_TEMP"]) as directory:
+            environment = os.environ | {"GITHUB_WORKSPACE": str(workspace), "RUNNER_TEMP": directory,
+                                        "CHROMIUM_WORK_VOLUME": os.environ["CHROMIUM_RELEASE_TEST_WORK_VOLUME"]}
+            result = subprocess.run(["bash", "-euo", "pipefail", "-c", script], cwd=workspace,
+                                    env=environment, capture_output=True, text=True, check=False, timeout=600)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            qualify = Path(directory) / "qualify"
+            reports = list(qualify.glob("*.acceptance.json"))
+            self.assertEqual(len(reports), 1)
+            acceptance = json.loads(reports[0].read_text())
+            self.assertTrue(all(value is True for value in acceptance["checks"].values()))
+            self.assertTrue(all(value is True for value in acceptance["host_headless"]["checks"].values()))
+            self.assertIs(acceptance["host_headless"]["checks"]["host-headless-load"], True)
+            for path in [qualify, *qualify.rglob("*")]:
+                self.assertEqual(path.lstat().st_uid, os.getuid(), str(path))
+
     def test_linux_release_replaces_its_current_workspace_and_checks_out_the_requested_commit(self):
         text = job_block(read_workflow("release-linux.yml"), "build")
         clone = text.split("      - name: Clone the exact dispatched commit\n", 1)[1].split("      - name:", 1)[0]

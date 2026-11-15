@@ -294,3 +294,18 @@ filter so the unprivileged browser can create its user namespace. Network
 isolation remains enabled. Chromium still installs its own renderer seccomp
 filter and namespace sandbox, and the qualification report must prove both.
 The native host qualification command above needs no Docker exception.
+
+
+Archive verification and extraction use disk-backed scratch under the mounted
+qualification directory. The 256 MiB `/tmp` tmpfs is too small for the unpacked
+browser. The container temporarily owns that directory for the installer's
+ownership checks and returns all outputs to the runner on exit, including
+failure. The unprivileged headless test uses the same writable scratch.
+
+To regression-test the actual workflow qualification step against a completed
+CI work volume on the runner, set `CHROMIUM_RELEASE_TEST_WORK_VOLUME` to that
+volume and run `PYTHONPATH=scripts:tests python3 -m unittest
+test_workflow.WorkflowTests.test_linux_release_qualifies_a_real_archive_and_returns_runner_ownership`.
+`RUNNER_TEMP` and the checkout must be visible at identical paths to Docker.
+This runs the full three-instance, 180-second headless check and verifies the
+acceptance report and restored ownership. It never rebuilds or publishes.
