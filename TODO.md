@@ -64,3 +64,12 @@ Next: 10
 - **Status (2026-11-10):** forward-ported and off by default (`8e21451`); a native `r7` candidate qualifies and blocks in bctl, measured in `docs/helium-adblock-rust.md`. Generic hiding now uses one native stylesheet and no isolated world, which cut the Speedometer cost from about 13 to about 6 percent (pending a quiet rerun). Open: the remaining 6 percent, most likely the per-request async engine hop; about 170 MiB of VM memory for the engine; `about:blank`/`data:` documents are unfiltered, hydrogen's `dev/helium-rootfs.sh` pins the r5 archive by digest, and no profile enables the flag.
 - **Fix with:** none
 - **Effort:** L
+
+### CHB-10 · P2 · stop exact Alpine package pins from rotting against the live v3.24 repository
+
+- **Area:** Build
+- **Where:** `config/helium.packages.amd64.lock`, `config/helium.packages.arm64.lock`, `config/packages.amd64.lock`, `config/packages.arm64.lock`, `Dockerfile:239`, `scripts/lockcheck.py`
+- **Problem:** The builder image is digest-pinned, but `apk add` installs exact `name=version` pins from the live `dl-cdn.alpinelinux.org/alpine/v3.24` repositories, which keep only the newest revision. Each Alpine point update breaks a fresh image build: `libopenmpt` on 2026-11-09 (`7bc3a0f`), then `go=1.26.10-r0` and `nodejs=24.22.1-r1` on 2026-11-15, when a fresh amd64 build failed in `image` with `breaks: world[go=1.26.10-r0]`. The arm64 and headless locks pin the same superseded `go` and `nodejs`.
+- **Recommendation:** Make the package world reproducible instead of re-bumping pins after each break: mirror the exact resolved `.apk` files as GitHub release assets, as the Rust toolchain mirror does, or pin a dated repository snapshot, and fetch them in `fetch` with checksums. Accept when a fresh `image` build succeeds from the lock after Alpine supersedes a pinned revision and Gate A's `lockcheck.py packages` still passes.
+- **Fix with:** none
+- **Effort:** M
