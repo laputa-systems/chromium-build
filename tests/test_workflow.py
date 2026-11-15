@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """Policy checks for the workflow files."""
 
+import os
 import re
+import subprocess
+import tempfile
+import textwrap
 import unittest
 from pathlib import Path
 
@@ -19,6 +23,31 @@ def job_block(text: str, job: str) -> str:
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_linux_release_replaces_its_current_workspace_and_checks_out_the_requested_commit(self):
+        text = job_block(read_workflow("release-linux.yml"), "build")
+        clone = text.split("      - name: Clone the exact dispatched commit\n", 1)[1].split("      - name:", 1)[0]
+        script = textwrap.dedent(clone.split("        run: |\n", 1)[1])
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            subprocess.run(["git", "init", str(source)], check=True, capture_output=True)
+            subprocess.run(["git", "-C", str(source), "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+                            "commit", "--allow-empty", "-m", "fixture"], check=True, capture_output=True)
+            sha = subprocess.check_output(["git", "-C", str(source), "rev-parse", "HEAD"], text=True).strip()
+            subprocess.run(["git", "clone", "--bare", str(source), str(root / "origin.git")], check=True, capture_output=True)
+            workspace = root / "workspace"
+            workspace.mkdir()
+            (workspace / "stale").write_text("old checkout")
+            runner_temp = root / "runner-temp"
+            runner_temp.mkdir()
+            environment = os.environ | {"GITHUB_WORKSPACE": str(workspace), "RUNNER_TEMP": str(runner_temp),
+                                        "GITHUB_SERVER_URL": root.as_uri(), "GITHUB_REPOSITORY": "origin", "GITHUB_SHA": sha}
+            result = subprocess.run(["bash", "-euo", "pipefail", "-c", script], cwd=workspace,
+                                    env=environment, capture_output=True, text=True, check=False)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse((workspace / "stale").exists())
+            self.assertEqual(subprocess.check_output(["git", "-C", str(workspace), "rev-parse", "HEAD"], text=True).strip(), sha)
+
     def test_uses_pins_are_immutable_shas(self):
         for path in sorted(WORKFLOWS.glob("*.yml")):
             uses = re.findall(r"(?m)^\s*(?:-\s+)?uses:\s*(\S+)", path.read_text(encoding="utf-8"))
