@@ -48,6 +48,27 @@ class WorkflowTests(unittest.TestCase):
             self.assertFalse((workspace / "stale").exists())
             self.assertEqual(subprocess.check_output(["git", "-C", str(workspace), "rev-parse", "HEAD"], text=True).strip(), sha)
 
+    def test_linux_release_notes_include_checksums_and_install_commands(self):
+        text = job_block(read_workflow("release-linux.yml"), "publish")
+        notes = text.split("      - name: Write release notes\n", 1)[1].split("      - name:", 1)[0]
+        script = textwrap.dedent(notes.split("        run: |\n", 1)[1])
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "dist").mkdir()
+            archive = "helium-0.20.3.1-r6-linux-x86_64-musl.tar.xz"
+            (root / "dist" / archive).write_bytes(b"fixture archive")
+            sha = "1" * 40
+            environment = os.environ | {"RUNNER_TEMP": str(root), "ARCHIVE": archive,
+                                        "RELEASE_TAG": "helium-0.20.3.1-r6", "GITHUB_SHA": sha}
+            result = subprocess.run(["bash", "-euo", "pipefail", "-c", script], cwd=root,
+                                    env=environment, capture_output=True, text=True, check=False)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            body = (root / "release-notes.md").read_text()
+            self.assertIn(sha, body)
+            self.assertIn("docs/linux.md", body)
+            self.assertIn(f"sha256sum -c {archive}.sha256", body)
+            self.assertIn(f"./{archive[:-7]}/helium-wrapper --version", body)
+
     def test_uses_pins_are_immutable_shas(self):
         for path in sorted(WORKFLOWS.glob("*.yml")):
             uses = re.findall(r"(?m)^\s*(?:-\s+)?uses:\s*(\S+)", path.read_text(encoding="utf-8"))
