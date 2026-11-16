@@ -1,5 +1,5 @@
 Prefix: CHB
-Next: 10
+Next: 12
 
 ### CHB-2 · P2 · restore the DevTools frontend after the first lean package
 
@@ -73,3 +73,12 @@ Next: 10
 - **Recommendation:** Make the package world reproducible instead of re-bumping pins after each break: mirror the exact resolved `.apk` files as GitHub release assets, as the Rust toolchain mirror does, or pin a dated repository snapshot, and fetch them in `fetch` with checksums. Accept when a fresh `image` build succeeds from the lock after Alpine supersedes a pinned revision and Gate A's `lockcheck.py packages` still passes.
 - **Fix with:** none
 - **Effort:** M
+
+### CHB-11 · P1 · bound back-to-back begin frames sent to the browser UI compositor in unthrottled headless
+
+- **Area:** Performance
+- **Where:** `components/viz/common/frame_sinks/begin_frame_source.cc` (`BackToBackBeginFrameSource::DidFinishFrame`, `OnTimerTick`), `cc/scheduler/scheduler.cc` (frames skipped with `kRecoverLatency`), `config/patches/helium/`, `config/helium.patch-disposition.json`; consumer evidence in laputa-systems/bctl `tests/bench/results/2026-11-15-ui-begin-frame-flood/` and the switch list in bctl `guest/appliance/src/browser.rs`
+- **Problem:** bctl runs headless Helium with `--disable-frame-rate-limit`, which makes Viz use `BackToBackBeginFrameSource`. That source re-ticks as soon as every observer finishes a frame. During each navigation and click, the browser process's own `ui::Compositor` on Linux Aura/Ozone needs a main frame while an earlier frame awaits acknowledgement, so its cc scheduler drops every begin frame with `kRecoverLatency` and the next arrives at once. In five warm open-and-click cycles of the Speedometer news fixture, the browser main thread receives 10k–28k `viz.mojom.CompositorFrameSinkClient` messages and 10k–13k `DidNotProduceFrame` events, against about 200 messages for native macOS Chromium, which composites its UI through Cocoa. Renderer main-thread task time is at parity, yet guest news open and click are 39.4/22.0 ms against 22.4/12.6 ms for native Helium, on a two-vCPU VM where this spin competes with the renderer. Kiosk mode removes browser UI paints but not the flood, and no switch or feature bounds the source. That the flood causes the latency gap is unproven; it is consistent with warm news falling from 388.9 to 245.9 to 204.9 ms at one, two and four vCPUs.
+- **Recommendation:** Add a Helium patch that stops the back-to-back source spinning on an observer that did not produce a frame: either re-arm that observer only after its pending frame is acknowledged or new damage arrives, or apply a small minimum interval (for example 1 ms) between back-to-back ticks. Keep screenshot and input latency unthrottled, since bctl adopted the unbounded source for those. Build an archive, then A/B it in bctl with `tests/bench/kernel_experiment.py` on warm news open/click and VM CPU, and confirm with a trace that the browser-main `CompositorFrameSinkClient` count drops to native scale.
+- **Fix with:** make-it-fast
+- **Effort:** L
