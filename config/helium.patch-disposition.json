@@ -258,6 +258,7 @@
     "adblock-blink-cosmetic-filtering.patch",
     "adblock-review-fixes.patch",
     "adblock-native-cosmetic-css.patch",
-    "helium-restore-immediate-begin-frames.patch"
+    "helium-restore-immediate-begin-frames.patch",
+    "helium-ui-frame-settings-test.patch"
   ]
 }
