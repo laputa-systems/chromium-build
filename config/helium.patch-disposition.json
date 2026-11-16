@@ -241,6 +241,7 @@
     "helium-disable-autoupdates.patch",
     "helium-partitionalloc-musl-ifunc.patch",
     "helium-devtools-product.patch",
+    "helium-bounded-back-to-back-begin-frames.patch",
     "adblock-rust-engine.patch",
     "adblock-rust-gn.patch",
     "adblock-buildflags.patch",

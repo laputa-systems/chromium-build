@@ -1,0 +1,20 @@
+diff --git a/components/viz/common/frame_sinks/begin_frame_source.cc b/components/viz/common/frame_sinks/begin_frame_source.cc
+--- a/components/viz/common/frame_sinks/begin_frame_source.cc
++++ b/components/viz/common/frame_sinks/begin_frame_source.cc
+@@ -272,9 +272,13 @@
+       time_source_(std::move(time_source)),
+       next_sequence_number_(BeginFrameArgs::kStartingFrameNumber) {
+   time_source_->SetClient(this);
+-  // The time_source_ ticks immediately, so we SetActive(true) for a single
+-  // tick when we need it, and keep it as SetActive(false) otherwise.
+-  time_source_->SetTimebaseAndInterval(base::TimeTicks(), base::TimeDelta());
++  // The time_source_ ticks on the next 1 ms boundary, so we SetActive(true)
++  // for a single tick when we need it, and keep it as SetActive(false)
++  // otherwise. Ticking immediately lets an observer that skips every frame,
++  // such as a cc scheduler recovering latency while it waits for an ack,
++  // receive tens of thousands of begin frames per second.
++  time_source_->SetTimebaseAndInterval(base::TimeTicks(),
++                                       base::Milliseconds(1));
+ }
+ 
+ BackToBackBeginFrameSource::~BackToBackBeginFrameSource() = default;
