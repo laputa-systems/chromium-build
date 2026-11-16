@@ -14,7 +14,6 @@ patch inventories, and phase reports define current behavior.
   check. Preserve resumable state when diagnosing failures.
 - Do not install or update host tools as part of a normal build. Keep macOS
   generated state under this repository's `.work/` directory.
-- Do not push or commit unless requested.
 
 ## Guides
 
