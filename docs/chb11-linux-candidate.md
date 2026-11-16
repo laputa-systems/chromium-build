@@ -12,7 +12,7 @@ The candidate archive SHA-256 is
 Its r6 filename is for local testing and must change before publication.
 The ordinary-user extracted-package sandbox load check remains unrun.
 
-The [bctl experiment record](https://github.com/laputa-systems/bctl/tree/main/tests/bench/results/2026-11-16-bounded-begin-frames)
+The [bctl experiment record](https://github.com/joshuarli/bctl/tree/f8405bb8/tests/bench/results/2026-11-16-bounded-begin-frames)
 contains the script, build phase exits, acceptance report, image digests,
 raw receipts, screenshots and traces. Both images use the same bctl release
 binary and kernel, with two vCPUs and production browser flags on Linux/KVM.
