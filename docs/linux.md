@@ -6,6 +6,9 @@ Helium). Headless Chromium remains amd64-only; Helium also builds for
 linux/arm64. Chromium source and Ninja output use Docker named volumes. Only
 `fetch` needs network access; later phases run offline.
 
+`image --jobs N` limits parallel compilation of Helium's pure arm64 runtime
+libraries. Without `--jobs`, that image stage uses the container's CPU count.
+
 ## Inputs and profiles
 
 The pinned Chromium revision, tool archives, and digests are in
@@ -121,7 +124,7 @@ hardware GPU; VA-API is optional at runtime.
 
 On arm64 the staged `lib/` directory contains only Chromium's own libraries
 plus pure-musl builds of SQLite 3.53.4, expat 2.10.0, xkbcommon 1.13.1, zlib
-1.4, libffi 3.5.2 (static PIC), NSS 3.124, and NSPR 4.38.2. The pinned sources and their sizes and SHA-512 digests
+1.4, libffi 3.5.2 (static PIC), NSS 3.133, and NSPR 4.38.2. The pinned sources and their sizes and SHA-512 digests
 are `runtime_sources.arm64` in the lock; the image builds them in a separate
 builder stage with the image's llvm-prebuilt-musl clang and installs the shared
 objects in `/usr/lib`, where `stage-runtime` reads them. FFmpeg, ANGLE, and

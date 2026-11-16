@@ -499,11 +499,11 @@
     },
     {
       "name": "helium/runtime_sources/arm64/nss",
-      "version": "3.124",
-      "url": "https://ftp.mozilla.org/pub/security/nss/releases/NSS_3_124_RTM/src/nss-3.124.tar.gz",
-      "sha256": "80da9f1cbcb267293b2248818d288bc02f874d6a34f1989a2828401d74a0bc9b",
-      "sha512": "9959977b3cbcb0306c8aeba2c059d4f3646b3144c6401fbc73c14aea364caa92331875354afa79c095b6482b29ae743228d35c1bd510c5124cad5e7c37c5daa2",
-      "size": 78530189,
+      "version": "3.133",
+      "url": "https://ftp.mozilla.org/pub/security/nss/releases/NSS_3_133_RTM/src/nss-3.133.tar.gz",
+      "sha256": "4d752526b9846a1d962588cfbd09b7cc2a4f6a4effbd9157d58a30e8a2573065",
+      "sha512": "0ee463238456df344f49ea0ceda1a206b093285f66a5cc88c4977121ed7f874348dfae6612e1d715bad598126e1cdfd6a1ba5835b210234e1206690528df5d6a",
+      "size": 87844450,
       "role": "runtime",
       "target": "aarch64-unknown-linux-musl",
       "lock": "config/helium.inputs.lock"

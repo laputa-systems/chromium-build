@@ -33,7 +33,7 @@ fail() {
 usage() {
     printf '%s\n' \
         'usage: chromium-build [--product chromium|helium] [--platform linux|macos] [--arch arm64|amd64] [--profile PROFILE] command' \
-        '       chromium-build image [--product chromium|helium] [--arch amd64|arm64]' \
+        '       chromium-build image [--product chromium|helium] [--arch amd64|arm64] [--jobs N]' \
         '       chromium-build ensure-source|fetch|prepare|gate-a|gate-b|gate-c|gate-d|gate-e|gate-f|poc|build|cache-stats|stage-runtime|test-fast|test|test-staged|package [--product chromium|helium] [--arch amd64|arm64] [--profile PROFILE] [--jobs N]' \
         '       chromium-build install [--product chromium|helium] [--profile PROFILE] [--prefix DIR] [--bin-dir DIR] [--archive PATH] [--rollback]' \
         '       chromium-build build-target <ninja-output-or-label> [--arch amd64] [--jobs N]' \
@@ -304,6 +304,7 @@ if [ "$command_name" = image ]; then
         --build-arg RUST_HOST_LINKER="$rust_host_linker"
         --build-arg CCACHE_MAXSIZE="$CCACHE_MAXSIZE"
         --build-arg PRODUCT="$PRODUCT"
+        --build-arg PURE_RUNTIME_JOBS="${JOBS:-}"
     )
     if [ "$PRODUCT" = helium ]; then
         package_world=$("${CHROMIUM_PYTHON:-python3}" "$ROOT/scripts/linux_product.py" \

@@ -49,3 +49,7 @@ image attempt failed on unavailable Alpine pins (CHB-10), and the owner chose
 amd64 verification first. An isolated baseline, arm64 build, macOS workflow
 comparison, screenshot regression check and wider browser qualification
 still block adoption. No browser release or bctl production pin changed.
+
+The subsequent [arm64 builder and cache smoke](chb11-arm64-smoke.md) passes
+with refreshed pins. The owner deferred the full browser rebuild to keep
+the Mac available. macOS workflow qualification remains unrun.

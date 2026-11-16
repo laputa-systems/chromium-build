@@ -19,6 +19,7 @@ done
 
 prefix=/opt/pure-runtime
 build=/tmp/pure-runtime-build
+jobs=${PURE_RUNTIME_JOBS:-$(nproc)}
 rm -rf "$prefix" "$build"
 mkdir -p "$prefix" "$build"
 
@@ -52,7 +53,7 @@ tar -xzf "$build/xkbcommon.tar.gz" -C "$build"
 tar -xzf "$build/zlib.tar.gz" -C "$build"
 tar -xzf "$build/libffi.tar.gz" -C "$build"
 
-nss_src=$build/nss-3.124
+nss_src=$build/nss-3.133
 nspr_src=$build/nspr-4.38.2
 sqlite_src=$build/sqlite-autoconf-3530400
 expat_src=$build/expat-2.10.0
@@ -75,7 +76,7 @@ sqlite_features="-DSQLITE_ENABLE_COLUMN_METADATA -DSQLITE_ENABLE_DBSTAT_VTAB -DS
         --enable-fts4 \
         --enable-fts5 \
         --soname=legacy
-    make -j"$(nproc)" libsqlite3.so CFLAGS="-O2 -fPIC" OPT_FEATURE_FLAGS="$sqlite_features" LDFLAGS.zlib=
+    make -j"$jobs" libsqlite3.so CFLAGS="-O2 -fPIC" OPT_FEATURE_FLAGS="$sqlite_features" LDFLAGS.zlib=
     mkdir -p "$prefix/lib" "$prefix/include"
     cp -L libsqlite3.so "$prefix/lib/libsqlite3.so.0"
     ln -sf libsqlite3.so.0 "$prefix/lib/libsqlite3.so"
@@ -85,21 +86,21 @@ sqlite_features="-DSQLITE_ENABLE_COLUMN_METADATA -DSQLITE_ENABLE_DBSTAT_VTAB -DS
 (
     cd "$expat_src"
     CFLAGS="-O2 -fPIC" ./configure --prefix="$prefix" --disable-static --without-docbook
-    make -j"$(nproc)"
+    make -j"$jobs"
     make install
 )
 
 (
     cd "$zlib_src"
     CFLAGS="-O2 -fPIC" ./configure --prefix="$prefix" --shared
-    make -j"$(nproc)"
+    make -j"$jobs"
     make install
 )
 
 (
     cd "$libffi_src"
     CFLAGS="-O2 -fPIC" ./configure --prefix="$prefix" --disable-shared --enable-static --with-pic
-    make -j"$(nproc)"
+    make -j"$jobs"
     make install
     cp "$prefix/lib/libffi.a" "$prefix/lib/libffi_pic.a"
 )
@@ -114,7 +115,7 @@ sqlite_features="-DSQLITE_ENABLE_COLUMN_METADATA -DSQLITE_ENABLE_DBSTAT_VTAB -DS
         -Denable-docs=false \
         -Denable-tools=false \
         -Denable-xkbregistry=false
-    ninja -C build
+    ninja -j"$jobs" -C build
     meson install -C build --no-rebuild
 )
 
@@ -122,7 +123,7 @@ rm -rf "$nss_src/nspr"
 cp -a "$nspr_src/nspr" "$nss_src/nspr"
 (
     cd "$nss_src/nss"
-    make -j"$(nproc)" nss_build_all \
+    make -j"$jobs" nss_build_all \
         USE_64=1 \
         BUILD_OPT=1 \
         OS_TARGET=Linux \
