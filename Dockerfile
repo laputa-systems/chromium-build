@@ -164,6 +164,7 @@ COPY tests/test_fetch_inputs.py /opt/chromium-build/tests/test_fetch_inputs.py
 COPY tests/test_helium_runtime.py /opt/chromium-build/tests/test_helium_runtime.py
 
 ENV PATH="/opt/chromium-llvm/bin:$PATH" \
+    LIBRARY_PATH=/opt/chromium-llvm/lib \
     CC=/opt/chromium-llvm/bin/clang \
     CXX=/opt/chromium-llvm/bin/clang++ \
     AR=/opt/chromium-llvm/bin/llvm-ar \
