@@ -9,8 +9,6 @@ import time
 import unittest
 from pathlib import Path
 
-from helium_wayland import HeadlessSway
-
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts/helium_wayland.py"
 
@@ -99,20 +97,15 @@ class FixtureTest(unittest.TestCase):
 
     def test_browser_environment_selects_the_started_wayland_display(self):
         self.install_success()
-        fixture = HeadlessSway(
-            self.output, str(self.bin / "sway"), str(self.bin / "swaymsg"),
-            str(self.bin / "grim"), str(self.bin / "wl-copy"), str(self.bin / "wl-paste"),
-        )
-        self.addCleanup(fixture.stop)
-        fixture.prepare()
-        fixture.start()
-        result = subprocess.run(
-            [sys.executable, "-c", ("import os; from pathlib import Path; "
-             "display = os.environ['WAYLAND_DISPLAY']; "
-             "assert display == 'wayland-1'; "
-             "assert (Path(os.environ['XDG_RUNTIME_DIR']) / display).exists()")],
-            env=fixture.environment(), capture_output=True, text=True, check=False,
-        )
+        self.write("swaymsg", SWAYMSG.replace(
+            "#!/bin/sh\n",
+            '#!/bin/sh\n[ "$WAYLAND_DISPLAY" = "wayland-1" ] || exit 9\n'
+            '[ -e "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ] || exit 10\n',
+            1,
+        ))
+        uid = os.geteuid()
+        result = self.run_fixture()
+        self.assertEqual(os.geteuid(), uid)
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def write(self, name: str, body: str) -> Path:

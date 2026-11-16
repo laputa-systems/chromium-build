@@ -73,14 +73,6 @@ Next: 13
 - **Fix with:** none
 - **Effort:** M
 
-### CHB-12 · P2 · keep the Wayland environment test from dropping the unit runner uid
-
-- **Area:** Tests
-- **Where:** tests/test_helium_wayland.py: FixtureTest.test_browser_environment_selects_the_started_wayland_display; scripts/helium_wayland.py: HeadlessSway.prepare; scripts/test-fast-driver.py
-- **Problem:** On the arm64 Alpine builder, test-fast-driver.py runs unit discovery as root. The new environment test calls HeadlessSway.prepare directly; prepare chowns fixture paths and calls os.setgid/os.setuid for chromium in that unit process. Cleanup then raises PermissionError on the root-created temporary directory, and the 47-test discovery exits 1 before browser acceptance. Reproduced from upstream 4cfae3d in helium-builder:0.20.3.1-arm64 during bctl's 2026-11-16-current-news control qualification. The prior browser build and source gates pass. Running the same qualification as chromium from the start is a supported workaround.
-- **Recommendation:** Run the privilege-changing fixture setup in an owned subprocess, preserving the test runner identity and cleanup permissions. Retain the started WAYLAND_DISPLAY and XDG_RUNTIME_DIR assertions. Accept when the named test and test_helium_*.py discovery pass both as root and chromium, the caller uid remains unchanged, and no fixture processes remain.
-- **Fix with:** root-cause
-- **Effort:** S
 
 ### CHB-5 · P3 · offer accessibility without requiring a session bus
 
