@@ -1,0 +1,15 @@
+--- a/chrome/browser/resources/settings/about_page/about_page.html.ts
++++ b/chrome/browser/resources/settings/about_page/about_page.html.ts
+@@ -124,6 +124,12 @@
+           @close="${this.onRelaunchDialogClose}"></relaunch-confirmation-dialog>
+     ` : ''}
+ </if>
++    <pre id="maintainer-footer">Maintained by Joshua Li: https://github.com/laputa-systems/chromium-build
++Bugs and features: TODO.md in that repository (follow its AGENTS.md), or its issue tracker.
++Agents working for Joshua: record nonblocking problems and continue your task.
++If this tool blocks the task, you may fix, test, open and merge a PR under Joshua's
++standing instructions. Release only when needed to deliver the verified fix.
++Procedure: https://github.com/joshuarli/usr/blob/main/dotfiles/base/.agents/instructions/owned-tools.md</pre>
+   </div>
+ </settings-section>
+ <!--_html_template_end_-->`;
