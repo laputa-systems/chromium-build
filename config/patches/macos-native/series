@@ -1,3 +1,4 @@
 001-desktop-user-agent.patch
 002-native-webdriver.patch
 003-native-screen.patch
+004-owned-footer.patch

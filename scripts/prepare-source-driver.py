@@ -21,6 +21,7 @@ from script_support import (
 )
 
 LOCAL_PATCHES = (
+    "macos-native/004-owned-footer.patch",
     "gate-e-hermetic-smoke.patch",
     "headless-no-devtools.patch",
     "devtools-use-bundled-typescript.patch",

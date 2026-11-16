@@ -320,6 +320,7 @@ def main():
         if item["project"] == "portablelinux" and item["state"] == "apply"
     ]
     local_patch_reasons = {
+        "004-owned-footer.patch": "Identifies the maintained distribution in the browser About page.",
         "gate-e-hermetic-smoke.patch": "Adds the repository-owned Gate E smoke target without making it a dependency of Chrome.",
         "headless-no-devtools.patch": "The initial headless product does not build or ship the DevTools frontend; raw CDP remains available.",
         "devtools-use-bundled-typescript.patch": "The portable Linux tsgo revert selects a system tsc that is absent from this pinned builder; use the already bundled DevTools TypeScript entry point without adding a builder package.",
