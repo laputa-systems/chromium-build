@@ -1,5 +1,23 @@
 Prefix: CHB
-Next: 12
+Next: 13
+
+### CHB-7 · P1 · qualify the Helium package on the owner's Alpine dwl desktop
+
+- **Area:** Tests
+- **Where:** `docs/helium-acceptance.md`, `scripts/test-functional.py`, `scripts/install-runtime.py`
+- **Problem:** The published prerelease passed only the five automated checks in the isolated Sway fixture. The direct-session harness mode (`--wayland-session existing`, `--runtime-kind package`) does not exist, the package has not run in the owner's dwl session, and it has not been installed live. The release stays a prerelease until target evidence exists.
+- **Recommendation:** Implement the direct-session and package runtime modes, then follow `docs/helium-acceptance.md`: verify-extract the archive, run the session-dependent rows in the active dwl session with a disposable HOME and profile, and after an explicit live-install request install the archive and repeat them through `~/usr/bin/helium`. Record passed, failed, and not-executed rows; never promote the Sway result to target proof.
+- **Fix with:** CHB-6
+- **Effort:** M
+
+### CHB-11 · P1 · bound back-to-back begin frames sent to the browser UI compositor in unthrottled headless
+
+- **Area:** Performance
+- **Where:** `components/viz/common/frame_sinks/begin_frame_source.cc` (`BackToBackBeginFrameSource::DidFinishFrame`, `OnTimerTick`), `cc/scheduler/scheduler.cc` (frames skipped with `kRecoverLatency`), `config/patches/helium/`, `config/helium.patch-disposition.json`; consumer evidence in laputa-systems/bctl `tests/bench/results/2026-11-15-ui-begin-frame-flood/` and the switch list in bctl `guest/appliance/src/browser.rs`
+- **Problem:** bctl runs headless Helium with `--disable-frame-rate-limit`, which makes Viz use `BackToBackBeginFrameSource`. That source re-ticks as soon as every observer finishes a frame. During each navigation and click, the browser process's own `ui::Compositor` on Linux Aura/Ozone needs a main frame while an earlier frame awaits acknowledgement, so its cc scheduler drops every begin frame with `kRecoverLatency` and the next arrives at once. In five warm open-and-click cycles of the Speedometer news fixture, the browser main thread receives 10k–28k `viz.mojom.CompositorFrameSinkClient` messages and 10k–13k `DidNotProduceFrame` events, against about 200 messages for native macOS Chromium, which composites its UI through Cocoa. Renderer main-thread task time is at parity, yet guest news open and click are 39.4/22.0 ms against 22.4/12.6 ms for native Helium, on a two-vCPU VM where this spin competes with the renderer. Kiosk mode removes browser UI paints but not the flood, and no switch or feature bounds the source. That the flood causes the latency gap is unproven; it is consistent with warm news falling from 388.9 to 245.9 to 204.9 ms at one, two and four vCPUs.
+- **Recommendation:** Add a Helium patch that stops the back-to-back source spinning on an observer that did not produce a frame: either re-arm that observer only after its pending frame is acknowledged or new damage arrives, or apply a small minimum interval (for example 1 ms) between back-to-back ticks. Keep screenshot and input latency unthrottled, since bctl adopted the unbounded source for those. Build an archive, then A/B it in bctl with `tests/bench/kernel_experiment.py` on warm news open/click and VM CPU, and confirm with a trace that the browser-main `CompositorFrameSinkClient` count drops to native scale.
+- **Fix with:** make-it-fast
+- **Effort:** L
 
 ### CHB-2 · P2 · restore the DevTools frontend after the first lean package
 
@@ -19,15 +37,6 @@ Next: 12
 - **Fix with:** none
 - **Effort:** M
 
-### CHB-5 · P3 · offer accessibility without requiring a session bus
-
-- **Area:** Operability
-- **Where:** `scripts/package-runtime.py` (`HELIUM_LAUNCHER`)
-- **Problem:** Screen readers and accessibility tooling do not work in the default packaged browser.
-- **Recommendation:** Add an opt-in launch path for accessibility on systems that provide a session bus, or build a non-D-Bus accessibility path. Keep the D-Bus-free default documented.
-- **Fix with:** none
-- **Effort:** M
-
 ### CHB-6 · P2 · verify VA-API decode on the Broadwell target
 
 - **Area:** Tests
@@ -36,15 +45,6 @@ Next: 12
 - **Recommendation:** In the owner's dwl session, run `vainfo` and require `VAProfileH264Main`/`VAProfileH264High`, play a local H.264 or VP8 file in the packaged browser, and check `chrome://media-internals` for `VaapiVideoDecoder`. Force H.264 on VP9-only sites rather than treating a software VP9 fallback as failure. If initialization fails, capture the browser log and test `LIBVA_DRIVER_NAME=i965` before changing the build.
 - **Fix with:** CHB-7
 - **Effort:** S
-
-### CHB-7 · P1 · qualify the Helium package on the owner's Alpine dwl desktop
-
-- **Area:** Tests
-- **Where:** `docs/helium-acceptance.md`, `scripts/test-functional.py`, `scripts/install-runtime.py`
-- **Problem:** The published prerelease passed only the five automated checks in the isolated Sway fixture. The direct-session harness mode (`--wayland-session existing`, `--runtime-kind package`) does not exist, the package has not run in the owner's dwl session, and it has not been installed live. The release stays a prerelease until target evidence exists.
-- **Recommendation:** Implement the direct-session and package runtime modes, then follow `docs/helium-acceptance.md`: verify-extract the archive, run the session-dependent rows in the active dwl session with a disposable HOME and profile, and after an explicit live-install request install the archive and repeat them through `~/usr/bin/helium`. Record passed, failed, and not-executed rows; never promote the Sway result to target proof.
-- **Fix with:** CHB-6
-- **Effort:** M
 
 ### CHB-8 · P2 · complete the Helium behavior acceptance matrix
 
@@ -60,8 +60,7 @@ Next: 12
 - **Area:** Build
 - **Where:** `docs/helium-adblock-rust.md`, `scripts/prepare-helium.py`, `config/helium.inputs.lock`, `imputnet/helium` branch `adblock-rust` (`88f7dda1`)
 - **Problem:** bctl disables Helium's bundled uBlock Origin because its per-profile filter compile cost about 4 s of startup and 850 MiB of VM memory, so packaged Helium blocks no ads. Helium's experimental native integration of the `adblock` crate is based on Chromium 155; our pin is 156. 13 of its 15 patches apply to our tree; three hunks need mechanical refreshes, and nothing has been compiled. Its crate vendoring downloads during setup, which our offline `prepare` phase forbids.
-- **Recommendation:** Move the 41 crate downloads and `helium-filters` into `fetch` with lockfile checksums, refresh the three hunks, add the series behind `ENABLE_ADBLOCK` in `prepare-helium.py`, and prove it compiles incrementally on the existing `out/helium-wayland-release` before a full package build. Drop the `ublock_origin` component from the native build so only one engine runs; compare the current uBlock package with the native build, pref on and off (`helium.adblock.enabled`), rather than adding a build-time selector. Add the missing tests (frames and workers, redirects, scriptlets, cosmetic), and decide on WebTransport and CNAME uncloaking before it replaces uBlock.
-- **Status (2026-11-10):** forward-ported and off by default (`8e21451`); a native `r7` candidate qualifies and blocks in bctl, measured in `docs/helium-adblock-rust.md`. Generic hiding now uses one native stylesheet and no isolated world, which cut the Speedometer cost from about 13 to about 6 percent (pending a quiet rerun). Open: the remaining 6 percent, most likely the per-request async engine hop; about 170 MiB of VM memory for the engine; `about:blank`/`data:` documents are unfiltered, hydrogen's `dev/helium-rootfs.sh` pins the r5 archive by digest, and no profile enables the flag.
+- **Recommendation:** Move the 41 crate downloads and `helium-filters` into `fetch` with lockfile checksums, refresh the three hunks, add the series behind `ENABLE_ADBLOCK` in `prepare-helium.py`, and prove it compiles incrementally on the existing `out/helium-wayland-release` before a full package build. Drop the `ublock_origin` component from the native build so only one engine runs; compare the current uBlock package with the native build, pref on and off (`helium.adblock.enabled`), rather than adding a build-time selector. Add the missing tests (frames and workers, redirects, scriptlets, cosmetic), and decide on WebTransport and CNAME uncloaking before it replaces uBlock. Status (2026-11-10): forward-ported and off by default (`8e21451`); a native `r7` candidate qualifies and blocks in bctl, measured in `docs/helium-adblock-rust.md`. Generic hiding now uses one native stylesheet and no isolated world, which cut the Speedometer cost from about 13 to about 6 percent (pending a quiet rerun). Open: the remaining 6 percent, most likely the per-request async engine hop; about 170 MiB of VM memory for the engine; `about:blank`/`data:` documents are unfiltered, hydrogen's `dev/helium-rootfs.sh` pins the r5 archive by digest, and no profile enables the flag.
 - **Fix with:** none
 - **Effort:** L
 
@@ -74,11 +73,21 @@ Next: 12
 - **Fix with:** none
 - **Effort:** M
 
-### CHB-11 · P1 · bound back-to-back begin frames sent to the browser UI compositor in unthrottled headless
+### CHB-12 · P2 · keep the Wayland environment test from dropping the unit runner uid
 
-- **Area:** Performance
-- **Where:** `components/viz/common/frame_sinks/begin_frame_source.cc` (`BackToBackBeginFrameSource::DidFinishFrame`, `OnTimerTick`), `cc/scheduler/scheduler.cc` (frames skipped with `kRecoverLatency`), `config/patches/helium/`, `config/helium.patch-disposition.json`; consumer evidence in laputa-systems/bctl `tests/bench/results/2026-11-15-ui-begin-frame-flood/` and the switch list in bctl `guest/appliance/src/browser.rs`
-- **Problem:** bctl runs headless Helium with `--disable-frame-rate-limit`, which makes Viz use `BackToBackBeginFrameSource`. That source re-ticks as soon as every observer finishes a frame. During each navigation and click, the browser process's own `ui::Compositor` on Linux Aura/Ozone needs a main frame while an earlier frame awaits acknowledgement, so its cc scheduler drops every begin frame with `kRecoverLatency` and the next arrives at once. In five warm open-and-click cycles of the Speedometer news fixture, the browser main thread receives 10k–28k `viz.mojom.CompositorFrameSinkClient` messages and 10k–13k `DidNotProduceFrame` events, against about 200 messages for native macOS Chromium, which composites its UI through Cocoa. Renderer main-thread task time is at parity, yet guest news open and click are 39.4/22.0 ms against 22.4/12.6 ms for native Helium, on a two-vCPU VM where this spin competes with the renderer. Kiosk mode removes browser UI paints but not the flood, and no switch or feature bounds the source. That the flood causes the latency gap is unproven; it is consistent with warm news falling from 388.9 to 245.9 to 204.9 ms at one, two and four vCPUs.
-- **Recommendation:** Add a Helium patch that stops the back-to-back source spinning on an observer that did not produce a frame: either re-arm that observer only after its pending frame is acknowledged or new damage arrives, or apply a small minimum interval (for example 1 ms) between back-to-back ticks. Keep screenshot and input latency unthrottled, since bctl adopted the unbounded source for those. Build an archive, then A/B it in bctl with `tests/bench/kernel_experiment.py` on warm news open/click and VM CPU, and confirm with a trace that the browser-main `CompositorFrameSinkClient` count drops to native scale.
-- **Fix with:** make-it-fast
-- **Effort:** L
+- **Area:** Tests
+- **Where:** tests/test_helium_wayland.py: FixtureTest.test_browser_environment_selects_the_started_wayland_display; scripts/helium_wayland.py: HeadlessSway.prepare; scripts/test-fast-driver.py
+- **Problem:** On the arm64 Alpine builder, test-fast-driver.py runs unit discovery as root. The new environment test calls HeadlessSway.prepare directly; prepare chowns fixture paths and calls os.setgid/os.setuid for chromium in that unit process. Cleanup then raises PermissionError on the root-created temporary directory, and the 47-test discovery exits 1 before browser acceptance. Reproduced from upstream 4cfae3d in helium-builder:0.20.3.1-arm64 during bctl's 2026-11-16-current-news control qualification. The prior browser build and source gates pass. Running the same qualification as chromium from the start is a supported workaround.
+- **Recommendation:** Run the privilege-changing fixture setup in an owned subprocess, preserving the test runner identity and cleanup permissions. Retain the started WAYLAND_DISPLAY and XDG_RUNTIME_DIR assertions. Accept when the named test and test_helium_*.py discovery pass both as root and chromium, the caller uid remains unchanged, and no fixture processes remain.
+- **Fix with:** root-cause
+- **Effort:** S
+
+### CHB-5 · P3 · offer accessibility without requiring a session bus
+
+- **Area:** Operability
+- **Where:** `scripts/package-runtime.py` (`HELIUM_LAUNCHER`)
+- **Problem:** Screen readers and accessibility tooling do not work in the default packaged browser.
+- **Recommendation:** Add an opt-in launch path for accessibility on systems that provide a session bus, or build a non-D-Bus accessibility path. Keep the D-Bus-free default documented.
+- **Fix with:** none
+- **Effort:** M
+
