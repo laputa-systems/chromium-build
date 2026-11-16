@@ -6,12 +6,12 @@ CHROMIUM_FOOTER_CDP=http://127.0.0.1:PORT CHROMIUM_FOOTER_BINARY=/path/to/chromi
 
 import json
 import os
-from pathlib import Path
-import sys
 import subprocess
+import sys
 import time
 import unittest
 import urllib.request
+from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from browser_test_support import CdpConnection, WebSocket
@@ -29,7 +29,7 @@ Procedure: https://github.com/joshuarli/usr/blob/main/dotfiles/base/.agents/inst
 class BuiltAboutPageTest(unittest.TestCase):
     def test_footer_and_protocol_version(self):
         binary = os.environ["CHROMIUM_FOOTER_BINARY"]
-        version_output = subprocess.run([binary, "--version"], capture_output=True, text=True, timeout=15)
+        version_output = subprocess.run([binary, "--version"], check=False, capture_output=True, text=True, timeout=15)
         self.assertEqual(version_output.returncode, 0)
         lock_name = "macos.inputs.lock" if sys.platform == "darwin" else "inputs.lock"
         lock = json.loads((Path(__file__).resolve().parents[1] / "config" / lock_name).read_text())
