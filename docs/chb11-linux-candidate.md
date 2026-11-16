@@ -51,5 +51,9 @@ comparison, screenshot regression check and wider browser qualification
 still block adoption. No browser release or bctl production pin changed.
 
 The subsequent [arm64 builder and cache smoke](chb11-arm64-smoke.md) passes
-with refreshed pins. The owner deferred the full browser rebuild to keep
-the Mac available. macOS workflow qualification remains unrun.
+with refreshed pins. The full arm64 build then completed on 2026-11-16:
+8680 seconds on 17 jobs, staged acceptance 30 tests with two skips, and
+archive SHA-256
+`99747f922e85a773655e4007a8728d6f2a51ee56b96308afb984486ee8880f32`.
+An isolated comparison baseline and macOS workflow qualification remain
+unrun.
