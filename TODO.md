@@ -1,5 +1,5 @@
 Prefix: CHB
-Next: 19
+Next: 20
 
 ### CHB-7 · P1 · qualify the Helium package on the owner's Alpine dwl desktop
 
@@ -20,6 +20,15 @@ Next: 19
 - **Effort:** L
 
 
+
+### CHB-19 · P1 · build Helium for macOS arm64 from the same sources as the Linux package
+
+- **Area:** Helium
+- **Where:** scripts/macos_backend.py; config/macos.inputs.lock; config/helium.inputs.lock; config/profiles/; docs/macos.md
+- **Problem:** The macOS backend builds only ungoogled Chromium. bctl's native performance control therefore uses the owner's everyday /Applications/Helium.app (upstream 0.21.3.1, Chromium 157) against the guest's chromium-build Helium 0.20.3.1 r8 (Chromium 156), so build, version and patches differ between the two sides of every comparison.
+- **Recommendation:** Add a separate macOS Helium input lock and a macos-helium-release profile on the existing macOS backend phases. Pin the same Chromium 156.0.8078.79 base, Helium source and core revisions as config/helium.inputs.lock, plus Helium's macOS platform patches at the matching 0.20.3.1 release. Keep native adblock off as in r8. Stage, sign and accept a Helium.app that reports Helium 0.20.3.1 (Chromium 156.0.8078.79), renders over CDP headless with the renderer sandbox enabled, and package it under the work root.
+- **Fix with:** `reference-parity`
+- **Effort:** L
 
 ### CHB-2 · P2 · restore the DevTools frontend after the first lean package
 
@@ -48,6 +57,9 @@ Next: 19
 - **Fix with:** CHB-7
 - **Effort:** S
 
+
+
+
 ### CHB-8 · P2 · complete the Helium behavior acceptance matrix
 
 - **Area:** Tests
@@ -56,8 +68,6 @@ Next: 19
 - **Recommendation:** Extend the Helium harness with the remaining rows from `docs/helium-acceptance.md`, reusing the Chromium fixture and CDP transport where it fits and the compositor input path for keyboard and clipboard. Keep the negative controls, reject certificate and sandbox bypasses, and bind each result to the archive digest. Add the rows to `scripts/qualify-package.py` only when they actually pass.
 - **Fix with:** CHB-7
 - **Effort:** L
-
-
 
 
 ### CHB-9 · P2 · forward-port Helium's native adblock-rust experiment
@@ -70,6 +80,8 @@ Next: 19
 - **Effort:** L
 
 
+
+
 ### CHB-10 · P2 · stop exact Alpine package pins from rotting against the live v3.24 repository
 
 - **Area:** Build
@@ -78,8 +90,6 @@ Next: 19
 - **Recommendation:** Make the package world reproducible instead of re-bumping pins after each break: mirror the exact resolved `.apk` files as GitHub release assets, as the Rust toolchain mirror does, or pin a dated repository snapshot, and fetch them in `fetch` with checksums. Accept when a fresh `image` build succeeds from the lock after Alpine supersedes a pinned revision and Gate A's `lockcheck.py packages` still passes.
 - **Fix with:** none
 - **Effort:** M
-
-
 
 
 ### CHB-5 · P3 · offer accessibility without requiring a session bus
