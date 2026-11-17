@@ -1,0 +1,38 @@
+diff --git a/services/device/device_service_test_base.cc b/services/device/device_service_test_base.cc
+--- a/services/device/device_service_test_base.cc
++++ b/services/device/device_service_test_base.cc
+@@ -21,7 +21,10 @@
+ #endif  // BUILDFLAG(OS_LEVEL_GEOLOCATION_PERMISSION_SUPPORTED)
+ 
+ #if BUILDFLAG(IS_LINUX)
++#include "build/config/linux/dbus/buildflags.h"
++#if BUILDFLAG(USE_DBUS)
+ #include "components/dbus/thread_linux/dbus_thread_linux.h"
++#endif
+ #endif  // BUILDFLAG(IS_LINUX)
+ 
+ namespace device {
+@@ -84,7 +87,9 @@
+ void DeviceServiceTestBase::TearDown() {
+ #if BUILDFLAG(IS_LINUX)
+   task_environment_.RunUntilIdle();
++#if BUILDFLAG(USE_DBUS)
+   dbus_thread_linux::ShutdownOnDBusThreadAndBlock();
++#endif
+ #endif  // BUILDFLAG(IS_LINUX)
+ }
+ 
+diff --git a/services/device/BUILD.gn b/services/device/BUILD.gn
+--- a/services/device/BUILD.gn
++++ b/services/device/BUILD.gn
+@@ -471,6 +471,10 @@
+     "//testing/gtest",
+   ]
+ 
++  if (is_linux) {
++    deps += [ "//build/config/linux/dbus:buildflags" ]
++  }
++
+   if (is_linux && use_dbus) {
+     deps += [ "//components/dbus" ]
+   }

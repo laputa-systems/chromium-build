@@ -1,0 +1,24 @@
+{
+  "command_list_sha256": "19c274b36154b1de02105d47a19b040991c87900b83f94f34c00eb3fe8997c5b",
+  "commands": {
+    "archive_commands": 2132,
+    "assembly_commands": 257,
+    "compile_commands": 46202,
+    "link_commands": 32,
+    "ranlib_commands": 0
+  },
+  "failures": [],
+  "gate_f_commands": {
+    "archive_commands": 2132,
+    "assembly_commands": 257,
+    "compile_commands": 46202,
+    "link_commands": 32,
+    "ranlib_commands": 0
+  },
+  "mismatches": {},
+  "network": "none",
+  "ninja_version": "1.13.2",
+  "schema": 1,
+  "scope": "chrome-target-command-oracle",
+  "status": "complete"
+}

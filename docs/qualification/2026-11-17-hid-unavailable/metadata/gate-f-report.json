@@ -1,0 +1,67 @@
+{
+  "checks": {
+    "absolute_chromium_compilers": true,
+    "bundled_ffmpeg": true,
+    "ccache_compile_wrapper": true,
+    "direct_chromium_archives_and_ranlib": true,
+    "ffmpeg_mode": "bundled",
+    "no_forbidden_flags_or_paths": true,
+    "system_ffmpeg_shim": false
+  },
+  "commands": {
+    "archive_commands": 2132,
+    "assembly_commands": 257,
+    "compile_commands": 46202,
+    "link_commands": 32,
+    "ranlib_commands": 0
+  },
+  "complete_build_reaudit_required": true,
+  "dry_run_mode": "passed",
+  "failures": [],
+  "network": "none",
+  "response_files": [
+    {
+      "bytes": 165,
+      "path": "/work/out/helium-wayland-release/obj/build/rust/std/rules/alloc_bindings_crubit_action.rsp"
+    },
+    {
+      "bytes": 0,
+      "path": "/work/out/helium-wayland-release/obj/build/rust/std/rules/core_bindings_crubit_action.rsp"
+    },
+    {
+      "bytes": 335,
+      "path": "/work/out/helium-wayland-release/obj/build/rust/std/rules/std_bindings_crubit_action.rsp"
+    },
+    {
+      "bytes": 495,
+      "path": "/work/out/helium-wayland-release/obj/components/cbor/rust/cbor_rust_bindings_crubit_action.rsp"
+    },
+    {
+      "bytes": 495,
+      "path": "/work/out/helium-wayland-release/obj/components/private_verification_tokens/common/athm_ffi/athm_ffi_bindings_crubit_action.rsp"
+    },
+    {
+      "bytes": 495,
+      "path": "/work/out/helium-wayland-release/obj/components/web_package/rust/web_package_rust_bindings_crubit_action.rsp"
+    },
+    {
+      "bytes": 495,
+      "path": "/work/out/helium-wayland-release/obj/components/web_package/signed_web_bundles/rust/signed_web_bundles_rust_bindings_crubit_action.rsp"
+    },
+    {
+      "bytes": 495,
+      "path": "/work/out/helium-wayland-release/obj/third_party/blink/renderer/platform/fonts/font_format_bindings_crubit_action.rsp"
+    },
+    {
+      "bytes": 495,
+      "path": "/work/out/helium-wayland-release/obj/third_party/blink/renderer/platform/fonts/ift_patcher_bindings_crubit_action.rsp"
+    },
+    {
+      "bytes": 495,
+      "path": "/work/out/helium-wayland-release/obj/third_party/rust/qr_code/v2/cpp_api_from_rust_crubit_action.rsp"
+    }
+  ],
+  "schema": 1,
+  "scope": "chrome-dry-run",
+  "status": "complete"
+}

@@ -1,0 +1,28 @@
+[
+  {
+    "site": "x",
+    "url": "https://x.com/i/flow/login",
+    "samples": [],
+    "status": "failed",
+    "error": "site did not render content: {'url': 'chrome-error://chromewebdata/', 'body': 98, 'error_page': \"Access to x.com was denied\\n\\nYou don't have authorization to view this page.\\n\\nHTTP ERROR 403\\nReload\"}",
+    "cleanup": {
+      "status": "complete",
+      "ok": true,
+      "root_pid": 68576,
+      "root_returncode": 0,
+      "process_group": 68576,
+      "initial_descendants": [
+        68587,
+        68588,
+        68590,
+        68633,
+        68657,
+        68678,
+        68710,
+        68718
+      ],
+      "survivors": [],
+      "escalated": false
+    }
+  }
+]

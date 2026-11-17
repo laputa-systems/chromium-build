@@ -1,5 +1,5 @@
 Prefix: CHB
-Next: 17
+Next: 19
 
 ### CHB-7 · P1 · qualify the Helium package on the owner's Alpine dwl desktop
 
@@ -88,6 +88,8 @@ Next: 17
 - **Effort:** M
 
 
+
+
 ### CHB-5 · P3 · offer accessibility without requiring a session bus
 
 - **Area:** Operability
@@ -102,8 +104,18 @@ Next: 17
 
 - **Area:** Build
 - **Where:** config/helium.inputs.lock; config/helium.packages.arm64.lock; config/helium.packages.amd64.lock; config/helium.system-library-preflight.schema.json; Chromium third_party/blink/renderer/platform/fonts/shaping/ and third_party/harfbuzz-ng/
-- **Problem:** The default Blink shaping path still selects HarfBuzz's OpenType shaper, and bctl does not enable Chromium's experimental HarfRustShaping feature. HarfBuzz therefore remains compiled and required even though the desired shaping implementation is HarfRust. This retains duplicate shaping implementation and build/runtime dependency cost.
+- **Problem:** HarfRust 0.13.3 is already compiled and linked in the recorded Helium arm64 build, but default Blink shaping selects HarfBuzz's OpenType shaper and bctl does not enable the experimental HarfRustShaping feature. HarfBuzz therefore remains compiled and required. Enabling the existing HarfRust path needs rendering qualification; eliminating HarfBuzz additionally requires auditing remaining callers and shaping fallbacks.
 - **Recommendation:** Make HarfRust the supported default for the bctl Helium build, audit all HarfBuzz callers and fallback shaping paths, and remove HarfBuzz compilation and dependencies once replacement coverage is proven. Qualify complex scripts, ligatures, fallback fonts, variable fonts and real headed/headless pages; do not equate enabling the experimental feature with eliminating HarfBuzz. Preserve sandbox and browser acceptance gates.
 - **Fix with:** `reference-parity`
+- **Effort:** L
+
+
+### CHB-18 · P3 · qualify browser payload reductions against required appliance capabilities
+
+- **Area:** Build
+- **Where:** scripts/stage-runtime.py; scripts/package-runtime.py; Helium GN profiles; bctl BCTL-32 release census
+- **Problem:** The appliance browser includes printing, Crashpad, SwiftShader/graphics libraries, broad locales and fonts. Runtime-disable flags do not prove their code or files are unused. Current size/load contributions and feature requirements are not fully qualified; Crashpad remains useful for the current real-site crash investigation.
+- **Recommendation:** Use a fresh digest-bound image size/runtime-load census to select one cut at a time. Separate print UI from automation PDF output, retain diagnostics until a replacement is proven, establish graphics-library loading/web-feature coverage, and preserve multilingual shaping/fallback/screenshot behavior when considering font/locales. Keep required licenses and provenance. Do not remove components solely because a launcher flag disables behavior.
+- **Fix with:** `blast-radius`
 - **Effort:** L
 
