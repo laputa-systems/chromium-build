@@ -1,5 +1,5 @@
 Prefix: CHB
-Next: 15
+Next: 17
 
 ### CHB-7 · P1 · qualify the Helium package on the owner's Alpine dwl desktop
 
@@ -19,6 +19,15 @@ Next: 15
 - **Fix with:** make-it-fast
 - **Effort:** L
 
+
+### CHB-15 · P1 · handle an unavailable hid backend without crashing the browser
+
+- **Area:** Runtime
+- **Where:** config/patches/helium/, config/helium.patch-disposition.json, Chromium services/device/hid/hid_service.cc and hid_manager_impl.cc
+- **Problem:** The qualified pure arm64 r7 build sets USE_UDEV=false. HidService::Create returns null, but HidManagerImpl unconditionally observes and later dereferences it. Real Instagram navigation crashes both headed and headless Nanos; a native Linux held-open run exits 139. Native GDB identifies DeviceService::BindHidManager and an observer dereference with x19=0x40. This blocks bctl graphical Instagram login and EXT-1 consumer qualification. The bctl release notes disclose the failure.
+- **Recommendation:** Provide a valid backend that reports no devices when no platform HID backend exists, fails connection attempts truthfully, and preserves enumeration/client lifecycle. Add a source regression and local packaged-browser check, then qualify native and actual Nanos real-site behavior with sandboxing intact.
+- **Fix with:** none
+- **Effort:** M
 
 ### CHB-2 · P2 · restore the DevTools frontend after the first lean package
 
@@ -56,6 +65,9 @@ Next: 15
 - **Fix with:** CHB-7
 - **Effort:** L
 
+
+
+
 ### CHB-9 · P2 · forward-port Helium's native adblock-rust experiment
 
 - **Area:** Build
@@ -64,8 +76,6 @@ Next: 15
 - **Recommendation:** Move the 41 crate downloads and `helium-filters` into `fetch` with lockfile checksums, refresh the three hunks, add the series behind `ENABLE_ADBLOCK` in `prepare-helium.py`, and prove it compiles incrementally on the existing `out/helium-wayland-release` before a full package build. Drop the `ublock_origin` component from the native build so only one engine runs; compare the current uBlock package with the native build, pref on and off (`helium.adblock.enabled`), rather than adding a build-time selector. Add the missing tests (frames and workers, redirects, scriptlets, cosmetic), and decide on WebTransport and CNAME uncloaking before it replaces uBlock. Status (2026-11-10): forward-ported and off by default (`8e21451`); a native `r7` candidate qualifies and blocks in bctl, measured in `docs/helium-adblock-rust.md`. Generic hiding now uses one native stylesheet and no isolated world, which cut the Speedometer cost from about 13 to about 6 percent (pending a quiet rerun). Open: the remaining 6 percent, most likely the per-request async engine hop; about 170 MiB of VM memory for the engine; `about:blank`/`data:` documents are unfiltered, hydrogen's `dev/helium-rootfs.sh` pins the r5 archive by digest, and no profile enables the flag.
 - **Fix with:** none
 - **Effort:** L
-
-
 
 
 ### CHB-10 · P2 · stop exact Alpine package pins from rotting against the live v3.24 repository
@@ -86,4 +96,14 @@ Next: 15
 - **Recommendation:** Add an opt-in launch path for accessibility on systems that provide a session bus, or build a non-D-Bus accessibility path. Keep the D-Bus-free default documented.
 - **Fix with:** none
 - **Effort:** M
+
+
+### CHB-16 · P3 · replace the default HarfBuzz OpenType shaping path with HarfRust
+
+- **Area:** Build
+- **Where:** config/helium.inputs.lock; config/helium.packages.arm64.lock; config/helium.packages.amd64.lock; config/helium.system-library-preflight.schema.json; Chromium third_party/blink/renderer/platform/fonts/shaping/ and third_party/harfbuzz-ng/
+- **Problem:** The default Blink shaping path still selects HarfBuzz's OpenType shaper, and bctl does not enable Chromium's experimental HarfRustShaping feature. HarfBuzz therefore remains compiled and required even though the desired shaping implementation is HarfRust. This retains duplicate shaping implementation and build/runtime dependency cost.
+- **Recommendation:** Make HarfRust the supported default for the bctl Helium build, audit all HarfBuzz callers and fallback shaping paths, and remove HarfBuzz compilation and dependencies once replacement coverage is proven. Qualify complex scripts, ligatures, fallback fonts, variable fonts and real headed/headless pages; do not equate enabling the experimental feature with eliminating HarfBuzz. Preserve sandbox and browser acceptance gates.
+- **Fix with:** `reference-parity`
+- **Effort:** L
 
