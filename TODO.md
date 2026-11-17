@@ -74,14 +74,6 @@ Next: 14
 - **Effort:** M
 
 
-### CHB-13 · P2 · bind Helium qualification readiness to the new document loader
-
-- **Area:** Tests
-- **Where:** scripts/helium_test_fast.py: navigate; scripts/browser_test_support.py: CdpConnection.events and wait_event; tests/test_helium_test_fast.py
-- **Problem:** Staged arm64 browser qualification failed with a null #status immediately after navigate. navigate accepts a buffered Page.frameNavigated for the same frame and an unqualified Page.domContentEventFired, so initial about:blank events can complete the wait before the fixture document is ready. A deterministic test using the real CdpConnection and an old-document event queue fails with fixture_ready false. Candidate binary d850859 already passes the UI settings C++ regression and built-browser checks; this readiness race blocks reliable staged qualification.
-- **Recommendation:** Enable lifecycle events and match both navigation frameId and loaderId for commit and DOMContentLoaded. Keep all fixture output and sandbox checks. Accept when the old-document event-queue test fails before the change and passes after, the focused Python suite passes, and the original staged qualification completes with no retry-to-green policy.
-- **Fix with:** root-cause
-- **Effort:** S
 
 
 ### CHB-5 · P3 · offer accessibility without requiring a session bus
