@@ -1,5 +1,5 @@
 Prefix: CHB
-Next: 16
+Next: 17
 
 ### CHB-7 · P1 · qualify the Helium package on the owner's Alpine dwl desktop
 
@@ -96,4 +96,14 @@ Next: 16
 - **Recommendation:** Add an opt-in launch path for accessibility on systems that provide a session bus, or build a non-D-Bus accessibility path. Keep the D-Bus-free default documented.
 - **Fix with:** none
 - **Effort:** M
+
+
+### CHB-16 · P3 · replace the default HarfBuzz OpenType shaping path with HarfRust
+
+- **Area:** Build
+- **Where:** config/helium.inputs.lock; config/helium.packages.arm64.lock; config/helium.packages.amd64.lock; config/helium.system-library-preflight.schema.json; Chromium third_party/blink/renderer/platform/fonts/shaping/ and third_party/harfbuzz-ng/
+- **Problem:** The default Blink shaping path still selects HarfBuzz's OpenType shaper, and bctl does not enable Chromium's experimental HarfRustShaping feature. HarfBuzz therefore remains compiled and required even though the desired shaping implementation is HarfRust. This retains duplicate shaping implementation and build/runtime dependency cost.
+- **Recommendation:** Make HarfRust the supported default for the bctl Helium build, audit all HarfBuzz callers and fallback shaping paths, and remove HarfBuzz compilation and dependencies once replacement coverage is proven. Qualify complex scripts, ligatures, fallback fonts, variable fonts and real headed/headless pages; do not equate enabling the experimental feature with eliminating HarfBuzz. Preserve sandbox and browser acceptance gates.
+- **Fix with:** `reference-parity`
+- **Effort:** L
 
