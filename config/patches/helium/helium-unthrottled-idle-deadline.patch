@@ -1,0 +1,13 @@
+diff --git a/cc/scheduler/scheduler_state_machine.cc b/cc/scheduler/scheduler_state_machine.cc
+--- a/cc/scheduler/scheduler_state_machine.cc
++++ b/cc/scheduler/scheduler_state_machine.cc
+@@ -1334,6 +1334,9 @@
+     // We do not want to wait for a deadline because we're waiting for full
+     // pipeline to be flushed for headless.
+     return BeginImplFrameDeadlineMode::BLOCKED;
++  } else if (settings_.disable_frame_rate_limit &&
++             !ShouldSubscribeToBeginFrames()) {
++    return BeginImplFrameDeadlineMode::IMMEDIATE;
+   } else if (ShouldTriggerBeginImplFrameDeadlineImmediately()) {
+     if (ShouldWaitForScrollEvent()) {
+       // We are scrolling but have not received a scroll event for this begin

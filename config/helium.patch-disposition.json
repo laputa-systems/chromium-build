@@ -261,6 +261,7 @@
     "helium-restore-immediate-begin-frames.patch",
     "helium-ui-frame-settings-test.patch",
     "helium-ui-frame-settings.patch",
-    "helium-unthrottled-idle-deadline-test.patch"
+    "helium-unthrottled-idle-deadline-test.patch",
+    "helium-unthrottled-idle-deadline.patch"
   ]
 }
