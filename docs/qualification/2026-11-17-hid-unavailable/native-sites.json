@@ -1,0 +1,168 @@
+[
+  {
+    "site": "instagram",
+    "url": "https://www.instagram.com/",
+    "samples": [
+      {
+        "title": "Instagram",
+        "url": "https://www.instagram.com/",
+        "state": "complete",
+        "body": 789
+      },
+      {
+        "title": "Instagram",
+        "url": "https://www.instagram.com/",
+        "state": "complete",
+        "body": 789
+      },
+      {
+        "title": "Instagram",
+        "url": "https://www.instagram.com/",
+        "state": "complete",
+        "body": 789
+      },
+      {
+        "title": "Instagram",
+        "url": "https://www.instagram.com/",
+        "state": "complete",
+        "body": 789
+      },
+      {
+        "title": "Instagram",
+        "url": "https://www.instagram.com/",
+        "state": "complete",
+        "body": 789
+      },
+      {
+        "title": "Instagram",
+        "url": "https://www.instagram.com/",
+        "state": "complete",
+        "body": 789
+      },
+      {
+        "title": "Instagram",
+        "url": "https://www.instagram.com/",
+        "state": "complete",
+        "body": 789
+      },
+      {
+        "title": "Instagram",
+        "url": "https://www.instagram.com/",
+        "state": "complete",
+        "body": 789
+      },
+      {
+        "title": "Instagram",
+        "url": "https://www.instagram.com/",
+        "state": "complete",
+        "body": 789
+      },
+      {
+        "title": "Instagram",
+        "url": "https://www.instagram.com/",
+        "state": "complete",
+        "body": 789
+      },
+      {
+        "title": "Instagram",
+        "url": "https://www.instagram.com/",
+        "state": "complete",
+        "body": 789
+      },
+      {
+        "title": "Instagram",
+        "url": "https://www.instagram.com/",
+        "state": "complete",
+        "body": 789
+      },
+      {
+        "title": "Instagram",
+        "url": "https://www.instagram.com/",
+        "state": "complete",
+        "body": 789
+      }
+    ],
+    "sandbox": {
+      "renderers": [
+        {
+          "pid": 68364,
+          "no_new_privs": "1",
+          "seccomp": "2",
+          "nspid": [
+            "68364",
+            "48",
+            "1"
+          ],
+          "cmdline": "/home/chromium/hid-r8/extract/helium --type=renderer --crashpad-handler-pid=68252 --enable-crash-reporter=, --noerrdialogs --user-data-dir=/home/chromium/hid-r8/native-sites-extracted/instagram-cf7nq9ai --change-stack-guard-on-fork=enable --remote-debugging-port=0 --ozone-platform=headless --disable-gpu-compositing --lang=en-US --num-raster-threads=4 --enable-main-frame-before-activation --renderer-client-id=8 --launch-time-ticks=60953767694 --shared-files=v8_context_snapshot_data:100 --field-trial-handle=3,i,7850894864588107805,8022606194140560817,262144 --enable-features=NetworkServiceInProcess2 --disable-features=PaintHolding,helium-noise,helium-split-clienthello --variations-seed-version --pseudonymization-salt-handle=7,i,4145392370375500182,13820759647413472994,4 --trace-process-track-uuid=3190708993808206286"
+        },
+        {
+          "pid": 68351,
+          "no_new_privs": "1",
+          "seccomp": "2",
+          "nspid": [
+            "68351",
+            "36",
+            "1"
+          ],
+          "cmdline": "/home/chromium/hid-r8/extract/helium --type=renderer --crashpad-handler-pid=68252 --enable-crash-reporter=, --noerrdialogs --user-data-dir=/home/chromium/hid-r8/native-sites-extracted/instagram-cf7nq9ai --extension-process --change-stack-guard-on-fork=enable --remote-debugging-port=0 --ozone-platform=headless --disable-gpu-compositing --lang=en-US --num-raster-threads=4 --enable-main-frame-before-activation --renderer-client-id=7 --launch-time-ticks=60953588224 --shared-files=v8_context_snapshot_data:100 --field-trial-handle=3,i,7850894864588107805,8022606194140560817,262144 --enable-features=NetworkServiceInProcess2 --disable-features=PaintHolding,helium-noise,helium-split-clienthello --variations-seed-version --pseudonymization-salt-handle=7,i,4145392370375500182,13820759647413472994,4 --trace-process-track-uuid=3190708992871164437"
+        },
+        {
+          "pid": 68328,
+          "no_new_privs": "1",
+          "seccomp": "2",
+          "nspid": [
+            "68328",
+            "13",
+            "1"
+          ],
+          "cmdline": "/home/chromium/hid-r8/extract/helium --type=renderer --crashpad-handler-pid=68252 --enable-crash-reporter=, --noerrdialogs --user-data-dir=/home/chromium/hid-r8/native-sites-extracted/instagram-cf7nq9ai --change-stack-guard-on-fork=enable --remote-debugging-port=0 --ozone-platform=headless --disable-gpu-compositing --lang=en-US --num-raster-threads=4 --enable-main-frame-before-activation --renderer-client-id=6 --launch-time-ticks=60953576101 --shared-files=v8_context_snapshot_data:100 --field-trial-handle=3,i,7850894864588107805,8022606194140560817,262144 --enable-features=NetworkServiceInProcess2 --disable-features=PaintHolding,helium-noise,helium-split-clienthello --variations-seed-version --pseudonymization-salt-handle=7,i,4145392370375500182,13820759647413472994,4 --trace-process-track-uuid=3190708991934122588"
+        },
+        {
+          "pid": 68329,
+          "no_new_privs": "1",
+          "seccomp": "2",
+          "nspid": [
+            "68329",
+            "14",
+            "1"
+          ],
+          "cmdline": "/home/chromium/hid-r8/extract/helium --type=renderer --crashpad-handler-pid=68252 --enable-crash-reporter=, --noerrdialogs --user-data-dir=/home/chromium/hid-r8/native-sites-extracted/instagram-cf7nq9ai --change-stack-guard-on-fork=enable --remote-debugging-port=0 --ozone-platform=headless --disable-gpu-compositing --lang=en-US --num-raster-threads=4 --enable-main-frame-before-activation --renderer-client-id=5 --launch-time-ticks=60953576821 --shared-files=v8_context_snapshot_data:100 --field-trial-handle=3,i,7850894864588107805,8022606194140560817,262144 --enable-features=NetworkServiceInProcess2 --disable-features=PaintHolding,helium-noise,helium-split-clienthello --variations-seed-version --pseudonymization-salt-handle=7,i,4145392370375500182,13820759647413472994,4 --trace-process-track-uuid=3190708990997080739"
+        }
+      ]
+    },
+    "exit": {
+      "returncode": 0,
+      "survivors": [],
+      "exited_unreaped": [
+        68261
+      ]
+    },
+    "status": "complete"
+  },
+  {
+    "site": "x",
+    "url": "https://x.com/i/flow/login",
+    "samples": [],
+    "status": "failed",
+    "error": "site did not render content: {'url': 'chrome-error://chromewebdata/', 'body': 98}",
+    "cleanup": {
+      "status": "complete",
+      "ok": true,
+      "root_pid": 68405,
+      "root_returncode": 0,
+      "process_group": 68405,
+      "initial_descendants": [
+        68416,
+        68417,
+        68419,
+        68462,
+        68487,
+        68501,
+        68540,
+        68541
+      ],
+      "survivors": [],
+      "escalated": false
+    }
+  }
+]

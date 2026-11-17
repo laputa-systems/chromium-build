@@ -1,0 +1,55 @@
+diff --git a/services/device/hid/hid_manager_unittest.cc b/services/device/hid/hid_manager_unittest.cc
+--- a/services/device/hid/hid_manager_unittest.cc
++++ b/services/device/hid/hid_manager_unittest.cc
+@@ -141,6 +141,51 @@
+   raw_ptr<MockHidService> mock_hid_service_;
+ };
+ 
++#if (BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)) && !defined(USE_UDEV)
++using HidManagerWithoutBackendTest = DeviceServiceTestBase;
++
++TEST_F(HidManagerWithoutBackendTest, EmptyEnumerationAndFailedConnection) {
++  mojo::Remote<mojom::HidManager> manager;
++  device_service()->BindHidManager(manager.BindNewPipeAndPassReceiver());
++  testing::StrictMock<MockHidManagerClient> client;
++  mojo::PendingAssociatedRemote<mojom::HidManagerClient> client_remote;
++  client.Bind(client_remote.InitWithNewEndpointAndPassReceiver());
++
++  {
++    base::RunLoop loop;
++    manager->GetDevicesAndSetClient(
++        std::move(client_remote),
++        base::BindLambdaForTesting(
++            [&](std::vector<mojom::HidDeviceInfoPtr> devices) {
++              EXPECT_TRUE(devices.empty());
++              loop.Quit();
++            }));
++    loop.Run();
++  }
++  {
++    base::RunLoop loop;
++    manager->Connect(
++        "missing-device", mojo::NullRemote(), mojo::NullRemote(), false, false,
++        base::BindLambdaForTesting(
++            [&](mojo::PendingRemote<mojom::HidConnection> connection) {
++              EXPECT_FALSE(connection.is_valid());
++              loop.Quit();
++            }));
++    loop.Run();
++  }
++  {
++    base::RunLoop loop;
++    manager->GetDevices(base::BindLambdaForTesting(
++        [&](std::vector<mojom::HidDeviceInfoPtr> devices) {
++          EXPECT_TRUE(devices.empty());
++          loop.Quit();
++        }));
++    loop.Run();
++  }
++  EXPECT_TRUE(manager.is_connected());
++}
++#endif
++
+ // Test the GetDevices.
+ TEST_F(HidManagerTest, GetDevicesOnly) {
+   // Add two hid devices.

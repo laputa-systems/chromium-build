@@ -1,0 +1,20 @@
+{
+  "binary": "/work/out/helium-wayland-release/hermetic_smoke",
+  "build_log": "/work/metadata/gate-e-build.log",
+  "checks": {
+    "chromium_in_tree_libcxx": true,
+    "exceptions_enabled": true,
+    "musl_interpreter": true,
+    "no_forbidden_gnu_runtime": true,
+    "target_built": true,
+    "target_ran": true,
+    "threads_enabled": true
+  },
+  "commands": "/work/metadata/gate-e-commands.txt",
+  "network": "none",
+  "ninja_target": "tools/hermetic_smoke:hermetic_smoke",
+  "run_log": "/work/metadata/gate-e-run.log",
+  "schema": 1,
+  "status": "complete",
+  "target": "//tools/hermetic_smoke:hermetic_smoke"
+}

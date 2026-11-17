@@ -260,6 +260,9 @@
     "helium-ui-frame-settings-test.patch",
     "helium-ui-frame-settings.patch",
     "helium-unthrottled-idle-deadline-test.patch",
-    "helium-unthrottled-idle-deadline.patch"
+    "helium-unthrottled-idle-deadline.patch",
+    "helium-hid-without-platform-backend-test.patch",
+    "helium-hid-without-platform-backend.patch",
+    "helium-device-tests-without-dbus.patch"
   ]
 }

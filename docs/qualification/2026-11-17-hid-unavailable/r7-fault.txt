@@ -1,0 +1,49 @@
+Thread 1 (LWP 9 "helium"):
+#0  0x0000aaaac4595d84 in base::ObserverList<prerender::NoStatePrefetchContents::Observer, false, (base::ObserverListReentrancyPolicy)0, base::internal::UncheckedObserverAdapter<(partition_alloc::internal::RawPtrTraits)1, false> >::AddObserver(prerender::NoStatePrefetchContents::Observer*) ()
+#1  0x0000aaaac504cbd0 in device::DeviceService::BindHidManager(mojo::PendingReceiver<device::mojom::HidManager>) ()
+#2  0x0000aaaac504cbd0 in device::DeviceService::BindHidManager(mojo::PendingReceiver<device::mojom::HidManager>) ()
+#3  0x0000aaaac504cbd0 in device::DeviceService::BindHidManager(mojo::PendingReceiver<device::mojom::HidManager>) ()
+#4  0x0000aaaac504cbd0 in device::DeviceService::BindHidManager(mojo::PendingReceiver<device::mojom::HidManager>) ()
+#5  0x0000aaaac504cbd0 in device::DeviceService::BindHidManager(mojo::PendingReceiver<device::mojom::HidManager>) ()
+#6  0x0000aaaac504cbd0 in device::DeviceService::BindHidManager(mojo::PendingReceiver<device::mojom::HidManager>) ()
+#7  0x0000aaaac504cbd0 in device::DeviceService::BindHidManager(mojo::PendingReceiver<device::mojom::HidManager>) ()
+x0             0x40                64
+x1             0x1c02094a88        120293247624
+x2             0x0                 0
+x3             0x2d03ea0000        193339195392
+x4             0x4                 4
+x5             0x1c01e20610        120290674192
+x6             0x1c01e20610        120290674192
+x7             0xffffffd0          4294967248
+x8             0x1c00000000        120259084288
+x9             0x0                 0
+x10            0x2b7b0             178096
+x11            0x10                16
+x12            0x5889d6f2          1485428466
+x13            0x0                 0
+x14            0x1                 1
+x15            0x1c0199db30        120285944624
+x16            0x1                 1
+x17            0xffffbc54777c      281473841395580
+x18            0xaaaaaaaaaaaaaaab  -6148914691236517205
+x19            0x40                64
+x20            0x1c02094a88        120293247624
+x21            0x1c02094a80        120293247616
+x22            0xffffbc506100      281473841127680
+x23            0x0                 0
+x24            0xaaaad0466000      187650615435264
+x25            0x0                 0
+x26            0x1c01a99480        120286975104
+x27            0x1                 1
+x28            0xaaaad04032d8      187650615030488
+x29            0xffffdc3a6480      281474376557696
+x30            0xaaaac504cbd0      187650426588112
+sp             0xffffdc3a6460      0xffffdc3a6460
+pc             0xaaaac4595d84      0xaaaac4595d84 <base::ObserverList<prerender::NoStatePrefetchContents::Observer, false, (base::ObserverListReentrancyPolicy)0, base::internal::UncheckedObserverAdapter<(partition_alloc::internal::RawPtrTraits)1, false> >::AddObserver(prerender::NoStatePrefetchContents::Observer*)+36>
+cpsr           0x80000000          [ EL=0 BTYPE=0 N ]
+fpsr           0x1b                [ IOC DZC UFC IXC ]
+fpcr           0x0                 [ Len=0 Stride=0 RMode=0 ]
+tpidr          0xffffbc506100      0xffffbc506100
+tpidr2         0x0                 0x0
+   0xaaaac4595d74 <_ZN4base12ObserverListIN9prerender23NoStatePrefetchContents8ObserverELb0ELNS_28ObserverListReentrancyPolicyE0ENS_8internal24UncheckedObserverAdapterILN15partition_alloc8internal12RawPtrTraitsE1ELb0EEEE11AddObserverEPS3_+20>:	stp	x29, x30, [sp, #32]
+   0xaaaac4595d78 <_ZN4base12ObserverListIN9prerender23NoStatePrefetchContents8ObserverELb0ELNS_28ObserverListReentrancyPolicyE0ENS_8internal24UncheckedObserverAdapterILN15partition_alloc8internal12RawPtrTraitsE1ELb0EEEE11AddObserverEPS3_+24>:	add	x29, sp, #0x20

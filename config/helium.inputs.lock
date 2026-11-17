@@ -4,7 +4,7 @@
     "name": "helium",
     "version": "0.20.3.1",
     "platform_version": "1",
-    "package_revision": 7,
+    "package_revision": 8,
     "source_revision": "83027a19267e526f08e25a3af1a30b45ee7e3e2e",
     "core_revision": "2f81b9cafa38a95071e20de3f9cd6b0aca6d3c65"
   },
@@ -94,7 +94,10 @@
         "sha512": "421e1e538ff2df20e39df8e3c8f62284c8f9fce0c8966b7e073bb5ece23e7e24910d6e7b4265394a237addec4f44d24f294cdc73520d6b535776b27e32a1e351",
         "member": "package/lib/tsc",
         "destination": "third_party/typescript/linux-amd64/src/lib/tsc",
-        "chromium_pin": {"path": "third_party/typescript/linux-amd64/src/package.json", "contains": "\"version\": \"7.0.2\""},
+        "chromium_pin": {
+          "path": "third_party/typescript/linux-amd64/src/package.json",
+          "contains": "\"version\": \"7.0.2\""
+        },
         "version_output": "Version 7.0.2"
       },
       "esbuild_native": {
@@ -105,7 +108,10 @@
         "sha512": "a56e000b43f78adf1cedda3d315338a79d45cc7cdd33f4d9adeaeeae045c1c9d964dad55435088ab5f319dc7e9049c38a23922659aca5b6c8805604ff768fa52",
         "member": "package/bin/esbuild",
         "destination": "third_party/devtools-frontend/src/third_party/esbuild/esbuild",
-        "chromium_pin": {"path": "third_party/devtools-frontend/src/DEPS", "contains": "version:3@0.28.2.chromium"},
+        "chromium_pin": {
+          "path": "third_party/devtools-frontend/src/DEPS",
+          "contains": "version:3@0.28.2.chromium"
+        },
         "version_output": "0.28.2"
       }
     }
@@ -194,7 +200,9 @@
     "clangxx_cfg_sha256": "4e48721b71aa07596a47e464beaad72e977831f95b226976e33929917fb7ead9",
     "host_runtime": {
       "image": "debian@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251",
-      "architectures": ["amd64"],
+      "architectures": [
+        "amd64"
+      ],
       "purpose": "build-only glibc loader and libraries for Chromium's bundled x86_64 Rust host tools"
     },
     "architectures": {

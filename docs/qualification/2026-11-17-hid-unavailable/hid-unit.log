@@ -1,0 +1,26 @@
+Note: Google Test filter = HidManagerWithoutBackendTest.*:HidManagerTest.*
+[==========] Running 7 tests from 2 test suites.
+[----------] Global test environment set-up.
+[----------] 1 test from HidManagerWithoutBackendTest
+[ RUN      ] HidManagerWithoutBackendTest.EmptyEnumerationAndFailedConnection
+[       OK ] HidManagerWithoutBackendTest.EmptyEnumerationAndFailedConnection (1 ms)
+[----------] 1 test from HidManagerWithoutBackendTest (1 ms total)
+
+[----------] 6 tests from HidManagerTest
+[ RUN      ] HidManagerTest.GetDevicesOnly
+[       OK ] HidManagerTest.GetDevicesOnly (0 ms)
+[ RUN      ] HidManagerTest.GetDevicesAndSetClient
+[       OK ] HidManagerTest.GetDevicesAndSetClient (0 ms)
+[ RUN      ] HidManagerTest.DeviceChangedBeforeFirstEnumeration
+[       OK ] HidManagerTest.DeviceChangedBeforeFirstEnumeration (0 ms)
+[ RUN      ] HidManagerTest.DeviceChangedAfterFirstEnumeration
+[       OK ] HidManagerTest.DeviceChangedAfterFirstEnumeration (0 ms)
+[ RUN      ] HidManagerTest.DeviceAddedAndChangedAfterFirstEnumeration
+[       OK ] HidManagerTest.DeviceAddedAndChangedAfterFirstEnumeration (0 ms)
+[ RUN      ] HidManagerTest.TestHidConnectionInterface
+[       OK ] HidManagerTest.TestHidConnectionInterface (0 ms)
+[----------] 6 tests from HidManagerTest (3 ms total)
+
+[----------] Global test environment tear-down
+[==========] 7 tests from 2 test suites ran. (5 ms total)
+[  PASSED  ] 7 tests.

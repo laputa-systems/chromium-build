@@ -1,0 +1,296 @@
+{
+  "browser": "/work/extract/hid-r8/helium-wrapper",
+  "chromium_version": "156.0.8078.79",
+  "cleanup": {
+    "escalated": false,
+    "initial_descendants": [
+      193,
+      194,
+      219,
+      196,
+      262,
+      281,
+      283,
+      308,
+      326,
+      217,
+      251
+    ],
+    "ok": true,
+    "process_group": 182,
+    "root_pid": 182,
+    "root_returncode": 0,
+    "status": "complete",
+    "survivors": []
+  },
+  "compositor": {
+    "path": "/work/test-output/hid-r8-extracted/fast-compositor.png",
+    "pixels": {
+      "background": [
+        40,
+        85,
+        119
+      ],
+      "chrome": [
+        255,
+        255,
+        255
+      ],
+      "content": [
+        51,
+        204,
+        102
+      ],
+      "window": {
+        "height": 873,
+        "width": 1280,
+        "x": 0,
+        "y": 27
+      }
+    }
+  },
+  "duration_seconds": 1.615254187003302,
+  "headless": {
+    "command": [
+      "/work/extract/hid-r8/helium-wrapper",
+      "--headless=new",
+      "--remote-debugging-port=0",
+      "--user-data-dir=/work/test-output/hid-r8-extracted/helium-headless-profile-9dmgbw0a/user-data",
+      "about:blank"
+    ],
+    "devtools_endpoint": "ws://127.0.0.1:37495/devtools/browser/3be3b766-1e10-4813-bbfd-11f13f229e5e",
+    "exit": {
+      "exited_unreaped": [
+        23,
+        24,
+        74
+      ],
+      "returncode": 0,
+      "survivors": []
+    },
+    "hid_granted_devices": 0,
+    "page": {
+      "evaluated": {
+        "layout": true,
+        "status": "ready"
+      },
+      "url": "http://127.0.0.1:36485/helium-fast.html"
+    },
+    "sandbox": {
+      "renderers": [
+        {
+          "cmdline": "/work/extract/hid-r8/helium --type=renderer --crashpad-handler-pid=15 --enable-crash-reporter=, --noerrdialogs --user-data-dir=/work/test-output/hid-r8-extracted/helium-headless-profile-9dmgbw0a/user-data --change-stack-guard-on-fork=enable --remote-debugging-port=0 --ozone-platform=headless --disable-gpu-compositing --lang=en-US --num-raster-threads=4 --enable-main-frame-before-activation --renderer-client-id=9 --launch-time-ticks=60965120412 --shared-files=v8_context_snapshot_data:100 --field-trial-handle=3,i,4514850548098909603,10648695151881597855,262144 --disable-features=PaintHolding --variations-seed-version --pseudonymization-salt-handle=7,i,2380533898491557910,15936468590155300100,4 --trace-process-track-uuid=3190708994745248135",
+          "no_new_privs": "1",
+          "nspid": [
+            "144",
+            "47",
+            "1"
+          ],
+          "pid": 144,
+          "seccomp": "2"
+        },
+        {
+          "cmdline": "/work/extract/hid-r8/helium --type=renderer --crashpad-handler-pid=15 --enable-crash-reporter=, --noerrdialogs --user-data-dir=/work/test-output/hid-r8-extracted/helium-headless-profile-9dmgbw0a/user-data --extension-process --change-stack-guard-on-fork=enable --remote-debugging-port=0 --ozone-platform=headless --disable-gpu-compositing --lang=en-US --num-raster-threads=4 --enable-main-frame-before-activation --renderer-client-id=8 --launch-time-ticks=60965100682 --shared-files=v8_context_snapshot_data:100 --field-trial-handle=3,i,4514850548098909603,10648695151881597855,262144 --disable-features=PaintHolding --variations-seed-version --pseudonymization-salt-handle=7,i,2380533898491557910,15936468590155300100,4 --trace-process-track-uuid=3190708993808206286",
+          "no_new_privs": "1",
+          "nspid": [
+            "128",
+            "33",
+            "1"
+          ],
+          "pid": 128,
+          "seccomp": "2"
+        },
+        {
+          "cmdline": "/work/extract/hid-r8/helium --type=renderer --crashpad-handler-pid=15 --enable-crash-reporter=, --noerrdialogs --user-data-dir=/work/test-output/hid-r8-extracted/helium-headless-profile-9dmgbw0a/user-data --change-stack-guard-on-fork=enable --remote-debugging-port=0 --ozone-platform=headless --disable-gpu-compositing --lang=en-US --num-raster-threads=4 --enable-main-frame-before-activation --renderer-client-id=7 --launch-time-ticks=60965091393 --shared-files=v8_context_snapshot_data:100 --field-trial-handle=3,i,4514850548098909603,10648695151881597855,262144 --disable-features=PaintHolding --variations-seed-version --pseudonymization-salt-handle=7,i,2380533898491557910,15936468590155300100,4 --trace-process-track-uuid=3190708992871164437",
+          "no_new_privs": "1",
+          "nspid": [
+            "108",
+            "14",
+            "1"
+          ],
+          "pid": 108,
+          "seccomp": "2"
+        },
+        {
+          "cmdline": "/work/extract/hid-r8/helium --type=renderer --crashpad-handler-pid=15 --enable-crash-reporter=, --noerrdialogs --user-data-dir=/work/test-output/hid-r8-extracted/helium-headless-profile-9dmgbw0a/user-data --change-stack-guard-on-fork=enable --remote-debugging-port=0 --ozone-platform=headless --disable-gpu-compositing --lang=en-US --num-raster-threads=4 --enable-main-frame-before-activation --renderer-client-id=6 --launch-time-ticks=60965092704 --shared-files=v8_context_snapshot_data:100 --field-trial-handle=3,i,4514850548098909603,10648695151881597855,262144 --disable-features=PaintHolding --variations-seed-version --pseudonymization-salt-handle=7,i,2380533898491557910,15936468590155300100,4 --trace-process-track-uuid=3190708991934122588",
+          "no_new_privs": "1",
+          "nspid": [
+            "109",
+            "15",
+            "1"
+          ],
+          "pid": 109,
+          "seccomp": "2"
+        }
+      ]
+    },
+    "user_namespaces": {
+      "user/max_user_namespaces": "176660"
+    },
+    "version_info": {
+      "Browser": "Helium/0.20.3.1",
+      "File-Path-Style": "posix",
+      "Protocol-Version": "1.3",
+      "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+      "V8-Version": "15.6.75.27",
+      "WebKit-Version": "537.36 (@a21ce95c24ce3964416f09ae1862f53f319eb4d0)",
+      "webSocketDebuggerUrl": "ws://127.0.0.1:37495/devtools/browser/3be3b766-1e10-4813-bbfd-11f13f229e5e"
+    }
+  },
+  "network": "loopback-only",
+  "output": {
+    "active": true,
+    "adaptive_sync_status": "disabled",
+    "allow_tearing": false,
+    "border": "none",
+    "current_border_width": 0,
+    "current_mode": {
+      "height": 900,
+      "refresh": 0,
+      "width": 1280
+    },
+    "current_workspace": "1",
+    "deco_rect": {
+      "height": 0,
+      "width": 0,
+      "x": 0,
+      "y": 0
+    },
+    "dpms": true,
+    "features": {
+      "adaptive_sync": false,
+      "hdr": false
+    },
+    "floating": null,
+    "floating_nodes": [],
+    "focus": [
+      4
+    ],
+    "focused": true,
+    "fullscreen_mode": 0,
+    "geometry": {
+      "height": 0,
+      "width": 0,
+      "x": 0,
+      "y": 0
+    },
+    "hdr": false,
+    "id": 3,
+    "layout": "output",
+    "make": "Unknown",
+    "marks": [],
+    "max_render_time": 0,
+    "model": "Unknown",
+    "modes": [],
+    "name": "HEADLESS-1",
+    "nodes": [],
+    "non_desktop": false,
+    "orientation": "none",
+    "percent": 1.0,
+    "power": true,
+    "primary": false,
+    "rect": {
+      "height": 900,
+      "width": 1280,
+      "x": 0,
+      "y": 0
+    },
+    "scale": 1.0,
+    "scale_filter": "nearest",
+    "scratchpad_state": null,
+    "serial": "Unknown",
+    "sticky": false,
+    "subpixel_hinting": "unknown",
+    "transform": "normal",
+    "type": "output",
+    "urgent": false,
+    "window": null,
+    "window_rect": {
+      "height": 0,
+      "width": 0,
+      "x": 0,
+      "y": 0
+    }
+  },
+  "product": "helium",
+  "product_version": "0.20.3.1",
+  "sandbox": {
+    "renderers": [
+      {
+        "cmdline": "/work/extract/hid-r8/helium --type=renderer --crashpad-handler-pid=185 --enable-crash-reporter=, --user-data-dir=/work/test-output/hid-r8-extracted/helium-profile-xy1rmp3n --change-stack-guard-on-fork=enable --remote-debugging-port=37117 --ozone-platform=wayland --lang=en-US --num-raster-threads=4 --enable-main-frame-before-activation --renderer-client-id=9 --launch-time-ticks=60965941498 --shared-files=v8_context_snapshot_data:100 --metrics-shmem-handle=4,i,5273410742116639859,8123499758916692806,1572864 --field-trial-handle=3,i,3964763498852215176,11209772922686459387,262144 --variations-seed-version --pseudonymization-salt-handle=7,i,6875808401817725514,15672359267410992965,4 --trace-process-track-uuid=3190708994745248135 --enable-logging=stderr",
+        "no_new_privs": "1",
+        "nspid": [
+          "326",
+          "54",
+          "1"
+        ],
+        "pid": 326,
+        "seccomp": "2"
+      },
+      {
+        "cmdline": "/work/extract/hid-r8/helium --type=renderer --crashpad-handler-pid=185 --enable-crash-reporter=, --user-data-dir=/work/test-output/hid-r8-extracted/helium-profile-xy1rmp3n --extension-process --change-stack-guard-on-fork=enable --remote-debugging-port=37117 --ozone-platform=wayland --lang=en-US --num-raster-threads=4 --enable-main-frame-before-activation --renderer-client-id=8 --launch-time-ticks=60965909427 --shared-files=v8_context_snapshot_data:100 --metrics-shmem-handle=4,i,17721110049934931530,13243997982669216036,1572864 --field-trial-handle=3,i,3964763498852215176,11209772922686459387,262144 --variations-seed-version --pseudonymization-salt-handle=7,i,6875808401817725514,15672359267410992965,4 --trace-process-track-uuid=3190708993808206286 --enable-logging=stderr",
+        "no_new_privs": "1",
+        "nspid": [
+          "308",
+          "36",
+          "1"
+        ],
+        "pid": 308,
+        "seccomp": "2"
+      },
+      {
+        "cmdline": "/work/extract/hid-r8/helium --type=renderer --crashpad-handler-pid=185 --enable-crash-reporter=, --user-data-dir=/work/test-output/hid-r8-extracted/helium-profile-xy1rmp3n --change-stack-guard-on-fork=enable --remote-debugging-port=37117 --ozone-platform=wayland --lang=en-US --num-raster-threads=4 --enable-main-frame-before-activation --renderer-client-id=7 --launch-time-ticks=60965900984 --shared-files=v8_context_snapshot_data:100 --metrics-shmem-handle=4,i,15891472474241831106,16619197139972569591,1572864 --field-trial-handle=3,i,3964763498852215176,11209772922686459387,262144 --variations-seed-version --pseudonymization-salt-handle=7,i,6875808401817725514,15672359267410992965,4 --trace-process-track-uuid=3190708992871164437 --enable-logging=stderr",
+        "no_new_privs": "1",
+        "nspid": [
+          "281",
+          "14",
+          "1"
+        ],
+        "pid": 281,
+        "seccomp": "2"
+      },
+      {
+        "cmdline": "/work/extract/hid-r8/helium --type=renderer --crashpad-handler-pid=185 --enable-crash-reporter=, --user-data-dir=/work/test-output/hid-r8-extracted/helium-profile-xy1rmp3n --change-stack-guard-on-fork=enable --remote-debugging-port=37117 --ozone-platform=wayland --lang=en-US --num-raster-threads=4 --enable-main-frame-before-activation --renderer-client-id=6 --launch-time-ticks=60965902138 --shared-files=v8_context_snapshot_data:100 --metrics-shmem-handle=4,i,5424898481943341495,14485275576995188705,1572864 --field-trial-handle=3,i,3964763498852215176,11209772922686459387,262144 --variations-seed-version --pseudonymization-salt-handle=7,i,6875808401817725514,15672359267410992965,4 --trace-process-track-uuid=3190708991934122588 --enable-logging=stderr",
+        "no_new_privs": "1",
+        "nspid": [
+          "283",
+          "16",
+          "1"
+        ],
+        "pid": 283,
+        "seccomp": "2"
+      }
+    ]
+  },
+  "schema": 2,
+  "screenshot": {
+    "dimensions": [
+      1268,
+      801
+    ],
+    "path": "/work/test-output/hid-r8-extracted/fast-screenshot.png",
+    "sha256": "89e81a8b0920748f61c2dd346c6e0d1958bb4ee281b72ee4a7e384589ed82920"
+  },
+  "status": "complete",
+  "version": "Helium 0.20.3.1 (Chromium 156.0.8078.79)",
+  "version_info": {
+    "Browser": "Helium/0.20.3.1",
+    "File-Path-Style": "posix",
+    "Protocol-Version": "1.3",
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+    "V8-Version": "15.6.75.27",
+    "WebKit-Version": "537.36 (@a21ce95c24ce3964416f09ae1862f53f319eb4d0)",
+    "webSocketDebuggerUrl": "ws://127.0.0.1:37117/devtools/browser/0483757a-02f0-4027-8ce5-122c0c439853"
+  },
+  "window": {
+    "app_id": "helium",
+    "name": "Helium Wayland fixture - Helium",
+    "pid": 182,
+    "rect": {
+      "height": 873,
+      "width": 1280,
+      "x": 0,
+      "y": 27
+    }
+  }
+}

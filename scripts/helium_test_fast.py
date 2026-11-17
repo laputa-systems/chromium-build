@@ -384,6 +384,14 @@ def run_headless(args: argparse.Namespace, output: Path, environment: dict, devt
         page = evaluate(connection, "({status: document.querySelector('#status').textContent, layout: window.fixture.layout})")
         if page != {"status": "ready", "layout": True}:
             raise RuntimeError(f"headless page did not compute its fixture values: {page}")
+        hid = connection.call("Runtime.evaluate", {
+            "expression": "navigator.hid.getDevices().then(devices => devices.length)",
+            "returnByValue": True,
+            "awaitPromise": True,
+        })
+        if "exceptionDetails" in hid or hid.get("result", {}).get("value") != 0:
+            raise RuntimeError(f"fresh headless profile did not enumerate an empty HID grant set: {hid}")
+        result["hid_granted_devices"] = 0
         result.update({"page": {"url": page_url, "evaluated": page}, "sandbox": sandbox_observations(browser_connection, require_pid_namespace=True)})
         connection.close()
         connection = None

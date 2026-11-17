@@ -1,0 +1,17 @@
+{
+  "build_driver_schema": 1,
+  "ccache_after": "/work/metadata/build-ccache-after.txt",
+  "ccache_before": "/work/metadata/build-ccache-before.txt",
+  "chrome": "/work/out/helium-wayland-release/helium",
+  "duration_seconds": 492,
+  "finished": 1794903425,
+  "jobs": 4,
+  "load_limit": null,
+  "network": "none",
+  "output": "/work/out/helium-wayland-release",
+  "profile": "helium-wayland-release",
+  "schema": 1,
+  "started": 1794902933,
+  "status": "complete",
+  "target": "chrome"
+}

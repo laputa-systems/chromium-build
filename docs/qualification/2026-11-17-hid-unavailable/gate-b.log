@@ -1,0 +1,27 @@
+Gate B: c-runtime-compile
+Gate B: c-runtime-run
+Gate B: archive-member-compile
+Gate B: archive-create
+Gate B: archive-index
+Gate B: archive-main-compile
+Gate B: archive-main-run
+Gate B: shared-compile
+Gate B: shared-link
+Gate B: shared-executable-link
+Gate B: shared-main-run
+Gate B: pkg-config---cflags-egl-glesv2-gbm-libdrm
+Gate B: pkg-config---libs-egl-glesv2-gbm-libdrm
+Gate B: mesa-link
+Gate B: pkg-config---cflags-egl-glesv2
+Gate B: pkg-config---libs-egl-glesv2
+Gate B: egl-renderer-link
+Gate B: egl-renderer-run
+Gate B: pkg-config---cflags-nss
+Gate B: pkg-config---libs-nss
+Gate B: nss-link
+Gate B: nss-run
+Gate B: pkg-config---cflags-libavcodec-libavformat-libavutil
+Gate B: pkg-config---libs-libavcodec-libavformat-libavutil
+Gate B: ffmpeg-link
+Gate B: ffmpeg-run
+Gate B: direct compiler/runtime probes passed

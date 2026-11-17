@@ -1,0 +1,17 @@
+{
+  "args_file": "/work/metadata/helium-wayland-release.args.gn",
+  "canonical_args": "/work/metadata/gn-args.canonical.txt",
+  "effective_args": "/work/metadata/gn-args.effective.json",
+  "gn_check": "skipped",
+  "gn_check_detail": "bounded GN check is disabled; set GN_CHECK=1 to run //chrome:chrome",
+  "musl_poll_overlay": {
+    "compiler_rule_count": 3,
+    "header": "/work/src/build/config/musl-compat/include/sys/poll.h",
+    "ninja_token": "-isystem ../../src/build/config/musl-compat/include"
+  },
+  "network": "none",
+  "output": "/work/out/helium-wayland-release",
+  "profile": "helium-wayland-release",
+  "schema": 1,
+  "status": "complete"
+}
