@@ -73,6 +73,7 @@ RUN set -eux; \
             xz=5.8.4-r0 \
             zstd=1.5.7-r2; \
     fi
+COPY scripts/helium-crt.sh /opt/chromium-build/scripts/helium-crt.sh
 RUN set -eux; \
     if [ "$PRODUCT" = helium ]; then \
         mkdir -p /opt/chromium-llvm; \
@@ -84,6 +85,7 @@ RUN set -eux; \
         printf '%s\n' "$LLVM_REVISION" > /opt/chromium-llvm/cr_build_revision; \
         if [ "$TARGET_ARCH" = "arm64" ]; then \
             linux_arch=aarch64; builtins_arch=aarch64; clang_major=23; \
+            sh /opt/chromium-build/scripts/helium-crt.sh /opt/chromium-llvm; \
         else \
             linux_arch=x86_64; builtins_arch=x86_64; clang_major=23; \
         fi; \

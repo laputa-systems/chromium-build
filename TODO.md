@@ -1,5 +1,5 @@
 Prefix: CHB
-Next: 14
+Next: 15
 
 ### CHB-7 · P1 · qualify the Helium package on the owner's Alpine dwl desktop
 
@@ -18,6 +18,15 @@ Next: 14
 - **Recommendation:** Add a Helium patch that stops the back-to-back source spinning on an observer that did not produce a frame: either re-arm that observer only after its pending frame is acknowledged or new damage arrives, or apply a small minimum interval (for example 1 ms) between back-to-back ticks. Keep screenshot and input latency unthrottled, since bctl adopted the unbounded source for those. Build an archive, then A/B it in bctl with `tests/bench/kernel_experiment.py` on warm news open/click and VM CPU, and confirm with a trace that the browser-main `CompositorFrameSinkClient` count drops to native scale.
 - **Fix with:** make-it-fast
 - **Effort:** L
+
+### CHB-14 · P1 · select clean musl startup objects for arm64 Helium links
+
+- **Area:** Build
+- **Where:** config/patches/helium/musl-target-triple.patch; Dockerfile; docs/helium-acceptance.md
+- **Problem:** The r7 arm64 package purity gate reports 3 impure executables because the Alpine-targeted Clang link selects musl-dev GCC-built Scrt1.o. The package cannot pass release acceptance.
+- **Recommendation:** Select the pinned LLVM distribution's musl startup objects for the Alpine arm64 target without changing the purity gate; prove the link inputs and purity with a tiny executable.
+- **Fix with:** root-cause
+- **Effort:** S
 
 ### CHB-2 · P2 · restore the DevTools frontend after the first lean package
 
@@ -64,6 +73,9 @@ Next: 14
 - **Fix with:** none
 - **Effort:** L
 
+
+
+
 ### CHB-10 · P2 · stop exact Alpine package pins from rotting against the live v3.24 repository
 
 - **Area:** Build
@@ -72,8 +84,6 @@ Next: 14
 - **Recommendation:** Make the package world reproducible instead of re-bumping pins after each break: mirror the exact resolved `.apk` files as GitHub release assets, as the Rust toolchain mirror does, or pin a dated repository snapshot, and fetch them in `fetch` with checksums. Accept when a fresh `image` build succeeds from the lock after Alpine supersedes a pinned revision and Gate A's `lockcheck.py packages` still passes.
 - **Fix with:** none
 - **Effort:** M
-
-
 
 
 ### CHB-5 · P3 · offer accessibility without requiring a session bus
