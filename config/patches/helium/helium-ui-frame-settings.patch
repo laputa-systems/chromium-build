@@ -1,0 +1,22 @@
+diff --git a/ui/compositor/compositor.cc b/ui/compositor/compositor.cc
+--- a/ui/compositor/compositor.cc
++++ b/ui/compositor/compositor.cc
+@@ -226,6 +226,8 @@
+       enable_compositing_based_throttling;
+ 
+   settings.is_layer_tree_for_ui = true;
++  settings.disable_frame_rate_limit =
++      command_line->HasSwitch(switches::kDisableFrameRateLimit);
+ 
+ #if DCHECK_IS_ON()
+   if (command_line->HasSwitch(switches::kLogOnUIDoubleBackgroundBlur)) {
+@@ -293,9 +295,6 @@
+     slow_animations_ = std::make_unique<gfx::ScopedAnimationDurationScaleMode>(
+         animation_duration_scale);
+   }
+-
+-  settings.disable_frame_rate_limit =
+-      command_line->HasSwitch(switches::kDisableFrameRateLimit);
+ }
+ 
+ Compositor::~Compositor() {
