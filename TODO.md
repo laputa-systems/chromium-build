@@ -19,14 +19,6 @@ Next: 15
 - **Fix with:** make-it-fast
 - **Effort:** L
 
-### CHB-14 · P1 · select clean musl startup objects for arm64 Helium links
-
-- **Area:** Build
-- **Where:** config/patches/helium/musl-target-triple.patch; Dockerfile; docs/helium-acceptance.md
-- **Problem:** The r7 arm64 package purity gate reports 3 impure executables because the Alpine-targeted Clang link selects musl-dev GCC-built Scrt1.o. The package cannot pass release acceptance.
-- **Recommendation:** Select the pinned LLVM distribution's musl startup objects for the Alpine arm64 target without changing the purity gate; prove the link inputs and purity with a tiny executable.
-- **Fix with:** root-cause
-- **Effort:** S
 
 ### CHB-2 · P2 · restore the DevTools frontend after the first lean package
 
