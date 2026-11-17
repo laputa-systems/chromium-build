@@ -20,14 +20,6 @@ Next: 19
 - **Effort:** L
 
 
-### CHB-15 · P1 · handle an unavailable hid backend without crashing the browser
-
-- **Area:** Runtime
-- **Where:** config/patches/helium/, config/helium.patch-disposition.json, Chromium services/device/hid/hid_service.cc and hid_manager_impl.cc
-- **Problem:** The qualified pure arm64 r7 build sets USE_UDEV=false. HidService::Create returns null, but HidManagerImpl unconditionally observes and later dereferences it. Real Instagram navigation crashes both headed and headless Nanos; a native Linux held-open run exits 139. Native GDB identifies DeviceService::BindHidManager and an observer dereference with x19=0x40. This blocks bctl graphical Instagram login and EXT-1 consumer qualification. The bctl release notes disclose the failure.
-- **Recommendation:** Provide a valid backend that reports no devices when no platform HID backend exists, fails connection attempts truthfully, and preserves enumeration/client lifecycle. Add a source regression and local packaged-browser check, then qualify native and actual Nanos real-site behavior with sandboxing intact.
-- **Fix with:** none
-- **Effort:** M
 
 ### CHB-2 · P2 · restore the DevTools frontend after the first lean package
 
