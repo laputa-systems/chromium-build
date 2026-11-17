@@ -260,6 +260,7 @@
     "adblock-native-cosmetic-css.patch",
     "helium-restore-immediate-begin-frames.patch",
     "helium-ui-frame-settings-test.patch",
-    "helium-ui-frame-settings.patch"
+    "helium-ui-frame-settings.patch",
+    "helium-unthrottled-idle-deadline-test.patch"
   ]
 }

@@ -1,0 +1,72 @@
+diff --git a/cc/scheduler/scheduler_state_machine_unittest.cc b/cc/scheduler/scheduler_state_machine_unittest.cc
+--- a/cc/scheduler/scheduler_state_machine_unittest.cc
++++ b/cc/scheduler/scheduler_state_machine_unittest.cc
+@@ -380,6 +380,68 @@
+   state.SetNeedsBeginMainFrameForTest(true);
+   state.SetDeferBeginMainFrame(true);
+   EXPECT_FALSE(state.BeginFrameNeeded());
++}
++
++TEST(SchedulerStateMachineTest, UnthrottledIdleDeadline) {
++  for (bool unthrottled : {false, true}) {
++    SchedulerSettings settings;
++    settings.disable_frame_rate_limit = unthrottled;
++    StateMachine state(settings);
++    SET_UP_STATE(state);
++    state.SetNeedsOneBeginImplFrame(true);
++    state.IssueNextBeginImplFrame();
++    EXPECT_ACTION_UPDATE_STATE(SchedulerStateMachine::Action::NONE);
++    ASSERT_FALSE(state.ShouldSubscribeToBeginFrames());
++    EXPECT_EQ(unthrottled
++                  ? SchedulerStateMachine::BeginImplFrameDeadlineMode::IMMEDIATE
++                  : SchedulerStateMachine::BeginImplFrameDeadlineMode::LATE,
++              state.CurrentBeginImplFrameDeadlineMode());
++    state.OnBeginImplFrameDeadline();
++    EXPECT_ACTION_UPDATE_STATE(SchedulerStateMachine::Action::NONE);
++    EXPECT_FALSE(state.ShouldSubscribeToBeginFrames());
++    state.SetNeedsBeginMainFrame(false);
++    EXPECT_TRUE(state.ShouldSubscribeToBeginFrames());
++    state.IssueNextBeginImplFrame();
++    EXPECT_ACTION_UPDATE_STATE(
++        SchedulerStateMachine::Action::SEND_BEGIN_MAIN_FRAME);
++  }
++}
++
++TEST(SchedulerStateMachineTest, UnthrottledDeadlinePreservesCommitAndActivation) {
++  for (bool commit_to_active : {false, true}) {
++    SchedulerSettings settings;
++    settings.disable_frame_rate_limit = true;
++    settings.commit_to_active_tree = commit_to_active;
++    StateMachine state(settings);
++    SET_UP_STATE(state);
++    state.SetNeedsBeginMainFrame(false);
++    state.IssueNextBeginImplFrame();
++    EXPECT_ACTION_UPDATE_STATE(
++        SchedulerStateMachine::Action::SEND_BEGIN_MAIN_FRAME);
++    ASSERT_TRUE(state.ShouldSubscribeToBeginFrames());
++    EXPECT_EQ(commit_to_active
++                  ? SchedulerStateMachine::BeginImplFrameDeadlineMode::BLOCKED
++                  : SchedulerStateMachine::BeginImplFrameDeadlineMode::LATE,
++              state.CurrentBeginImplFrameDeadlineMode());
++    state.NotifyReadyToCommit();
++    EXPECT_ACTION_UPDATE_STATE(SchedulerStateMachine::Action::COMMIT);
++    EXPECT_ACTION_UPDATE_STATE(SchedulerStateMachine::Action::POST_COMMIT);
++    ASSERT_TRUE(state.ShouldSubscribeToBeginFrames());
++    EXPECT_EQ(commit_to_active
++                  ? SchedulerStateMachine::BeginImplFrameDeadlineMode::BLOCKED
++                  : SchedulerStateMachine::BeginImplFrameDeadlineMode::LATE,
++              state.CurrentBeginImplFrameDeadlineMode());
++    state.NotifyReadyToActivate();
++    EXPECT_ACTION_UPDATE_STATE(SchedulerStateMachine::Action::ACTIVATE_SYNC_TREE);
++    state.NotifyReadyToDraw();
++    EXPECT_EQ(SchedulerStateMachine::BeginImplFrameDeadlineMode::IMMEDIATE,
++              state.CurrentBeginImplFrameDeadlineMode());
++    state.OnBeginImplFrameDeadline();
++    EXPECT_ACTION_UPDATE_STATE(SchedulerStateMachine::Action::DRAW_IF_POSSIBLE);
++    state.DidSubmitCompositorFrame();
++    state.DidReceiveCompositorFrameAck();
++    EXPECT_ACTION_UPDATE_STATE(SchedulerStateMachine::Action::NONE);
++  }
+ }
+ 
+ TEST(SchedulerStateMachineTest, BeginMainFrameIsHighestPriorityAction) {
