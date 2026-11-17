@@ -82,16 +82,25 @@ def wait_cdp(port: int, process: subprocess.Popen, timeout: float) -> dict:
 def navigate(connection: CdpConnection, url: str) -> None:
     connection.call("Page.enable")
     connection.call("Runtime.enable")
+    connection.call("Page.setLifecycleEventsEnabled", {"enabled": True})
     navigation = connection.call("Page.navigate", {"url": url})
     frame_id = navigation.get("frameId")
-    if not frame_id:
-        raise RuntimeError("navigation returned no frame ID")
+    loader_id = navigation.get("loaderId")
+    if not frame_id or not loader_id:
+        raise RuntimeError("navigation returned no frame or loader ID")
     connection.wait_event(
         "Page.frameNavigated",
-        predicate=lambda event: event.get("params", {}).get("frame", {}).get("id") == frame_id,
+        predicate=lambda event: event.get("params", {}).get("frame", {}).get("id") == frame_id
+        and event.get("params", {}).get("frame", {}).get("loaderId") == loader_id,
         timeout=30,
     )
-    connection.wait_event("Page.domContentEventFired", timeout=30)
+    connection.wait_event(
+        "Page.lifecycleEvent",
+        predicate=lambda event: event.get("params", {}).get("frameId") == frame_id
+        and event.get("params", {}).get("loaderId") == loader_id
+        and event.get("params", {}).get("name") == "DOMContentLoaded",
+        timeout=30,
+    )
 
 
 def evaluate(connection: CdpConnection, expression: str):

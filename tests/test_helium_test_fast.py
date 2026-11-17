@@ -16,6 +16,41 @@ def crashed(error_code):
     return {"method": "Target.targetCrashed", "params": {"targetId": "T", "status": "crashed", "errorCode": error_code}}
 
 
+class NavigationTransport:
+    def __init__(self):
+        self.messages = []
+        self.fixture_ready = False
+
+    def send(self, command):
+        if command["method"] == "Page.enable":
+            self.messages.extend([
+                {"method": "Page.frameNavigated", "params": {"frame": {"id": "F", "loaderId": "old"}}},
+                {"method": "Page.domContentEventFired", "params": {"timestamp": 1}},
+            ])
+        if command["method"] == "Page.setLifecycleEventsEnabled":
+            self.messages.append({"method": "Page.lifecycleEvent", "params": {"frameId": "F", "loaderId": "old", "name": "DOMContentLoaded"}})
+        result = {"frameId": "F", "loaderId": "new"} if command["method"] == "Page.navigate" else {}
+        self.messages.append({"id": command["id"], "result": result})
+        if command["method"] == "Page.navigate":
+            self.messages.extend([
+                {"method": "Page.frameNavigated", "params": {"frame": {"id": "F", "loaderId": "new"}}},
+                {"method": "Page.lifecycleEvent", "params": {"frameId": "F", "loaderId": "new", "name": "DOMContentLoaded"}},
+            ])
+
+    def receive(self):
+        message = self.messages.pop(0)
+        if message.get("method") == "Page.lifecycleEvent" and message["params"]["loaderId"] == "new":
+            self.fixture_ready = True
+        return message
+
+
+class NavigationTest(unittest.TestCase):
+    def test_ignores_previous_document_events_for_the_same_frame(self):
+        transport = NavigationTransport()
+        helium_test_fast.navigate(CdpConnection(transport), "https://fixture.invalid/")
+        self.assertTrue(transport.fixture_ready)
+
+
 class CrashedTargetsTest(unittest.TestCase):
     def test_sigsys_wait_status_is_recognised_with_or_without_core_dump(self):
         connection = connection_with([crashed(31), crashed(31 | 0x80)])
