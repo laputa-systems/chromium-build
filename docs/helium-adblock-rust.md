@@ -247,3 +247,21 @@ The work volume keeps the last official ThinLTO build in
 series there and running Ninja would recompile only the changed and new
 files, but `chrome` is re-linked with ThinLTO, which is the expensive step.
 That is the cheapest proof that the forward-port compiles; it is not done.
+
+## On by default (package revision 9, 2026-11-18)
+
+Revision 9 compiles native adblock into the Linux package and the
+`macos-helium-release` app, defaults `helium.adblock.enabled` to true, and
+stops loading the bundled uBlock Origin. Linux preparation had silently
+skipped the crate patches under `config/patches/helium/adblock-crates`, so
+the first amd64 build failed to compile `helium_adblock`. Preparation now
+passes that directory explicitly and refuses a missing one.
+
+Both Linux archives qualified, with the same eleven checks as revision 8:
+
+| Archive | SHA-256 | Extra evidence |
+| --- | --- | --- |
+| `helium-0.20.3.1-r9-linux-x86_64-musl.tar.xz` | `f832b3f39022a37c24fc9c1b3b3fc3df4b666c8fc20aeca405d706c66a1da799` | Host headless load on a Linux amd64 host: 3 instances for 180 s, 11,226 iterations, no crashes or `SIGSYS` exits |
+| `helium-0.20.3.1-r9-linux-aarch64-musl.tar.xz` | `ef2b1831f655ae97c66df47e54b04178da40137cf857d1461ef215ecc9c19de6` | In bctl Nanos arm64 sessions on Apple Silicon, `ad.doubleclick.net` and `google-analytics.com/collect` fail from an http page with the default preference and load with it off, while `example.org` loads in both |
+
+The macOS app's checks are in [macos.md](macos.md#build-helium).
