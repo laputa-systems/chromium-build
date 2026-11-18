@@ -130,6 +130,18 @@ candidate, set `MACOS_SKIP_ACCEPTANCE=1` when packaging and independently
 verify the staged app. The resulting package is experimental and does not
 claim Shadowdriver acceptance.
 
+Launch the staged app with `--use-mock-keychain` when verifying it from a
+non-interactive shell. Without it, the first request that sends cookies waits
+for a Keychain prompt for "Helium Safe Storage" that nobody can answer, and
+every page load stalls. With a fresh profile, `--headless`, and
+`--use-mock-keychain`, the candidate built from this lock reports
+`Helium 0.20.3.1 (Chromium 156.0.8078.79)`. Its GPU, network, storage and
+renderer processes are all under Seatbelt (`sandbox_check`). No extension
+target is loaded, and `chrome://version` shows the Support row. An
+`ad.doubleclick.net` image on a loopback page fails with
+`ERR_BLOCKED_BY_CLIENT`, and loads when the profile's Preferences set
+`helium.adblock.enabled` to false.
+
 ## Native automation compatibility
 
 The macOS-only overlay is documented in
