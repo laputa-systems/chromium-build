@@ -146,7 +146,7 @@ case "$PLATFORM" in
         [ "$PRODUCT" = chromium ] || fail "product $PRODUCT is not supported on macOS"
         [ "$ARCH" = arm64 ] || fail 'macOS supports native arm64 only'
         PROFILE=${PROFILE:-macos-release}
-        [ "$PROFILE" = macos-release ] || fail "macOS profile $PROFILE is not supported; expected macos-release"
+        case "$PROFILE" in macos-release|macos-helium-release) ;; *) fail "macOS profile $PROFILE is not supported; expected macos-release or macos-helium-release" ;; esac
         [ -z "$ARCHIVE_PATH" ] || fail '--archive is Linux Helium only'
         [ "$ROLLBACK" = 0 ] || fail '--rollback is Linux Helium install only'
         native_args=(--repo-root "$ROOT" --platform macos --arch "$ARCH" --profile "$PROFILE" --command "$command_name")

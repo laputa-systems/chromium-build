@@ -111,6 +111,10 @@ def fail(message: str) -> NoReturn:
     raise MacOSFailure(message)
 
 
+def product_name() -> str:
+    return "Helium" if DEFAULT_PROFILE == "macos-helium-release" else "Chromium"
+
+
 def atomic_write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}-{time.time_ns()}")
@@ -635,6 +639,9 @@ def isolated_environment(
     else:
         environment.pop("CHROMIUM_SANDBOX_PROFILE", None)
     selected_path = [str(layout.tools / "bin"), str(layout.tools / "depot_tools")]
+    pinned_python = layout.source / "third_party" / "cpython3" / "host" / "bin"
+    if (pinned_python / "python3").is_file():
+        selected_path.insert(0, str(pinned_python))
     if llvm_root:
         selected_path.append(str(llvm_root / "bin"))
     for host_tool in ("rustup", "cargo"):
@@ -1489,6 +1496,9 @@ def update_lock(layout: WorkLayout, *, latest: bool = True) -> dict[str, Any]:
 
 
 def load_lock(layout: WorkLayout) -> dict[str, Any]:
+    if DEFAULT_PROFILE == "macos-helium-release":
+        import macos_helium
+        return macos_helium.load_lock(layout)
     path = layout.repo_root / LOCK_RELATIVE
     if not path.is_file():
         fail(f"macOS lock is missing: {path}; run update-lock --latest")
@@ -2194,7 +2204,35 @@ def replace_archive_with_git_source(
         shutil.rmtree(checkout, ignore_errors=True)
 
 
+def extract_official_source(layout: WorkLayout, lock: Mapping[str, Any]) -> dict[str, Any]:
+    chromium_archive = layout.inputs / lock["chromium"]["source"]["filename"]
+    extraction = layout.tmp / f"source-acquire-{os.getpid()}-{time.time_ns()}"
+    extraction.mkdir(parents=True, exist_ok=False)
+    try:
+        safe_extract_tar(chromium_archive, extraction, allow_conflicting_regular_duplicates=True)
+        source_root = find_chromium_root(extraction)
+        if layout.source.exists():
+            if layout.source.is_symlink():
+                fail(f"source path is a symlink: {layout.source}")
+            shutil.rmtree(layout.source)
+        os.replace(source_root, layout.source)
+        return {
+            "schema": 1,
+            "status": "complete",
+            "network": "fetch",
+            "chromium_version": lock["chromium"]["version"],
+            "chromium_commit": lock["chromium"]["commit"],
+            "source_archive": str(chromium_archive),
+            "source_method": "official-native-macos-source-archive",
+        }
+    finally:
+        shutil.rmtree(extraction, ignore_errors=True)
+
+
 def fetch_inputs(layout: WorkLayout) -> dict[str, Any]:
+    if DEFAULT_PROFILE == "macos-helium-release":
+        import macos_helium
+        return macos_helium.fetch_inputs(layout)
     layout.ensure()
     lock = load_lock(layout)
     environment = isolated_environment(layout, network="fetch")
@@ -2226,33 +2264,8 @@ def fetch_inputs(layout: WorkLayout) -> dict[str, Any]:
             fail("source acquisition identity differs from the macOS lock; use reset --yes")
         source_status = existing
     else:
-        chromium_archive = layout.inputs / lock["chromium"]["source"]["filename"]
-        extraction = layout.tmp / f"source-acquire-{os.getpid()}-{time.time_ns()}"
-        extraction.mkdir(parents=True, exist_ok=False)
-        try:
-            safe_extract_tar(
-                chromium_archive,
-                extraction,
-                allow_conflicting_regular_duplicates=True,
-            )
-            source_root = find_chromium_root(extraction)
-            if layout.source.exists():
-                if layout.source.is_symlink():
-                    fail(f"source path is a symlink: {layout.source}")
-                shutil.rmtree(layout.source)
-            os.replace(source_root, layout.source)
-            source_status = {
-                "schema": 1,
-                "status": "complete",
-                "network": "fetch",
-                "chromium_version": lock["chromium"]["version"],
-                "chromium_commit": lock["chromium"]["commit"],
-                "source_archive": str(chromium_archive),
-                "source_method": "official-native-macos-source-archive",
-            }
-            atomic_json(source_state, source_status)
-        finally:
-            shutil.rmtree(extraction, ignore_errors=True)
+        source_status = extract_official_source(layout, lock)
+        atomic_json(source_state, source_status)
 
     source_status = replace_archive_with_git_source(layout, lock, source_status, environment)
     archive_worktree = ensure_archive_worktree(layout.source, environment)
@@ -2757,6 +2770,9 @@ def stable_digest(value: Any) -> str:
 
 
 def local_overlay_identity(layout: WorkLayout) -> dict[str, Any]:
+    if DEFAULT_PROFILE == "macos-helium-release":
+        import macos_helium
+        return macos_helium.local_overlay_identity(layout)
     root = layout.repo_root / "config" / "patches" / "macos-native"
     series = root / "series"
     names = series.read_text(encoding="utf-8").splitlines()
@@ -2866,6 +2882,9 @@ def require_overlay_identity(layout: WorkLayout, record: Mapping[str, Any]) -> s
 
 
 def prepare_source(layout: WorkLayout) -> dict[str, Any]:
+    if DEFAULT_PROFILE == "macos-helium-release":
+        import macos_helium
+        return macos_helium.prepare_source(layout)
     layout.ensure()
     lock = load_lock(layout)
     if not layout.source.is_dir():
@@ -3276,8 +3295,8 @@ def build_source(layout: WorkLayout, jobs: str | None) -> dict[str, Any]:
         log_path=layout.logs / "ninja-chrome.log",
         timeout=24 * 60 * 60,
     )
-    app = layout.output / "Chromium.app"
-    executable = app / "Contents" / "MacOS" / "Chromium"
+    app = layout.output / f"{product_name()}.app"
+    executable = app / "Contents" / "MacOS" / product_name()
     if not app.is_dir() or not executable.is_file():
         fail(f"ninja reported success but the macOS application is missing: {executable}")
     report = {
@@ -3517,7 +3536,7 @@ def audit_bundle(app: Path, layout: WorkLayout, environment: Mapping[str, str], 
     """Audit a bundle before signing or acceptance promotion."""
 
     app = validate_app_path(app, layout, "Chromium application")
-    executable = app / "Contents" / "MacOS" / "Chromium"
+    executable = app / "Contents" / "MacOS" / product_name()
     if not executable.is_file() or executable.is_symlink():
         fail(f"Chromium.app has no regular native executable: {executable}")
     plist_path = app / "Contents" / "Info.plist"
@@ -3531,7 +3550,7 @@ def audit_bundle(app: Path, layout: WorkLayout, environment: Mapping[str, str], 
     if not isinstance(plist, dict):
         fail(f"Chromium.app Info.plist is not a dictionary: {plist_path}")
     bundle_executable = plist.get("CFBundleExecutable")
-    if bundle_executable and bundle_executable != "Chromium":
+    if bundle_executable and bundle_executable != product_name():
         fail(f"unexpected CFBundleExecutable {bundle_executable!r} in {plist_path}")
 
     mach_o: list[str] = []
@@ -3794,18 +3813,18 @@ def stage_runtime(layout: WorkLayout) -> dict[str, Any]:
         fail("the build report is not complete; run build")
     overlay_digest = require_overlay_identity(layout, build)
     require_build_identity(layout, build)
-    source_app = validate_app_path(build.get("app", layout.output / "Chromium.app"), layout, "built Chromium.app", built=True)
+    source_app = validate_app_path(build.get("app", layout.output / f"{product_name()}.app"), layout, f"built {product_name()}.app", built=True)
     environment = isolated_environment(layout, network="none")
     require_sandboxed_environment(environment)
     source_audit = audit_bundle(source_app, layout, environment, require_signatures=False)
-    pending = layout.candidates / f".pending-{os.getpid()}-{time.time_ns()}" / "Chromium.app"
+    pending = layout.candidates / f".pending-{os.getpid()}-{time.time_ns()}" / f"{product_name()}.app"
     pending.parent.mkdir(parents=True, exist_ok=False)
     try:
         shutil.copytree(source_app, pending, symlinks=True)
         signing = sign_bundle(pending, layout, environment)
         staged_audit = audit_bundle(pending, layout, environment)
         fingerprint = bundle_fingerprint(pending)
-        destination = layout.candidates / fingerprint / "Chromium.app"
+        destination = layout.candidates / fingerprint / f"{product_name()}.app"
         if destination.exists():
             shutil.rmtree(pending.parent)
             staged_audit = audit_bundle(destination, layout, environment)
@@ -3817,7 +3836,7 @@ def stage_runtime(layout: WorkLayout) -> dict[str, Any]:
             "status": "complete",
             "fingerprint": fingerprint,
             "app": str(destination),
-            "executable": str(destination / "Contents" / "MacOS" / "Chromium"),
+            "executable": str(destination / "Contents" / "MacOS" / product_name()),
             "source_app": str(source_app),
             "local_overlay_sha256": overlay_digest,
             "build_identity": build.get("build_identity"),
@@ -3847,7 +3866,7 @@ def package_bundle(layout: WorkLayout) -> dict[str, Any]:
         fail("staged candidate has no complete bundle audit; run stage-runtime")
     app = validate_app_path(candidate.get("app", ""), layout, "staged candidate", built=True)
     candidates_root = layout.candidates.resolve()
-    if candidates_root not in app.parents or app.name != "Chromium.app":
+    if candidates_root not in app.parents or app.name != f"{product_name()}.app":
         fail(f"staged candidate escapes the candidate root: {app}")
     fingerprint = bundle_fingerprint(app)
     if candidate.get("fingerprint") != fingerprint:
@@ -3863,7 +3882,7 @@ def package_bundle(layout: WorkLayout) -> dict[str, Any]:
     release = layout.release
     skip_acceptance = os.environ.get("MACOS_SKIP_ACCEPTANCE", "0").lower() in {"1", "true", "yes"}
     if skip_acceptance:
-        archive = release / f"Chromium-{version}-macos-arm64-experimental.zip"
+        archive = release / f"{product_name()}-{version}-macos-arm64-experimental.zip"
         acceptance_status = "skipped"
     else:
         accepted_path = layout.stage / "accepted.json"
@@ -3881,7 +3900,7 @@ def package_bundle(layout: WorkLayout) -> dict[str, Any]:
         for key in ("lock_sha256", "overlay_sha256", "clang_version", "clang_sha256", "xcode", "sdk", "linker", "rust", "gn_args_sha256", "digest"):
             if str(candidate_identity.get(key, "")) != str(accepted_identity.get(key, "")):
                 fail(f"accepted build identity mismatch in {key}; rerun test-staged")
-        archive = release / f"Chromium-{version}-macos-arm64.zip"
+        archive = release / f"{product_name()}-{version}-macos-arm64.zip"
         acceptance_status = "local-stage-only"
     temporary = release / f".{archive.name}.tmp-{os.getpid()}-{time.time_ns()}"
     ditto = Path("/usr/bin/ditto")
@@ -3994,7 +4013,7 @@ def build_release_manifest(layout: WorkLayout, lock: Mapping[str, Any], candidat
         "source_clean": source_clean,
         "chromium_version": lock["chromium"]["version"],
         "chromium_commit": lock["chromium"]["commit"],
-        "ungoogled_commit": lock["ungoogled"]["commit"],
+        "ungoogled_commit": lock["product"]["core_revision"] if DEFAULT_PROFILE == "macos-helium-release" else lock["ungoogled"]["commit"],
         "clang_version": str(build_identity.get("clang_version", "")),
         "clang_sha256": str(build_identity.get("clang_sha256", "")),
         "lock_sha256": sha256(layout.repo_root / LOCK_RELATIVE),
@@ -4532,6 +4551,7 @@ def parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    global DEFAULT_PROFILE, LOCK_RELATIVE
     arguments = parse_arguments(argv)
     try:
         repo_root = canonical_path(arguments.repo_root, "repository root", must_exist=True)
@@ -4540,15 +4560,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         arch = normalize_arch(arguments.arch)
         if arguments.headed_reference and arguments.command != "test-staged":
             fail("--headed-reference applies only to test-staged")
-        if arch != "arm64" or arguments.profile != DEFAULT_PROFILE:
-            fail("the native macOS backend supports arm64 and macos-release only")
+        if arch != "arm64" or arguments.profile not in {"macos-release", "macos-helium-release"}:
+            fail("the native macOS backend supports arm64 and macos-release or macos-helium-release")
+        DEFAULT_PROFILE = arguments.profile
+        LOCK_RELATIVE = Path("config/macos-helium.inputs.lock" if DEFAULT_PROFILE == "macos-helium-release" else "config/macos.inputs.lock")
         configured_root = os.environ.get("CHROMIUM_WORK_ROOT")
         work_root = configured_root or str(repo_root / ".work" / "macos-arm64")
         layout = WorkLayout(validate_work_root(work_root, repo_root), repo_root)
         with work_lock(layout):
             command = arguments.command
             if command == "doctor":
-                run_doctor(layout)
+                run_doctor(layout, require_references=DEFAULT_PROFILE != "macos-helium-release")
             elif command == "smoke-preflight":
                 run_doctor(layout, require_references=False)
             elif command == "update-lock":
@@ -4587,4 +4609,5 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    sys.modules["macos_backend"] = sys.modules[__name__]
     raise SystemExit(main())

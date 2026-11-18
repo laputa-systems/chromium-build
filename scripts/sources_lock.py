@@ -19,10 +19,11 @@ LOCKS = {
     "linux": "config/inputs.lock",
     "helium": "config/helium.inputs.lock",
     "macos": "config/macos.inputs.lock",
+    "macos-helium": "config/macos-helium.inputs.lock",
 }
 RUST_TOOLCHAIN_SCRIPT = "scripts/build-rust-toolchain.sh"
 TARGETS = {"amd64": "x86_64-unknown-linux-musl", "arm64": "aarch64-unknown-linux-musl"}
-SCOPE_TARGETS = {"linux": "x86_64-unknown-linux-musl", "macos": "aarch64-apple-darwin"}
+SCOPE_TARGETS = {"linux": "x86_64-unknown-linux-musl", "macos": "aarch64-apple-darwin", "macos-helium": "aarch64-apple-darwin"}
 ROLES = {
     "chromium": "source",
     "ungoogled": "source",
@@ -32,6 +33,7 @@ ROLES = {
     "architecture_inputs": "toolchain",
     "runtime_sources": "runtime",
     "toolchain": "toolchain",
+    "pgo_profile": "dependency",
 }
 FIELD_ORDER = ("name", "version", "url", "sha256", "sha512", "size", "role", "target", "lock")
 SHA512 = re.compile(r"[0-9a-f]{128}")

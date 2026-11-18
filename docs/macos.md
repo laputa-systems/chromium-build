@@ -87,6 +87,46 @@ and commit the result. The Rust nightly that `rustup` installs and the
 `depot_tools` commit are pinned in `config/macos.inputs.lock` only, because they
 are not digest-addressed downloads.
 
+## Build Helium
+
+The `macos-helium-release` profile uses the Chromium version and Helium core
+revision pinned by the Linux Helium package. Its separate input lock pins the
+official Chromium source archive and matching macOS platform series. The patch disposition
+is in `config/macos-helium.patch-disposition.json`. Native adblock
+(`enable_native_adblock`) is compiled in and its `helium.adblock.enabled`
+preference defaults to on; its filter lists and crates are the pinned
+`adblock_inputs` shared with the Linux lock.
+
+From Helium's own infrastructure the profile fetches only the two pinned
+source revisions (`imputnet/helium` and `imputnet/helium-macos`) and the
+pinned `imputnet/helium-filters` lists, plus the pinned uBlock Origin package
+that Helium's later patches build on. A local patch keeps that bundled uBlock
+from loading, so native adblock is the only blocker that runs. The profile
+leaves out Sparkle and the nonfree search-engine assets, and drops the upstream
+patches that exist only to integrate them; the disposition file lists each one
+with its reason. Branding icons are scaled
+with `/usr/bin/sips` instead of upstream's Pillow-based generator, so
+preparation needs no third-party Python packages.
+
+To stay comparable with the Linux package, the Helium profile is an official,
+PGO-optimized build with DCHECKs off (`is_official_build=true`,
+`dcheck_always_on=false`, `chrome_pgo_phase=2`). Its PGO profile is the pinned
+`mac-arm` profile that `chrome/build/mac-arm.pgo.txt` names; fetch places it
+under `chrome/build/pgo_profiles`. ThinLTO stays off, unlike Linux, for the
+lld and Xcode 27 TAPI reason given under "Release configuration vs upstream
+official" below.
+
+Set `CHROMIUM_WORK_ROOT` to a separate absolute directory under this checkout's
+`.work/`, and select `--profile macos-helium-release` for each phase. Fetch
+before running doctor: doctor checks the compiler in the fetched source. Run
+`prepare`, `configure`, `build`, `stage-runtime`, and `package` in order.
+Compiler cache selection uses `MACOS_COMPILER_CACHE=auto` by default.
+
+Shadowdriver's staged acceptance currently targets Chromium. For a Helium
+candidate, set `MACOS_SKIP_ACCEPTANCE=1` when packaging and independently
+verify the staged app. The resulting package is experimental and does not
+claim Shadowdriver acceptance.
+
 ## Native automation compatibility
 
 The macOS-only overlay is documented in

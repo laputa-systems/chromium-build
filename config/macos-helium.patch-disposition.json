@@ -1,0 +1,465 @@
+{
+  "schema": 1,
+  "linux_layers": [
+    {
+      "project": "alpine",
+      "state": "exclude",
+      "reason": "Linux platform and musl adaptation."
+    },
+    {
+      "project": "copium",
+      "state": "exclude",
+      "reason": "Linux platform and musl adaptation."
+    }
+  ],
+  "local_patches": [
+    {
+      "name": "gate-e-hermetic-smoke.patch",
+      "state": "exclude",
+      "reason": "Linux build or test fixture; not part of the macOS product."
+    },
+    {
+      "name": "alpine-node-version.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "alpine-rust-bootstrap.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-sched-param-initializer.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-allocator-cdefs.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-allocator-cpp-noexcept.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-allocator-libc-noexcept.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-perfetto-cmsg-sign-compare.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-unix-domain-socket-types.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-stack-trace-noexecinfo.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-cookie-string-view-iterator.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-udp-cmsg-sign-compare.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-mojo-cmsg-sign-compare.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-mojo-vector-bool-clone.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-raw-ref-transparent-const.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-private-key-find-iterator.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-webrtc-physical-socket.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-sandbox-cmsg-sign-compare.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-sys-poll-compat-overlay.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-v8-sanitizer-header.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-fontconfig-no-nls.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-fontconfig-random.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-expat-hash-salt-2-8.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-libsync-no-cdefs.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-bindgen-clang22.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-crashpad-cmsg.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-native-egl-share-group.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-native-egl-semaphore-share-group.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-gpu-sandbox-tsync.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-gpu-sched-affinity-errno.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-gpu-sandbox-broker-tsync.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-gpu-pwritev2-sandbox.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-pwritev2-sandbox.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-seccomp-sched-get.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "helium-crashpad-null-signal-handler.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-seccomp-membarrier.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-seccomp-clone-detached.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-clang23-function-view-pointer-bool.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-clang23-omnibox-nodiscard.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "headless-link-dawn-drm-and-variations.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "headless-no-web-app-dbus-portal.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "headless-global-accelerator-no-dbus-return.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "declare-is-musl.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "libcxx-musl-rune-table.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-target-triple.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "rust-chromium-toolchain.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-bindgen-libclang-flags.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-mallinfo-guard.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-fontconfig-strerror-r.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-libsync-cdefs-include.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-swiftshader-llvm-config.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "rust-bytemuck-simd.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "musl-v8-no-execinfo.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "helium-no-devtools-frontend.patch",
+      "state": "apply",
+      "reason": "Shared guest product behavior."
+    },
+    {
+      "name": "helium-no-dbus.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "helium-dawn-vulkan-headers.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "helium-devtools-policy-prefs.patch",
+      "state": "apply",
+      "reason": "Shared guest product behavior."
+    },
+    {
+      "name": "helium-fake-audio-persona.patch",
+      "state": "apply",
+      "reason": "Shared guest product behavior."
+    },
+    {
+      "name": "helium-remove-onboarding.patch",
+      "state": "apply",
+      "reason": "Shared guest product behavior."
+    },
+    {
+      "name": "helium-disable-autoupdates.patch",
+      "state": "apply",
+      "reason": "Shared guest product behavior."
+    },
+    {
+      "name": "helium-partitionalloc-musl-ifunc.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "helium-devtools-product.patch",
+      "state": "apply",
+      "reason": "Shared guest product behavior."
+    },
+    {
+      "name": "adblock-rust-engine.patch",
+      "state": "apply",
+      "reason": "Native adblock is enabled by default in this profile."
+    },
+    {
+      "name": "adblock-rust-gn.patch",
+      "state": "apply",
+      "reason": "Native adblock is enabled by default in this profile."
+    },
+    {
+      "name": "adblock-buildflags.patch",
+      "state": "apply",
+      "reason": "Native adblock is enabled by default in this profile."
+    },
+    {
+      "name": "adblock-filter-sources.patch",
+      "state": "apply",
+      "reason": "Native adblock is enabled by default in this profile."
+    },
+    {
+      "name": "adblock-engine-bridge.patch",
+      "state": "apply",
+      "reason": "Native adblock is enabled by default in this profile."
+    },
+    {
+      "name": "adblock-core-api.patch",
+      "state": "apply",
+      "reason": "Native adblock is enabled by default in this profile."
+    },
+    {
+      "name": "adblock-engine-lifecycle.patch",
+      "state": "apply",
+      "reason": "Native adblock is enabled by default in this profile."
+    },
+    {
+      "name": "adblock-service.patch",
+      "state": "apply",
+      "reason": "Native adblock is enabled by default in this profile."
+    },
+    {
+      "name": "adblock-service-filtering.patch",
+      "state": "apply",
+      "reason": "Native adblock is enabled by default in this profile."
+    },
+    {
+      "name": "adblock-service-refresh.patch",
+      "state": "apply",
+      "reason": "Native adblock is enabled by default in this profile."
+    },
+    {
+      "name": "adblock-bundled-filters.patch",
+      "state": "apply",
+      "reason": "Native adblock is enabled by default in this profile."
+    },
+    {
+      "name": "adblock-chrome-runtime.patch",
+      "state": "apply",
+      "reason": "Native adblock is enabled by default in this profile."
+    },
+    {
+      "name": "adblock-chrome-network.patch",
+      "state": "apply",
+      "reason": "Native adblock is enabled by default in this profile."
+    },
+    {
+      "name": "adblock-blink-cosmetic-filtering.patch",
+      "state": "apply",
+      "reason": "Native adblock is enabled by default in this profile."
+    },
+    {
+      "name": "adblock-review-fixes.patch",
+      "state": "apply",
+      "reason": "Native adblock is enabled by default in this profile."
+    },
+    {
+      "name": "adblock-native-cosmetic-css.patch",
+      "state": "apply",
+      "reason": "Native adblock is enabled by default in this profile."
+    },
+    {
+      "name": "helium-ui-frame-settings-test.patch",
+      "state": "exclude",
+      "reason": "Linux build or test fixture; not part of the macOS product."
+    },
+    {
+      "name": "helium-ui-frame-settings.patch",
+      "state": "apply",
+      "reason": "Shared guest product behavior."
+    },
+    {
+      "name": "helium-unthrottled-idle-deadline-test.patch",
+      "state": "exclude",
+      "reason": "Linux build or test fixture; not part of the macOS product."
+    },
+    {
+      "name": "helium-unthrottled-idle-deadline.patch",
+      "state": "apply",
+      "reason": "Shared guest product behavior."
+    },
+    {
+      "name": "helium-hid-without-platform-backend-test.patch",
+      "state": "exclude",
+      "reason": "Linux build or test fixture; not part of the macOS product."
+    },
+    {
+      "name": "helium-hid-without-platform-backend.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "helium-device-tests-without-dbus.patch",
+      "state": "exclude",
+      "reason": "Linux musl, Wayland, D-Bus, HID, or Linux toolchain adaptation."
+    },
+    {
+      "name": "native-adblock-replaces-ublock.patch",
+      "state": "apply",
+      "reason": "Native adblock is the only blocker; the bundled uBlock Origin component is not loaded."
+    }
+  ],
+  "upstream_excluded": [
+    {
+      "name": "macos/rebel/macos/sparkle-integration.patch",
+      "reason": "Sparkle is not shipped; enable_sparkle stays false and the Sparkle source is not fetched."
+    },
+    {
+      "name": "macos/helium/macos/updater/fixup-sparkle-glue.patch",
+      "reason": "Sparkle is not shipped; enable_sparkle stays false and the Sparkle source is not fetched."
+    },
+    {
+      "name": "macos/helium/macos/updater/sparkle2-integration.patch",
+      "reason": "Sparkle is not shipped; enable_sparkle stays false and the Sparkle source is not fetched."
+    },
+    {
+      "name": "core/helium/core/search/fix-search-engine-icons.patch",
+      "reason": "Helium's nonfree search provider assets are not fetched; Chromium's default keeps enable_builtin_search_provider_assets off for unbranded builds."
+    }
+  ]
+}
