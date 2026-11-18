@@ -112,6 +112,12 @@ class VendorTest(unittest.TestCase):
         with self.assertRaisesRegex(SystemExit, "match no crate in Cargo.lock"):
             self.vendor()
 
+    def test_a_missing_crate_patch_directory_is_refused(self) -> None:
+        self.locked_crate()
+        self.patches.rmdir()
+        with self.assertRaisesRegex(SystemExit, "crate patch directory .* does not exist"):
+            self.vendor()
+
 
 if __name__ == "__main__":
     unittest.main()

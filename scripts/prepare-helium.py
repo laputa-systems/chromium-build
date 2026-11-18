@@ -249,6 +249,7 @@ def main() -> None:
     parser.add_argument("--disposition", type=Path, required=True)
     parser.add_argument("--patches", type=Path, required=True)
     parser.add_argument("--local-patches", type=Path, action="append", required=True)
+    parser.add_argument("--crate-patches", type=Path, required=True)
     parser.add_argument("--arch", required=True)
     args = parser.parse_args()
 
@@ -391,7 +392,7 @@ def main() -> None:
         "--filters-sha256",
         filters["sha256"],
         "--crate-patches",
-        str(args.patches / "helium/adblock-crates"),
+        str(args.crate_patches),
         "--record",
         str(args.metadata / "helium-adblock.json"),
     ])

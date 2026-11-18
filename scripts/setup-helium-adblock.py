@@ -73,6 +73,8 @@ def vendor_crates(source: Path, inputs: Path, crate_patches: Path) -> list[dict[
     vendor = source / WORKSPACE / "vendor"
     vendor.mkdir(parents=True, exist_ok=True)
     packages = registry_packages(lock_text)
+    if not crate_patches.is_dir():
+        raise SystemExit(f"crate patch directory {crate_patches} does not exist")
     patches = {patch.stem: patch for patch in sorted(crate_patches.glob("*.patch"))}
     if stale := sorted(set(patches) - {f"{p['name']}-{p['version']}" for p in packages}):
         raise SystemExit(f"crate patches {stale} match no crate in Cargo.lock")

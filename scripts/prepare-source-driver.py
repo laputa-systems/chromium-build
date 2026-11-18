@@ -273,6 +273,8 @@ def prepare_helium(root: Path, work: Path, inputs: Path, metadata: Path, source:
             str(root / "config/patches/helium"),
             "--local-patches",
             str(root / "config/patches"),
+            "--crate-patches",
+            str(root / "config/patches/helium/adblock-crates"),
             "--arch",
             arch,
         ]
