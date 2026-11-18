@@ -112,9 +112,12 @@ To stay comparable with the Linux package, the Helium profile is an official,
 PGO-optimized build with DCHECKs off (`is_official_build=true`,
 `dcheck_always_on=false`, `chrome_pgo_phase=2`). Its PGO profile is the pinned
 `mac-arm` profile that `chrome/build/mac-arm.pgo.txt` names; fetch places it
-under `chrome/build/pgo_profiles`. ThinLTO stays off, unlike Linux, for the
-lld and Xcode 27 TAPI reason given under "Release configuration vs upstream
-official" below.
+under `chrome/build/pgo_profiles`. Like Linux it links with lld and ThinLTO
+(`use_lld=true`, `use_thin_lto=true`, `thin_lto_enable_optimizations=true`).
+The TAPI limitation noted for `macos-release` below does not apply to the
+Chromium 156.0.8078.79 toolchain (clang 24.0.0git, `86922d51`): its
+`ld64.lld` links ThinLTO objects against the Xcode 27.2 SDK, AppKit, Metal,
+ScreenCaptureKit and the other system frameworks Chromium uses.
 
 Set `CHROMIUM_WORK_ROOT` to a separate absolute directory under this checkout's
 `.work/`, and select `--profile macos-helium-release` for each phase. Fetch
