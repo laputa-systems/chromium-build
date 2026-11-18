@@ -592,16 +592,6 @@
       "lock": "config/helium.inputs.lock"
     },
     {
-      "name": "helium/source_inputs/search_engines_data",
-      "version": "202609082320",
-      "url": "https://github.com/imputnet/helium-nonfree-assets/releases/download/202609082320/nonfree-search-engines-data-202609082320.tar.gz",
-      "sha256": "2a8d63af41454446d64bb5f19786d908419265f152adaff087132d8e0cda51a7",
-      "sha512": "860bcd73508c4e52d54f995de3cc7b18ea51edc45cd46329f845c3fde0a7d41aa8057d1d2f8824974783f675ba27131f7e3d89e2d8a40884a41b9ba417368640",
-      "size": 43698,
-      "role": "source",
-      "lock": "config/helium.inputs.lock"
-    },
-    {
       "name": "helium/source_inputs/ublock_origin",
       "version": "1.75.0",
       "url": "https://github.com/imputnet/uBlock/releases/download/1.75.0/uBlock0_1.75.0.chromium.zip",

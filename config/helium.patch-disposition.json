@@ -263,6 +263,13 @@
     "helium-unthrottled-idle-deadline.patch",
     "helium-hid-without-platform-backend-test.patch",
     "helium-hid-without-platform-backend.patch",
-    "helium-device-tests-without-dbus.patch"
+    "helium-device-tests-without-dbus.patch",
+    "native-adblock-replaces-ublock.patch"
+  ],
+  "upstream_excluded": [
+    {
+      "name": "core/helium/core/search/fix-search-engine-icons.patch",
+      "reason": "Helium's nonfree search provider assets are not fetched; Chromium's default keeps enable_builtin_search_provider_assets off for unbranded builds."
+    }
   ]
 }

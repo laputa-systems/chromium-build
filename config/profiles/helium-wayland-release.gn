@@ -87,3 +87,4 @@ use_unofficial_version_number = false
 optimize_webui = false
 
 v8_use_metagen_instance_types = false
+enable_native_adblock = true

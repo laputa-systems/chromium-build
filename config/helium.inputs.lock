@@ -4,7 +4,7 @@
     "name": "helium",
     "version": "0.20.3.1",
     "platform_version": "1",
-    "package_revision": 8,
+    "package_revision": 9,
     "source_revision": "83027a19267e526f08e25a3af1a30b45ee7e3e2e",
     "core_revision": "2f81b9cafa38a95071e20de3f9cd6b0aca6d3c65"
   },
@@ -41,25 +41,6 @@
       "size": 2015138,
       "sha512": "b7b67d8e5d1c0a10f17e2d2419303c1ad2d7eeef89b18af6978dbda84ce7294d7aa76e0acc43c1f53cd351c35042fa240f48fc0b34e38e3d3fa8e76eaced61bd"
     },
-    "search_engines_data": {
-      "version": "202609082320",
-      "filename": "nonfree-search-engines-data-202609082320.tar.gz",
-      "url": "https://github.com/imputnet/helium-nonfree-assets/releases/download/202609082320/nonfree-search-engines-data-202609082320.tar.gz",
-      "size": 43698,
-      "sha512": "860bcd73508c4e52d54f995de3cc7b18ea51edc45cd46329f845c3fde0a7d41aa8057d1d2f8824974783f675ba27131f7e3d89e2d8a40884a41b9ba417368640",
-      "upstream_sha256": "2a8d63af41454446d64bb5f19786d908419265f152adaff087132d8e0cda51a7",
-      "destination": "third_party/search_engines_data/resources_internal"
-    },
-    "ublock_origin": {
-      "version": "1.75.0",
-      "filename": "ublock-origin-1.75.0.zip",
-      "url": "https://github.com/imputnet/uBlock/releases/download/1.75.0/uBlock0_1.75.0.chromium.zip",
-      "size": 4653769,
-      "sha512": "a58338c4b6dcecbe02e461f4d082a3b6846e5b7d931c5e0a6855ef14f2026fdb33cf8b089569b1861af33020324fcd2479e48791fb98d714b28fe0a559b8fc17",
-      "upstream_sha256": "49214674f7c6c474e60da647c05bd28463b1f7a55b2a2b0a53e9d297ef7bf3c6",
-      "destination": "third_party/ublock",
-      "strip_leading_dirs": "uBlock0.chromium"
-    },
     "alpine": {
       "revision": "0a7d119de30703ac470c1a0b2935c0136e5b3c5e",
       "filename": "aports-0a7d119de30703ac470c1a0b2935c0136e5b3c5e.tar.gz",
@@ -73,6 +54,16 @@
       "url": "https://codeberg.org/selfisekai/copium/archive/a887c5e7de6a9c768c5875625d1af814d60dc378.tar.gz",
       "size": 24220,
       "sha512": "76c47baee157744ed78242b8cf9991dcd51383cb7a2e5274acd9e2c4d373839f70f8879c0c8c0ee9e6acd0a46810780c3200ec599dbf81ff84fbe3f45c48bf9b"
+    },
+    "ublock_origin": {
+      "version": "1.75.0",
+      "filename": "ublock-origin-1.75.0.zip",
+      "url": "https://github.com/imputnet/uBlock/releases/download/1.75.0/uBlock0_1.75.0.chromium.zip",
+      "size": 4653769,
+      "sha512": "a58338c4b6dcecbe02e461f4d082a3b6846e5b7d931c5e0a6855ef14f2026fdb33cf8b089569b1861af33020324fcd2479e48791fb98d714b28fe0a559b8fc17",
+      "upstream_sha256": "49214674f7c6c474e60da647c05bd28463b1f7a55b2a2b0a53e9d297ef7bf3c6",
+      "destination": "third_party/ublock",
+      "strip_leading_dirs": "uBlock0.chromium"
     }
   },
   "architecture_inputs": {

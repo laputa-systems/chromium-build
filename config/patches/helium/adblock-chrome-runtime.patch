@@ -245,7 +245,7 @@
 +
 +void HeliumAdBlockServiceFactory::RegisterProfilePrefs(
 +    user_prefs::PrefRegistrySyncable* registry) {
-+  registry->RegisterBooleanPref(prefs::kHeliumAdBlockEnabled, false);
++  registry->RegisterBooleanPref(prefs::kHeliumAdBlockEnabled, true);
 +  registry->RegisterDictionaryPref(prefs::kHeliumAdBlockSourceOverrides);
 +  registry->RegisterListPref(prefs::kHeliumAdBlockCustomSources);
 +  registry->RegisterListPref(prefs::kHeliumAdBlockSiteExceptions);

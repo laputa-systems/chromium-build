@@ -1,0 +1,9 @@
+--- a/chrome/browser/extensions/component_loader.cc
++++ b/chrome/browser/extensions/component_loader.cc
+@@ -713,6 +713,5 @@ void ComponentLoader::AddDefaultComponen
+   if (!skip_session_components) {
+     AddWebStoreApp();
+-    AddUBlock();
+     AddExtstoreFixups();
+ #if BUILDFLAG(IS_CHROMEOS)
+     AddChromeApp();

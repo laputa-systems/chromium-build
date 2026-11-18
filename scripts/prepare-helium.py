@@ -96,11 +96,15 @@ def apply_patch(source: Path, patch: Path, record_dir: Path | None = None) -> di
     }
 
 
-def apply_series(source: Path, root: Path, label: str, record_dir: Path) -> list[dict]:
-    records = []
+def apply_series(source: Path, root: Path, label: str, record_dir: Path, excluded: set[str]) -> tuple[list[dict], list[str]]:
+    records, skipped = [], []
     for patch in series(root, label):
+        name = f"{label}/{patch.relative_to(root / 'patches').as_posix()}"
+        if name in excluded:
+            skipped.append(name)
+            continue
         records.append(apply_patch(source, patch, record_dir))
-    return records
+    return records, skipped
 
 
 def materialize_local_patches(destination: Path, names: list[str], source_roots: list[Path]) -> list[Path]:
@@ -270,7 +274,7 @@ def main() -> None:
     core = args.core
     platform = args.platform
     python = sys.executable
-    deps = [
+    run([
         python,
         str(core / "utils/downloads.py"),
         "unpack",
@@ -280,10 +284,8 @@ def main() -> None:
         str(args.inputs),
         str(args.source),
         "--components",
-        "search_engines_data",
         "ublock_origin",
-    ]
-    run(deps)
+    ])
     pruning_entries = [
         line.strip()
         for line in (core / "pruning.list").read_text(encoding="utf-8").splitlines()
@@ -303,9 +305,12 @@ def main() -> None:
     ])
     pruning_removed = sorted(entry for entry in pruning_present if not (args.source / entry).exists())
     pruning_retained = sorted(entry for entry in pruning_present if (args.source / entry).exists())
-    patch_records = apply_series(args.source, core, "core", args.metadata / "patches/core") + apply_series(
-        args.source, platform, "linux", args.metadata / "patches/linux"
-    )
+    excluded = {row["name"] for row in disposition["upstream_excluded"]}
+    core_records, core_skipped = apply_series(args.source, core, "core", args.metadata / "patches/core", excluded)
+    linux_records, linux_skipped = apply_series(args.source, platform, "linux", args.metadata / "patches/linux", excluded)
+    patch_records = core_records + linux_records
+    if missing := excluded - set(core_skipped + linux_skipped):
+        raise SystemExit(f"excluded Helium patches are not in the upstream series: {sorted(missing)}")
 
     domain_entries = [
         line.strip()
@@ -531,6 +536,7 @@ def main() -> None:
         **identity,
         "entries": inherited,
         "upstream_layers": patch_records,
+        "excluded_upstream_patches": core_skipped + linux_skipped,
         "local_patches": [
             {
                 "name": record["name"],
