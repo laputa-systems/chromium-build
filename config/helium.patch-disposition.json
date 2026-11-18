@@ -264,7 +264,8 @@
     "helium-hid-without-platform-backend-test.patch",
     "helium-hid-without-platform-backend.patch",
     "helium-device-tests-without-dbus.patch",
-    "native-adblock-replaces-ublock.patch"
+    "native-adblock-replaces-ublock.patch",
+    "maintained-distribution-version-page.patch"
   ],
   "upstream_excluded": [
     {

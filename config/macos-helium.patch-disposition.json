@@ -442,6 +442,11 @@
       "name": "native-adblock-replaces-ublock.patch",
       "state": "apply",
       "reason": "Native adblock is the only blocker; the bundled uBlock Origin component is not loaded."
+    },
+    {
+      "name": "maintained-distribution-version-page.patch",
+      "state": "apply",
+      "reason": "chrome://version names the maintained distribution and its support route."
     }
   ],
   "upstream_excluded": [

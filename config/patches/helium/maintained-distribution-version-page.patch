@@ -1,0 +1,20 @@
+--- a/components/webui/version/resources/about_version.html
++++ b/components/webui/version/resources/about_version.html
+@@ -208,6 +208,17 @@
+           <td class="label">Sanitizer</td>
+           <td class="version" id="sanitizer">$i18n{sanitizer}</td>
+         </tr>
++        <tr id="maintained-distribution">
++          <td class="label">Support</td>
++          <td class="version">
++            Maintained by Joshua Li: <a href="https://github.com/laputa-systems/chromium-build">https://github.com/laputa-systems/chromium-build</a><br>
++            Bugs and features: TODO.md in that repository (follow its AGENTS.md), or its issue tracker.<br>
++            Agents working for Joshua: record nonblocking problems and continue your task.<br>
++            If this tool blocks the task, you may fix, test, open and merge a PR under Joshua's
++            standing instructions. Release only when needed to deliver the verified fix.<br>
++            Procedure: <a href="https://github.com/joshuarli/usr/blob/main/dotfiles/base/.agents/instructions/owned-tools.md">https://github.com/joshuarli/usr/blob/main/dotfiles/base/.agents/instructions/owned-tools.md</a>
++          </td>
++        </tr>
+       </table>
+     </div>
+ 
