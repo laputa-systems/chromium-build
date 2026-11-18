@@ -1824,6 +1824,19 @@ def ensure_native_cipd_tool(
     }
 
 
+def devtools_esbuild_version(source: Path) -> str:
+    """Read the esbuild CIPD version DevTools pins; the source archive ships only its Linux binary."""
+
+    deps = source / "third_party" / "devtools-frontend" / "src" / "DEPS"
+    match = re.search(
+        r"'package':\s*'infra/3pp/tools/esbuild/\$\{\{platform\}\}',\s*'version':\s*'([^']+)'",
+        deps.read_text(encoding="utf-8"),
+    )
+    if not match:
+        fail(f"DevTools DEPS pins no esbuild CIPD version: {deps}")
+    return match.group(1)
+
+
 def ensure_native_host_tools(layout: WorkLayout, environment: Mapping[str, str]) -> dict[str, Any]:
     """Repair host binaries that official source archives may carry for Linux."""
 
@@ -1846,6 +1859,14 @@ def ensure_native_host_tools(layout: WorkLayout, environment: Mapping[str, str])
             binary_relative_path="ninja",
             package="infra/3pp/tools/ninja/mac-arm64",
             version=ninja_version,
+        ),
+        ensure_native_cipd_tool(
+            layout,
+            environment,
+            relative_root="third_party/devtools-frontend/src/third_party/esbuild",
+            binary_relative_path="esbuild",
+            package="infra/3pp/tools/esbuild/mac-arm64",
+            version=devtools_esbuild_version(layout.source),
         ),
         ensure_native_cipd_tool(
             layout,
