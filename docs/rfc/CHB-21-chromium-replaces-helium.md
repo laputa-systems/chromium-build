@@ -66,9 +66,10 @@ an appliance, and it is a thin series built to follow each Chromium release.
   proves an aarch64 musl builder with a pinned Rust, Crubit and bindgen
   toolchain under `architecture_inputs.arm64`. Move that builder, its inputs
   and its pure-runtime build into the `chromium` product unchanged.
-- **macOS** stays on its native backend and uses the same Chromium and
-  ungoogled-chromium revisions, so bctl's native control is a same-build
-  browser rather than stock Chromium.app.
+- **macOS:** the owner deferred a macOS Hydrogen build on 2026-11-19. The macOS
+  backend keeps its current revision until then. The amd64 Hydrogen build
+  runs on the threadripper Linux x86_64 host, which can also run it natively
+  as bctl's same-build control.
 
 ### A lean appliance profile
 
