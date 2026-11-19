@@ -12,7 +12,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def copy_inputs(destination: Path) -> None:
-    for relative in (*sources_lock.LOCKS.values(), sources_lock.RUST_TOOLCHAIN_SCRIPT, sources_lock.SOURCES_LOCK):
+    for relative in (
+        *sources_lock.LOCKS.values(), *sources_lock.BUILDER_APK_LOCKS.values(),
+        sources_lock.RUST_TOOLCHAIN_SCRIPT, sources_lock.SOURCES_LOCK,
+    ):
         target = destination / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(ROOT / relative, target)

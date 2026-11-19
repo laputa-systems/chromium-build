@@ -3,6 +3,7 @@
 ARG GLIBC_IMAGE=debian@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251
 ARG BASE_IMAGE=alpine@sha256:d56c381f961d307a21b3ca004cf1e3910f106644aefb1f43e654c8a56c4fd395
 ARG TARGET_ARCH=amd64
+FROM scratch AS locked-apks
 FROM ${GLIBC_IMAGE} AS host-runtime-amd64
 RUN mkdir -p /rootfs/usr/lib /rootfs/lib64 \
     && cp -a /usr/lib/x86_64-linux-gnu /rootfs/usr/lib/ \
@@ -14,7 +15,6 @@ FROM ${BASE_IMAGE} AS builder-base
 
 ARG TARGET_ARCH
 ARG PRODUCT=chromium
-ARG PACKAGE_WORLD=
 ARG PACKAGE_LOCK=config/packages.amd64.lock
 ARG INPUTS_LOCK=config/inputs.lock
 ARG SYSTEM_LIBRARY_POLICY=config/system-library-preflight.schema.json
@@ -27,13 +27,12 @@ ARG CCACHE_MAXSIZE=10G
 
 COPY --from=host-runtime /rootfs/ /
 
-RUN set -eux; \
+RUN --network=none --mount=type=bind,from=locked-apks,target=/locked-apks set -eux; \
     if [ "$PRODUCT" = helium ]; then \
-        test -n "$PACKAGE_WORLD"; \
-        printf '%s\n' "$PACKAGE_WORLD" | tr ' ' '\n' | grep -Eq '^[A-Za-z0-9+._-]+=[A-Za-z0-9._-]+$' || \
-            { echo "invalid Helium package token" >&2; exit 1; }; \
-        apk add --no-cache $PACKAGE_WORLD; \
-    else \
+        apk add --no-cache --repositories-file /dev/null /locked-apks/*.apk; \
+    fi
+RUN set -eux; \
+    if [ "$PRODUCT" != helium ]; then \
         test "$PRODUCT" = chromium; \
         apk add --no-cache \
             bash=5.3.9-r1 \

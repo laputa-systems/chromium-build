@@ -27,9 +27,24 @@ else:
     sys.exit('unexpected docker command')
 ''')
             docker.chmod(0o755)
+            python = root / 'python'
+            python.write_text(f'#!{sys.executable}\n' + '''import json, os, sys
+from pathlib import Path
+if Path(sys.argv[1]).name == 'fetch-inputs.py':
+    Path(os.environ['APK_FETCH_ARGS']).write_text(json.dumps(sys.argv[2:]))
+    assert os.environ['NETWORK_MODE'] == 'fetch'
+    print(os.environ['APK_CONTEXT'])
+else:
+    os.execv(sys.executable, [sys.executable, *sys.argv[1:]])
+''')
+            python.chmod(0o755)
+            apk_context = root / 'verified apks'
+            apk_context.mkdir()
             environment = os.environ | {'PATH': str(root) + os.pathsep + os.environ['PATH'],
-                                       'CHROMIUM_PYTHON': sys.executable,
-                                       'BUILD_ARGS': str(root / 'args.json')}
+                                       'CHROMIUM_PYTHON': str(python),
+                                       'BUILD_ARGS': str(root / 'args.json'),
+                                       'APK_FETCH_ARGS': str(root / 'apk-fetch.json'),
+                                       'APK_CONTEXT': str(apk_context)}
             for options, expected in ((['--jobs', '2'], '2'), ([], '')):
                 result = subprocess.run(['bash', str(ROOT / 'chromium-build'), '--product', 'helium',
                                          '--arch', 'arm64', 'image', *options], env=environment,
@@ -38,6 +53,13 @@ else:
                 args = json.loads((root / 'args.json').read_text())
                 index = args.index(f'PURE_RUNTIME_JOBS={expected}')
                 self.assertEqual(args[index - 1], '--build-arg')
+                context = args.index('--build-context')
+                self.assertEqual(args[context + 1], f'locked-apks={apk_context}')
+                self.assertEqual(json.loads((root / 'apk-fetch.json').read_text()), [
+                    '--lock', str(ROOT / 'config/helium.packages.arm64.lock'),
+                    '--inputs-root', str(ROOT / '.work/cache/helium-apks'),
+                    '--builder-apks', 'arm64',
+                ])
 
 
 if __name__ == '__main__':

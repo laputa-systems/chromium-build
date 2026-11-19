@@ -3,8 +3,9 @@
 The Linux backend builds headless Chromium and the Helium desktop browser in
 an Alpine container on the native host architecture (amd64, or arm64 for
 Helium). Headless Chromium remains amd64-only; Helium also builds for
-linux/arm64. Chromium source and Ninja output use Docker named volumes. Only
-`fetch` needs network access; later phases run offline.
+linux/arm64. Chromium source and Ninja output use Docker named volumes.
+The `image` and `fetch` phases acquire inputs. Later browser build phases run
+offline.
 
 `image --jobs N` limits parallel compilation of Helium's pure arm64 runtime
 libraries. Without `--jobs`, that image stage uses the container's CPU count.
@@ -20,6 +21,25 @@ Chromium's compiler runs against a pinned glibc runtime in the image and targets
 directly require glibc, libstdc++, or libgcc. Chromium's in-tree libc++ provides
 the C++ runtime. The audited FFmpeg runtime closure is the only bundled GNU
 runtime exception.
+
+### Helium builder packages
+
+The ARM64 and AMD64 package locks record the dependency closure
+on their digest-pinned Alpine 3.24.2 images. Each lock also records
+the URL, byte count and hashes for the exact APK files needed
+beyond that base image.
+
+`chromium-build image` verifies those archives in its worktree
+cache and passes them to the Docker build. The installation
+runs with networking disabled and an empty APK repository list.
+The installed package manifest must match the owning lock.
+
+To refresh the closure, resolve the supported stable branch in
+a disposable container from the same base digest. Capture the
+installed manifest and keep the exact archive set for its
+difference from the base inventory. Verify an isolated offline
+install with `python3 scripts/lockcheck.py packages`, then regenerate
+`sources.lock.json` from the committed archive metadata.
 
 ## Build and acceptance
 

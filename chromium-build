@@ -307,11 +307,11 @@ if [ "$command_name" = image ]; then
         --build-arg PURE_RUNTIME_JOBS="${JOBS:-}"
     )
     if [ "$PRODUCT" = helium ]; then
-        package_world=$("${CHROMIUM_PYTHON:-python3}" "$ROOT/scripts/linux_product.py" \
-            --product helium --arch "$ARCH" --profile "$PROFILE" --root "$ROOT" --package-world) \
-            || fail 'could not resolve the Helium package world'
+        apk_context=$(NETWORK_MODE=fetch "${CHROMIUM_PYTHON:-python3}" "$ROOT/scripts/fetch-inputs.py" \
+            --lock "$PACKAGE_LOCK" --inputs-root "$ROOT/.work/cache/helium-apks" --builder-apks "$ARCH") \
+            || fail 'could not stage the locked Helium APKs'
         image_args+=(
-            --build-arg PACKAGE_WORLD="$package_world"
+            --build-context "locked-apks=$apk_context"
             --build-arg PACKAGE_LOCK="config/$(basename -- "$PACKAGE_LOCK")"
             --build-arg INPUTS_LOCK="config/$(basename -- "$INPUTS_LOCK")"
             --build-arg PATCH_INVENTORY="config/$(basename -- "$PATCH_INVENTORY")"

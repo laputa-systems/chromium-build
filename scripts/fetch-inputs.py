@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import tempfile
 import urllib.parse
 import urllib.request
@@ -14,7 +15,7 @@ from pathlib import Path
 from typing import IO
 from urllib.request import Request
 
-from script_support import fail_main, require_file, require_network
+from script_support import ScriptFailure, fail_main, require_file, require_network
 
 
 class HTTPSRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -131,6 +132,48 @@ def fetch_one(item, inputs_root):
     }
 
 
+def stage_builder_apks(lock, lock_path, architecture, cache_root):
+    archives = lock.get("archives")
+    release = lock.get("base_release")
+    resolved = lock.get("resolved")
+    if (lock.get("status") != "resolved" or lock.get("architecture") != architecture
+            or not isinstance(release, str) or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", release)
+            or not isinstance(resolved, list) or not resolved
+            or not isinstance(archives, dict) or not archives):
+        raise ScriptFailure(f"{lock_path}: no resolved {architecture} builder APK archives")
+
+    series = release.rsplit(".", 1)[0]
+    apk_arch = {"amd64": "x86_64", "arm64": "aarch64"}[architecture]
+    repositories = tuple(f"https://dl-cdn.alpinelinux.org/alpine/v{series}/{section}" for section in ("main", "community"))
+    items = []
+    for name, archive in sorted(archives.items()):
+        filename = f"{name}.apk"
+        if (not re.fullmatch(r"[A-Za-z0-9+._-]+", name) or name not in resolved
+                or not isinstance(archive, dict) or archive.get("url") not in {
+                    f"{repository}/{apk_arch}/{filename}" for repository in repositories
+                }):
+            raise ScriptFailure(f"{lock_path}: invalid builder APK archive {name!r}")
+        digest = archive.get("sha512")
+        size = archive.get("size")
+        if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{128}", digest) or type(size) is not int or size <= 0:
+            raise ScriptFailure(f"{lock_path}: invalid digest or size for {name}")
+        items.append(dict(archive, name=name, filename=filename))
+
+    identity = json.dumps(archives, sort_keys=True, separators=(",", ":"))
+    destination = cache_root / hashlib.sha256(identity.encode()).hexdigest()
+    destination.mkdir(parents=True, exist_ok=True)
+    allowed = {item["filename"] for item in items}
+    for archive in destination.glob("*.apk"):
+        if archive.name not in allowed or archive.is_symlink() or not archive.is_file():
+            raise ScriptFailure(f"unexpected builder APK in {destination}: {archive.name}")
+    try:
+        with ThreadPoolExecutor(max_workers=min(4, len(items))) as executor:
+            list(executor.map(fetch_one, items, [destination] * len(items)))
+    except (OSError, RuntimeError) as error:
+        raise ScriptFailure(f"{lock_path}: could not verify builder APKs: {error}") from error
+    return destination
+
+
 def main():
     parser = argparse.ArgumentParser()
     root = Path(os.environ.get("CHROMIUM_BUILD_ROOT", "/opt/chromium-build"))
@@ -144,6 +187,7 @@ def main():
         raise SystemExit(f"unknown product {product}")
     parser.add_argument("--lock", type=Path, default=Path(os.environ.get("INPUTS_LOCK", lock_default)))
     parser.add_argument("--inputs-root", type=Path, default=work / "inputs")
+    parser.add_argument("--builder-apks", choices=("amd64", "arm64"))
     parser.add_argument(
         "--metadata",
         type=Path,
@@ -155,6 +199,9 @@ def main():
     require_file(args.lock, f"missing {args.lock}")
 
     lock = json.loads(args.lock.read_text(encoding="utf-8"))
+    if args.builder_apks:
+        print(stage_builder_apks(lock, args.lock, args.builder_apks, args.inputs_root))
+        return
     identity = lock_identity(lock, args.lock)
     if identity["product"] != product:
         raise SystemExit(f"{args.lock} belongs to product {identity['product']}, not {product}")

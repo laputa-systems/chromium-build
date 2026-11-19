@@ -23,6 +23,7 @@ LOCKS = {
 }
 RUST_TOOLCHAIN_SCRIPT = "scripts/build-rust-toolchain.sh"
 TARGETS = {"amd64": "x86_64-unknown-linux-musl", "arm64": "aarch64-unknown-linux-musl"}
+BUILDER_APK_LOCKS = {architecture: f"config/helium.packages.{architecture}.lock" for architecture in TARGETS}
 SCOPE_TARGETS = {"linux": "x86_64-unknown-linux-musl", "macos": "aarch64-apple-darwin", "macos-helium": "aarch64-apple-darwin"}
 ROLES = {
     "chromium": "source",
@@ -31,6 +32,7 @@ ROLES = {
     "test_inputs": "test",
     "adblock_inputs": "dependency",
     "architecture_inputs": "toolchain",
+    "builder_apks": "toolchain",
     "runtime_sources": "runtime",
     "toolchain": "toolchain",
     "pgo_profile": "dependency",
@@ -100,6 +102,9 @@ def derive(root):
     found = []
     for scope, lock_path in LOCKS.items():
         walk(scope, lock_path, read_json(root / lock_path), [], [], found)
+    for architecture, lock_path in BUILDER_APK_LOCKS.items():
+        archives = read_json(root / lock_path)["archives"]
+        walk("helium", lock_path, archives, ["builder_apks", architecture], [], found)
     found.append(rust_toolchain_script_input(root))
     return sorted(found, key=lambda entry: entry["name"])
 
