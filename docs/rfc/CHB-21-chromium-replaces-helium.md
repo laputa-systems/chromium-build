@@ -60,6 +60,8 @@ an appliance, and it is a thin series built to follow each Chromium release.
   `config/profiles/helium-wayland-release.gn` without Helium's arguments: Ozone
   Wayland only, musl, ThinLTO with PGO phase 2, no D-Bus, and the hermetic
   smoke target.
+  linux/amd64 serves bctl's Linux x86_64 appliance; linux/arm64 serves the
+  macOS appliance and is built first.
 - **linux/arm64 joins the `chromium` product.** The `helium` product already
   proves an aarch64 musl builder with a pinned Rust, Crubit and bindgen
   toolchain under `architecture_inputs.arm64`. Move that builder, its inputs
@@ -128,8 +130,8 @@ Re-target or close the Helium tickets:
 - **CHB-9** and **CHB-20** (adblock) carry over with the renamed pref and
   locked filter sources.
 - **CHB-11** carries over with its patch.
-- **CHB-7** (the owner's Alpine dwl desktop) depends on the open question
-  below.
+- **CHB-7** (the owner's Alpine dwl desktop) and the desktop-only CHB-3, CHB-5
+  and CHB-6 are closed: the owner dropped that target on 2026-11-19.
 
 ## Alternatives considered
 
@@ -145,13 +147,9 @@ Re-target or close the Helium tickets:
 
 ## Open questions
 
-1. **The Alpine dwl desktop.** Upstream Helium ships only glibc Linux builds,
-   and CHB-7 qualifies this repository's musl Helium package on that machine.
-   Should the new Chromium Wayland package replace Helium there, or does that
-   machine keep a Helium build?
-2. **Helium-core privacy patches.** Which, if any, does acceptance show bctl
+1. **Helium-core privacy patches.** Which, if any, does acceptance show bctl
    needs? Decide by the outbound-traffic audit and the behavior matrix.
-3. **The adblock pref and filter source.** What names and locked filter-list
+2. **The adblock pref and filter source.** What names and locked filter-list
    inputs replace `helium.adblock.enabled` and Helium's filter services?
 
 ## Decision

@@ -308,11 +308,10 @@ the published archive in a disposable `alpine:edge` container: checksum and
 sidecar validation, manifest digests, the setuid `chrome_sandbox`, the
 `--version` probe, and a second idempotent run all passed.
 
-That is automated fixture and container evidence, not target evidence. The
-package has not run in the owner's dwl session, has not been installed live, and
-has not been exercised against Broadwell VA-API hardware.
-[Helium acceptance](helium-acceptance.md) defines the remaining observations
-and the target qualification procedure.
+That is automated fixture and container evidence. The owner dropped the Alpine
+dwl desktop target on 2026-11-19, so no live desktop installation or Broadwell
+VA-API qualification follows. [Helium acceptance](helium-acceptance.md) defines
+the remaining observations.
 
 The `release-linux` qualification container disables Docker’s outer seccomp
 filter so the unprivileged browser can create its user namespace. Network

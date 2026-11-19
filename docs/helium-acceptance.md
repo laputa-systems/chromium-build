@@ -1,8 +1,8 @@
 # Helium acceptance
 
 [Linux](linux.md) covers the Linux amd64 musl Helium build, package, and install
-commands. This document is the acceptance contract for the browser and for the
-owner's Alpine dwl target.
+commands. This document is the acceptance contract for the browser. The owner
+dropped the Alpine dwl desktop target on 2026-11-19.
 
 ## Current automated coverage
 
@@ -52,7 +52,7 @@ others need the target session. `TODO.md` carries the remaining work.
 ## Required observations
 
 Run every row on the build, the stage, and the extracted package before a full
-release. Repeat session-dependent rows in the owner's dwl session. A result is
+release. A result is
 `passed`, `failed`, or `not-executed`; missing data is not a pass. The aggregate
 may be complete only if every mandatory row for that artifact passed.
 
@@ -148,66 +148,6 @@ Chromium filter. If `/proc` or status cannot supply the necessary distinction,
 leave that check unverified and require the normal-user target-host test.
 
 The existing privileged Docker test path may be used for diagnosis, with the
-privilege level recorded. It never replaces a normal-user Alpine/dwl run. Do not
+privilege level recorded. It never replaces a normal-user run. Do not
 add privilege to the delivered launcher or require a setuid-root browser
 installation as a fallback.
-
-## Owner dwl qualification
-
-The target is the owner's `~/usr/host/alpine` desktop: Alpine edge, amd64,
-OpenRC, seatd, dwl, and ghostty-custom. It has no XWayland, display manager,
-systemd, session D-Bus, or PulseAudio/PipeWire service requirement. Read its
-current `AGENTS.md` and `README` read-only before qualification. Do not edit or
-provision that repository or run its setup/sync scripts as part of browser
-qualification.
-
-The direct-session harness mode does not exist yet. Add it before running the
-target gate: `--wayland-session existing` must require the active socket, start
-no compositor, and clean up only the browser children it owns.
-`--runtime-kind package` must run the extracted archive rather than a builder
-output. The default automated mode stays `--wayland-session isolated`.
-
-First verify and extract the archive without installing it:
-
-```sh
-python3 scripts/install-runtime.py \
-    --archive "$PWD/.work/tmp/helium-0.20.3.1-linux-x86_64-musl.tar.xz" \
-    --verify-extract "$PWD/.work/tmp/helium-dwl"
-```
-
-Then run in the logged-in user's real dwl session, using the active runtime
-socket and a disposable HOME/profile. Do not import the test CA into the
-owner's NSS store.
-
-```sh
-python3 scripts/test-functional.py --product helium --runtime-kind package \
-    --wayland-session existing \
-    --chrome "$PWD/.work/tmp/helium-dwl/helium-wrapper" \
-    --fixtures "$PWD/tests/fixtures" \
-    --output "$PWD/.work/tmp/helium-dwl-results" \
-    --require-llvmpipe --require-media
-```
-
-`--require-llvmpipe` is the amd64 software-rendering assertion. On arm64 use
-the same run without it and require CDP GPU information to name SwiftShader
-instead.
-
-Those options are the target contract, not current behavior. Until the harness
-implements them, leave the affected rows `not-executed` and use the manual
-steps: launch the package, open a local fixture, create and switch two tabs,
-use vertical tabs, visit settings, type and paste unique fixture
-text, upload and download the fixture, restart with the same disposable
-profile, and confirm persisted state. Confirm that `chrome://setup` does not
-resolve and that no setup tab opens. Capture the browser in dwl and record the
-actual outcomes in the acceptance report. Sway IPC observations do not apply to
-dwl.
-
-## Live installation
-
-Live installation is a separate owner request. The installer is already
-validated in scratch and in a disposable `alpine:edge` container. After the
-request, install the archive as described in [Linux](linux.md), then rerun the
-session-dependent rows through `$HOME/usr/bin/helium` with a disposable
-profile. Do not edit personal profiles, default-browser MIME handling, dwl
-keybindings, or the `~/usr` source tree. Roll back with the same installer if
-the installed-path check fails.
