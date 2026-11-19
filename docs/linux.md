@@ -334,3 +334,5 @@ test_workflow.WorkflowTests.test_linux_release_qualifies_a_real_archive_and_retu
 `RUNNER_TEMP` and the checkout must be visible at identical paths to Docker.
 This runs the full three-instance, 180-second headless check and verifies the
 acceptance report and restored ownership. It never rebuilds or publishes.
+
+For the Chromium Wayland desktop, packaging must trim locale packs to en-US.
