@@ -155,7 +155,11 @@ def main():
     if args.profile == HELIUM_PROFILE:
         expected = helium_expected(args)
     elif args.profile == CHROMIUM_WAYLAND_PROFILE:
-        expected = helium_expected(args) | LEAN_DESKTOP
+        system_rust = args.target_cpu != "arm64"
+        expected = helium_expected(args) | LEAN_DESKTOP | {
+            "rust_sysroot_absolute": "/usr" if system_rust else "",
+            "rust_bindgen_root": "/usr" if system_rust else "//third_party/rust-toolchain",
+        }
     else:
         expected = {
             "target_os": "linux",

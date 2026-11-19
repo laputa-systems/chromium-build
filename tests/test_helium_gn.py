@@ -216,6 +216,20 @@ class VerifyArgsTest(unittest.TestCase):
             result = self.run_contract(Path(directory), "x64", "chromium-wayland-release")
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_chromium_wayland_amd64_uses_alpine_rust_and_arm64_the_locked_toolchain(self):
+        verify_args = load_verify_args()
+        expected = {
+            "x64": {"rust_sysroot_absolute": "/usr", "rust_bindgen_root": "/usr"},
+            "arm64": {"rust_sysroot_absolute": "", "rust_bindgen_root": "//third_party/rust-toolchain"},
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for target_cpu, rust in expected.items():
+                result = self.run_contract(root, target_cpu, "chromium-wayland-release")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                values = verify_args.parse_args(root / f"{target_cpu}-args.gn")
+                self.assertEqual({name: values[name] for name in rust}, rust)
+
     def test_helium_profile_matches_the_effective_contract(self):
         with tempfile.TemporaryDirectory() as directory:
             result = self.run_contract(Path(directory), "x64")

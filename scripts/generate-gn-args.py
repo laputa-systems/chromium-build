@@ -62,6 +62,8 @@ def main():
         .replace("@USE_SYSTEM_MINIGBM@", "false" if pure_arm64 else "true")
         .replace("@USE_VAAPI@", "false" if pure_arm64 else "true")
         .replace("@ENABLE_SWIFTSHADER@", "true" if pure_arm64 else "false")
+        .replace("@RUST_SYSROOT@", "" if pure_arm64 else "/usr")
+        .replace("@RUST_BINDGEN_ROOT@", "//third_party/rust-toolchain" if pure_arm64 else "/usr")
     )
     probe = {
         "schema": 1,
