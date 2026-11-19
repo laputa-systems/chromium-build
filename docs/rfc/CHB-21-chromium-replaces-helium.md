@@ -13,6 +13,11 @@ bctl qualifies the new package, the `helium` product, its locks, its builder
 and its documentation are removed. Helium itself stays an end-user browser,
 used from upstream releases.
 
+The owner calls the new browser **Hydrogen**. The name is for prose only: the
+product id stays `chromium`, the executable stays `chrome`, and the browser
+keeps Chromium's branding. bctl's kernel, formerly called Hydrogen, is now
+Reactor.
+
 ## Motivation
 
 Two lines track two Chromium versions. `config/inputs.lock` pins Chromium
