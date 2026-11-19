@@ -351,7 +351,7 @@ image_path() {
 }
 
 product_environment=(-e "CHROMIUM_PRODUCT=$PRODUCT")
-if [ "$PRODUCT" = helium ]; then
+if [ "$PRODUCT" = helium ] || [ "$PROFILE" = chromium-wayland-release ]; then
     if [ "$ARCH" = arm64 ]; then
         gn_path=/usr/bin/gn
     else

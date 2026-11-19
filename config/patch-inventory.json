@@ -3,15 +3,17 @@
   "layers": [
     {
       "project": "portablelinux",
-      "revision": "effeae1d0728db00ed21cbf603af88e0fc38f97b",
+      "revision": "6f0aa178c2394fc0a177edc0fd64e41f402a0418",
       "patches": [
-        "drop-nodejs-version-check.patch",
         "use-oauth2-client-switches-as-default.patch",
         "fix-compiling-on-arm64.patch",
-        "revert-crubit-changes.patch",
-        "revert-public-input-changes.patch",
-        "revert-python-path-adjustement.patch",
-        "revert-tsgo-usage.patch"
+        "chromium-138-drop-nodejs-version-check.patch",
+        "chromium-153-revert-hermetic-python.patch",
+        "chromium-154-use-system-tsc.patch",
+        "chromium-155-use-system-esbuild.patch",
+        "chromium-156-remove-private-verification-tokens.patch",
+        "chromium-156-revert-crubit-changes.patch",
+        "chromium-156-revert-use-typescript-go.patch"
       ]
     },
     {

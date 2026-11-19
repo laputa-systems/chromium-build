@@ -1,0 +1,316 @@
+--- a/printing/BUILD.gn
++++ b/printing/BUILD.gn
+@@ -15,8 +15,6 @@
+ 
+ if (enable_printing_tests) {
+   import("//build/config/ios/bundle_data_from_filelist.gni")
+-} else {
+-  assert(enable_printing)
+ }
+ 
+ if (is_win || enable_print_preview) {
+--- a/chrome/browser/BUILD.gn
++++ b/chrome/browser/BUILD.gn
+@@ -1360,7 +1360,6 @@
+       "//chrome/browser/headless:headless_extra_parts",
+       "//chrome/browser/indigo/onboarding",
+       "//chrome/browser/media/router/discovery/access_code:access_code_sink_service",
+-      "//chrome/browser/printing",
+       "//chrome/browser/record_replay:impl",
+       "//chrome/browser/sensor",
+       "//chrome/browser/sharing_hub",
+@@ -1935,6 +1934,7 @@
+ 
+   if (enable_printing) {
+     deps += [
++      "//chrome/browser/printing",
+       "//chrome/browser/printing:impl",
+       "//chrome/common/printing",
+       "//components/printing/browser/headless",
+--- a/chrome/browser/ui/webui/print_preview/BUILD.gn
++++ b/chrome/browser/ui/webui/print_preview/BUILD.gn
+@@ -8,7 +8,7 @@
+ import("//pdf/features.gni")
+ import("//printing/buildflags/buildflags.gni")
+ 
+-assert(enable_print_preview)
++assert(enable_print_preview || !enable_printing)
+ 
+ # Header-only target exposing the print_preview public API. This is kept
+ # separate from ":impl" so that //chrome/browser/printing:impl can include
+@@ -166,7 +166,7 @@
+       "//components/signin/public/identity_manager",
+       "//components/user_manager",
+     ]
+-  } else {
++  } else if (enable_print_preview) {
+     sources += [ "local_printer_handler_default.cc" ]
+     deps += [ "//chrome/browser/resources/print_preview:resources" ]
+   }
+--- a/components/printing/common/BUILD.gn
++++ b/components/printing/common/BUILD.gn
+@@ -6,7 +6,7 @@
+ import("//mojo/public/tools/bindings/mojom.gni")
+ import("//printing/buildflags/buildflags.gni")
+ 
+-assert(enable_printing)
++assert(enable_printing || !enable_print_preview)
+ 
+ if (enable_print_media_l10n) {
+   source_set("print_media_l10n") {
+--- a/chrome/browser/renderer_context_menu/BUILD.gn
++++ b/chrome/browser/renderer_context_menu/BUILD.gn
+@@ -135,7 +135,6 @@
+       "//chrome/browser/lens/region_search",
+       "//chrome/browser/media/router:media_router_feature",
+       "//chrome/browser/password_manager",
+-      "//chrome/browser/pdf",
+       "//chrome/browser/predictors",
+       "//chrome/browser/prefs",
+       "//chrome/browser/preloading:prefs",
+@@ -195,6 +194,10 @@
+       "//url",
+     ]
+ 
++    if (enable_pdf) {
++      deps += [ "//chrome/browser/pdf" ]
++    }
++
+     if (enable_print_preview) {
+       deps += [ "//chrome/browser/printing" ]
+     }
+--- a/chrome/browser/extensions/BUILD.gn
++++ b/chrome/browser/extensions/BUILD.gn
+@@ -3083,11 +3083,9 @@
+       "//chrome/browser/extensions/api/messaging:test_support",
+       "//chrome/browser/extensions/api/mime_handlers:browser_tests",
+       "//chrome/browser/extensions/api/passwords_private:test_support",
+-      "//chrome/browser/extensions/api/pdf_viewer_private:browser_tests",
+       "//chrome/browser/hid",
+       "//chrome/browser/password_manager",
+       "//chrome/browser/password_manager:test_support",
+-      "//chrome/browser/pdf:pdf_extension_test_utils",
+       "//chrome/browser/prefetch",
+       "//chrome/browser/service_worker:browser_tests",
+       "//chrome/browser/sync_file_system",
+@@ -3170,6 +3168,13 @@
+       "//ui/web_dialogs:test_support",
+     ]
+ 
++    if (enable_pdf) {
++      deps += [
++        "//chrome/browser/extensions/api/pdf_viewer_private:browser_tests",
++        "//chrome/browser/pdf:pdf_extension_test_utils",
++      ]
++    }
++
+     if (!is_chromeos) {
+       # Chrome OS doesn't use background mode or download bubbles.
+       deps += [
+--- a/chrome/browser/renderer_context_menu/BUILD.gn
++++ b/chrome/browser/renderer_context_menu/BUILD.gn
+@@ -396,7 +396,6 @@
+       "//chrome/browser/context_hub",
+       "//chrome/browser/devtools",
+       "//chrome/browser/enterprise/data_controls:test_support",
+-      "//chrome/browser/pdf:pdf_extension_test_utils",
+       "//chrome/browser/profiles:misc",
+       "//chrome/browser/search_engines",
+       "//chrome/browser/send_tab_to_self",
+@@ -449,7 +448,10 @@
+     }
+ 
+     if (enable_pdf) {
+-      deps += [ "//chrome/browser/pdf:pdf_extension_test_base" ]
++      deps += [
++        "//chrome/browser/pdf:pdf_extension_test_base",
++        "//chrome/browser/pdf:pdf_extension_test_utils",
++      ]
+     }
+   }
+ 
+--- a/chrome/browser/ui/BUILD.gn
++++ b/chrome/browser/ui/BUILD.gn
+@@ -845,11 +845,9 @@
+       "//chrome/browser/media/router:media_router_feature",
+       "//chrome/browser/page_info",
+       "//chrome/browser/password_manager",
+-      "//chrome/browser/pdf",
+       "//chrome/browser/permissions",
+       "//chrome/browser/picture_in_picture",
+       "//chrome/browser/prefs",
+-      "//chrome/browser/printing",
+       "//chrome/browser/profiles:profile",
+       "//chrome/browser/profiles:profile_util",
+       "//chrome/browser/reading_list",
+@@ -955,6 +953,12 @@
+       "//ui/gfx",
+       "//ui/gfx/geometry",
+     ]
++    if (enable_pdf) {
++      deps += [ "//chrome/browser/pdf" ]
++    }
++    if (enable_printing) {
++      deps += [ "//chrome/browser/printing" ]
++    }
+   }
+ }
+ if (is_mac) {
+--- a/chrome/browser/ui/read_anything/BUILD.gn
++++ b/chrome/browser/ui/read_anything/BUILD.gn
+@@ -7,6 +7,7 @@
+ import("//build/config/compiler/compiler.gni")
+ import("//chrome/common/features.gni")
+ import("//extensions/buildflags/buildflags.gni")
++import("//pdf/features.gni")
+ import("//testing/test.gni")
+ 
+ source_set("prefs") {
+@@ -143,7 +144,6 @@
+     "//base/test:test_support",
+     "//chrome/browser",
+     "//chrome/browser/optimization_guide:test_support",
+-    "//chrome/browser/pdf:pdf_extension_test_utils",
+     "//chrome/browser/search_engines",
+     "//chrome/browser/ui",
+     "//chrome/browser/ui:browser_commands",
+@@ -167,7 +167,11 @@
+     "//content/test:test_support",
+     "//testing/gtest",
+     "//ui/views",
+-  ]
++    "//pdf:buildflags",
++  ]
++  if (enable_pdf) {
++    deps += [ "//chrome/browser/pdf:pdf_extension_test_utils" ]
++  }
+ }
+ 
+ source_set("interactive_ui_tests") {
+--- a/chrome/browser/ui/read_anything/read_anything_entry_point_controller_browsertest.cc
++++ b/chrome/browser/ui/read_anything/read_anything_entry_point_controller_browsertest.cc
+@@ -12,7 +12,10 @@
+ #include "chrome/browser/optimization_guide/mock_optimization_guide_keyed_service.h"
+ #include "chrome/browser/optimization_guide/optimization_guide_keyed_service.h"
+ #include "chrome/browser/optimization_guide/optimization_guide_keyed_service_factory.h"
++#include "pdf/buildflags.h"
++#if BUILDFLAG(ENABLE_PDF)
+ #include "chrome/browser/pdf/pdf_extension_test_util.h"
++#endif
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/ui/browser_commands.h"
+ #include "chrome/browser/ui/browser_tabstrip.h"
+@@ -525,6 +528,7 @@
+       ReadAnythingOmniboxChipDecision::kHideOptimizationGuide, 1);
+ }
+ 
++#if BUILDFLAG(ENABLE_PDF)
+ IN_PROC_BROWSER_TEST_F(ReadAnythingEntryPointControllerOmniboxBrowserTest,
+                        CheckIfShouldSuggestReadingMode_LongerPdfIsCandidate) {
+   ASSERT_TRUE(embedded_test_server()->Start());
+@@ -593,6 +597,8 @@
+       "Accessibility.ReadAnything.OmniboxChipDecision",
+       ReadAnythingOmniboxChipDecision::kHideLowAlphabeticPdf, 1);
+ }
++
++#endif
+ 
+ IN_PROC_BROWSER_TEST_F(ReadAnythingEntryPointControllerOmniboxBrowserTest,
+                        CheckIfShouldSuggestReadingMode_NonHttpIsNotCandidate) {
+--- a/chrome/browser/ui/lens/BUILD.gn
++++ b/chrome/browser/ui/lens/BUILD.gn
+@@ -379,7 +379,6 @@
+       "//chrome/browser/contextual_tasks:test_support",
+       "//chrome/browser/contextual_tasks:ui",
+       "//chrome/browser/lens/core/mojom:mojo_bindings",
+-      "//chrome/browser/pdf:pdf_extension_test_base",
+       "//chrome/browser/profiles:profile",
+       "//chrome/browser/signin/e2e_tests:test_support",
+       "//chrome/browser/sync",
+@@ -445,7 +444,10 @@
+       "//url",
+     ]
+     if (enable_pdf) {
+-      deps += [ "//chrome/browser/pdf" ]
++      deps += [
++        "//chrome/browser/pdf",
++        "//chrome/browser/pdf:pdf_extension_test_base",
++      ]
+     }
+ 
+     # TODO(crbug.com/40031409): Fix code that adds exit-time destructors and
+--- a/chrome/browser/ui/lens/lens_overlay_controller_browsertest.cc
++++ b/chrome/browser/ui/lens/lens_overlay_controller_browsertest.cc
+@@ -41,7 +41,10 @@
+ #include "chrome/browser/lens/core/mojom/page_content_type.mojom.h"
+ #include "chrome/browser/lens/core/mojom/polygon.mojom.h"
+ #include "chrome/browser/lens/core/mojom/text.mojom.h"
++#include "pdf/buildflags.h"
++#if BUILDFLAG(ENABLE_PDF)
+ #include "chrome/browser/pdf/pdf_extension_test_base.h"
++#endif
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/renderer_context_menu/render_view_context_menu_browsertest_util.h"
+ #include "chrome/browser/renderer_context_menu/render_view_context_menu_test_util.h"
+@@ -5872,6 +5875,7 @@
+   }));
+ }
+ 
++#if BUILDFLAG(ENABLE_PDF)
+ class LensOverlayControllerBrowserPDFTest
+     : public base::test::WithFeatureOverride,
+       public PDFExtensionTestBase {
+@@ -5955,6 +5959,8 @@
+ 
+ // Regression test for crbug.com/360710001. Asserts the overlay lens page will
+ // load in a tab without crashing.
++#endif
++
+ IN_PROC_BROWSER_TEST_F(LensOverlayControllerBrowserTest,
+                        OverlayWebUILoadsInTab) {
+   content::WebContents* active_contents =
+@@ -5983,6 +5989,7 @@
+                   ->GetAs<lens::LensSidePanelUntrustedUI>());
+ }
+ 
++#if BUILDFLAG(ENABLE_PDF)
+ IN_PROC_BROWSER_TEST_P(LensOverlayControllerBrowserPDFTest,
+                        ContextMenuOpensOverlay) {
+   // Open the PDF document and wait for it to finish loading.
+@@ -6957,6 +6964,8 @@
+ 
+ // Test with --enable-pixel-output-in-tests enabled, required to actually grab
+ // screenshots for color extraction.
++#endif
++
+ class LensOverlayControllerBrowserWithPixelsTest
+     : public LensOverlayControllerBrowserTest {
+  protected:
+--- a/chrome/browser/ui/lens/BUILD.gn
++++ b/chrome/browser/ui/lens/BUILD.gn
+@@ -427,6 +427,7 @@
+       "//content/test:test_support",
+       "//mojo/public/cpp/bindings",
+       "//net",
++      "//pdf:buildflags",
+       "//pdf:features",
+       "//third_party/lens_server_proto:lens_overlay_proto",
+       "//ui/base",
+--- a/chrome/browser/back_forward_cache/BUILD.gn
++++ b/chrome/browser/back_forward_cache/BUILD.gn
+@@ -32,7 +32,6 @@
+       "//chrome/browser:browser_process",
+       "//chrome/browser/content_settings",
+       "//chrome/browser/content_settings:content_settings_factory",
+-      "//chrome/browser/pdf:test_mime_handler_stream_manager",
+       "//chrome/browser/preloading:test_support",
+       "//chrome/browser/profiles:profile",
+       "//chrome/browser/task_manager:test_support",
+@@ -61,6 +60,7 @@
+ 
+     if (enable_pdf) {
+       deps += [
++        "//chrome/browser/pdf:test_mime_handler_stream_manager",
+         "//chrome/browser/pdf:pdf_extension_test_utils",
+         "//pdf:features",
+       ]

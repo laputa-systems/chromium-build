@@ -1,0 +1,77 @@
+--- a/base/trace_event/malloc_dump_provider.cc
++++ b/base/trace_event/malloc_dump_provider.cc
+@@ -266,7 +266,7 @@
+ 
+ #if (PA_BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC) && BUILDFLAG(IS_ANDROID)) || \
+     (!PA_BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC) && !BUILDFLAG(IS_WIN) &&    \
+-     !BUILDFLAG(IS_APPLE) && !BUILDFLAG(IS_FUCHSIA))
++     !BUILDFLAG(IS_APPLE) && !BUILDFLAG(IS_FUCHSIA) && defined(__GLIBC__))
+ void ReportMallinfoStats(ProcessMemoryDump* pmd,
+                          size_t* total_virtual_size,
+                          size_t* resident_size,
+@@ -534,7 +534,7 @@
+                      nullptr);
+ #elif BUILDFLAG(IS_FUCHSIA)
+ // TODO(fuchsia): Port, see https://crbug.com/706592.
+-#else
++#elif defined(__GLIBC__)
+   ReportMallinfoStats(/*pmd=*/nullptr, &total_virtual_size, &resident_size,
+                       &allocated_objects_size, &allocated_objects_count);
+ #endif
+--- a/base/process/process_metrics_posix.cc
++++ b/base/process/process_metrics_posix.cc
+@@ -108,7 +108,8 @@
+ 
+ #endif  // !BUILDFLAG(IS_FUCHSIA)
+ 
+-#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_ANDROID)
++#if (BUILDFLAG(IS_LINUX) && defined(__GLIBC__)) || BUILDFLAG(IS_CHROMEOS) || \
++    BUILDFLAG(IS_ANDROID)
+ namespace {
+ 
+ size_t GetMallocUsageMallinfo() {
+@@ -126,17 +127,18 @@
+ }
+ 
+ }  // namespace
+-#endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) ||
+-        // BUILDFLAG(IS_ANDROID)
++#endif  // (BUILDFLAG(IS_LINUX) && defined(__GLIBC__)) ||
++        // BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_ANDROID)
+ 
+ size_t ProcessMetrics::GetMallocUsage() {
+ #if BUILDFLAG(IS_APPLE)
+   malloc_statistics_t stats = {0};
+   malloc_zone_statistics(nullptr, &stats);
+   return stats.size_in_use;
+-#elif BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_ANDROID)
++#elif (BUILDFLAG(IS_LINUX) && defined(__GLIBC__)) || BUILDFLAG(IS_CHROMEOS) || \
++    BUILDFLAG(IS_ANDROID)
+   return GetMallocUsageMallinfo();
+-#elif BUILDFLAG(IS_FUCHSIA)
++#else
+   // TODO(fuchsia): Not currently exposed. https://crbug.com/735087.
+   return 0;
+ #endif
+--- a/base/allocator/partition_allocator/src/partition_alloc/shim/allocator_shim_default_dispatch_to_partition_alloc.cc
++++ b/base/allocator/partition_allocator/src/partition_alloc/shim/allocator_shim_default_dispatch_to_partition_alloc.cc
+@@ -1253,7 +1253,8 @@
+ 
+ #endif  // !PA_BUILDFLAG(IS_APPLE) && !PA_BUILDFLAG(IS_ANDROID)
+ 
+-#if PA_BUILDFLAG(IS_LINUX) || PA_BUILDFLAG(IS_CHROMEOS)
++#if (PA_BUILDFLAG(IS_LINUX) && defined(__GLIBC__)) || \
++    PA_BUILDFLAG(IS_CHROMEOS)
+ SHIM_ALWAYS_EXPORT struct mallinfo mallinfo(void) __THROW {
+   partition_alloc::SimplePartitionStatsDumper allocator_dumper;
+   // TODO(crbug.com/477186304): Dump stats for all alloc tokens, by accumulating
+@@ -1280,7 +1281,8 @@
+ 
+   return info;
+ }
+-#endif  // PA_BUILDFLAG(IS_LINUX) || PA_BUILDFLAG(IS_CHROMEOS)
++#endif  // (PA_BUILDFLAG(IS_LINUX) && defined(__GLIBC__)) ||
++        // PA_BUILDFLAG(IS_CHROMEOS)
+ 
+ }  // extern "C"
+ 

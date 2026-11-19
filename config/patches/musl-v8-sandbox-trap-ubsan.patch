@@ -1,0 +1,7 @@
+--- a/v8/src/sandbox/testing.cc
++++ b/v8/src/sandbox/testing.cc
+@@ -53,3 +53,2 @@
+-#if defined(V8_USE_ADDRESS_SANITIZER) || defined(V8_USE_MEMORY_SANITIZER) || \
+-    defined(V8_USE_UNDEFINED_BEHAVIOR_SANITIZER)
++#if defined(V8_USE_ADDRESS_SANITIZER) || defined(V8_USE_MEMORY_SANITIZER)
+ #define V8_USE_ANY_SANITIZER 1

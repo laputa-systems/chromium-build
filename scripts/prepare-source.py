@@ -11,6 +11,13 @@ import subprocess
 import sys
 from pathlib import Path
 
+from linux_native_tools import (
+    NATIVE_EXECUTABLES,
+    install_native_executable,
+    install_rust_toolchain,
+    remove_foreign_host_binaries,
+)
+
 
 def read_json(path):
     return json.loads(path.read_text(encoding="utf-8"))
@@ -214,12 +221,16 @@ def add_rust_target(source, target):
     }
 
 
-def add_builder_links(source):
+def add_builder_links(source, arm64=False):
     links = {
         "third_party/node/linux/node-linux-x64/bin/node": "/usr/bin/node",
         "third_party/gperf/cipd/bin/gperf": "/usr/bin/gperf",
         "third_party/dawn/tools/golang/linux-amd64/bin/go": "/usr/bin/go",
     }
+    if arm64:
+        del links["third_party/dawn/tools/golang/linux-amd64/bin/go"]
+        links["third_party/dawn/tools/golang/linux-arm64/bin/go"] = "/usr/bin/go"
+        links["buildtools/linux64-format/clang-format"] = "../../third_party/rust-toolchain/bin/clang-format"
     records = []
     for relative, target in links.items():
         path = source / relative
@@ -279,6 +290,8 @@ def main():
     parser.add_argument("--patches", type=Path, required=True)
     parser.add_argument("--local-patch", type=Path, action="append", required=True)
     parser.add_argument("--rust-target-triple", required=True)
+    parser.add_argument("--native-inputs", type=Path)
+    parser.add_argument("--arch", choices=("arm64",))
     args = parser.parse_args()
 
     lock = read_json(args.lock)
@@ -417,7 +430,14 @@ def main():
                 },
             }
         )
-    pruning_root = next(args.ungoogled_root.glob("ungoogled-chromium-*"))
+    if args.native_inputs:
+        filters = lock["adblock_inputs"]["adblock_filters"]
+        subprocess.run([sys.executable, str(Path(__file__).with_name("setup-chromium-adblock.py")), "vendor", "--source", str(args.source), "--inputs", str(args.native_inputs), "--filters", filters["filename"], "--filters-sha256", filters["sha256"], "--crate-patches", str(args.inventory.parent / "patches/adblock-crates"), "--record", str(args.metadata / "adblock.json")], check=True)
+    pruning_root = next(path for path in args.ungoogled_root.glob("ungoogled-chromium-*") if (path / "chromium_version.txt").is_file())
+    ungoogled_chromium_version = (pruning_root / "chromium_version.txt").read_text(encoding="utf-8").strip()
+    ungoogled_revision = (pruning_root / "revision.txt").read_text(encoding="utf-8").strip()
+    if ungoogled_chromium_version != version or not ungoogled_revision.isdecimal():
+        raise SystemExit("ungoogled release identity does not match the Chromium lock")
     pruning_report = prune(args.source, pruning_root / "pruning.list", version)
     domain_report = substitute_domains(
         args.source,
@@ -426,8 +446,13 @@ def main():
         version,
     )
     rust_target = add_rust_target(args.source, args.rust_target_triple)
-    builder_links = add_builder_links(args.source)
-    unbundle = apply_system_unbundle(args.source)
+    native = {}
+    if args.native_inputs and args.arch == "arm64":
+        native["rust_toolchain"] = install_rust_toolchain(args.source, args.native_inputs, lock, args.arch)
+        native["native_host_tools"] = remove_foreign_host_binaries(args.source, args.arch)
+        native["native_executables"] = {name: install_native_executable(args.source, args.native_inputs, lock["architecture_inputs"][args.arch][name], args.arch) for name in NATIVE_EXECUTABLES}
+    builder_links = add_builder_links(args.source, bool(native))
+    unbundle = ({"schema": 1, "status": "complete", "network": "none", "libraries": [{"name": "ffmpeg", "state": "bundled", "gn_replacement": "third_party/ffmpeg/BUILD.gn", "removed_source_trees": []}]} if native else apply_system_unbundle(args.source))
 
     source_report = {
         "schema": 1,
@@ -444,7 +469,7 @@ def main():
         "revision_files": [
             {"path": "chrome/VERSION", "contains": f"MAJOR={expected['MAJOR']}"}
         ],
-        "source_transformations": {"rust_target": rust_target, "builder_links": builder_links},
+        "source_transformations": {"rust_target": rust_target, "builder_links": builder_links, **native},
     }
     patch_report = {
         "schema": 1,
@@ -452,6 +477,7 @@ def main():
         "network": "none",
         "chromium_version": version,
         "entries": records,
+        "ungoogled_version": f"{ungoogled_chromium_version}-{ungoogled_revision}",
         "source_layers": {
             "ungoogled": ungoogled,
             "portablelinux": [item for item in records if item["project"] == "portablelinux"],

@@ -1,29 +1,20 @@
 {
   "schema": 1,
-  "chromium_version": "153.0.8010.52",
+  "chromium_version": "156.0.8078.79",
   "patch_application": {
     "max_fuzz": 2
   },
   "layers": [
     {
       "project": "portablelinux",
-      "revision": "effeae1d0728db00ed21cbf603af88e0fc38f97b",
+      "revision": "6f0aa178c2394fc0a177edc0fd64e41f402a0418",
       "patches": [
-        {
-          "name": "drop-nodejs-version-check.patch",
-          "state": "not-applicable",
-          "replacement": null,
-          "affected_paths": [
-            "third_party/node/node.gni",
-            "third_party/protobuf/proto_library.gni"
-          ],
-          "reason": "The selected ungoogled core series already provides the Node version change."
-        },
         {
           "name": "use-oauth2-client-switches-as-default.patch",
           "state": "apply",
           "replacement": null,
-          "affected_paths": []
+          "affected_paths": [],
+          "reason": "Use the portable Linux OAuth switch defaults (google_apis/api_key_cache.cc:256)."
         },
         {
           "name": "fix-compiling-on-arm64.patch",
@@ -37,39 +28,73 @@
             "tools/rust/cargo-config.toml.template",
             "tools/rust/config.toml.template"
           ],
-          "reason": "The current native Linux target is x86-64."
+          "reason": "The native arm64 musl build uses the locked native toolchains and arm64 V8; this patch targets bundled toolchain builds and an x64 V8 snapshot cross toolchain (build/toolchain/linux/BUILD.gn:179; tools/rust/build_rust.py:65)."
         },
         {
-          "name": "revert-crubit-changes.patch",
-          "state": "not-applicable",
-          "replacement": null,
-          "affected_paths": [
-            "components/cbor/BUILD.gn"
-          ],
-          "reason": "Alpine rust-cbor.patch already handles this source change; the portable revert would reverse it."
-        },
-        {
-          "name": "revert-public-input-changes.patch",
+          "name": "chromium-138-drop-nodejs-version-check.patch",
           "state": "apply",
           "replacement": null,
           "affected_paths": [],
-          "reason": "Retain the portablelinux public input compatibility change."
+          "reason": "The 156 source retains both Node version-check dependencies and the selected ungoogled patches do not remove them; the portable patch applies (third_party/node/node.gni:40; third_party/protobuf/proto_library.gni:603)."
         },
         {
-          "name": "revert-python-path-adjustement.patch",
-          "state": "not-applicable",
-          "replacement": null,
-          "affected_paths": [
-            ".gn"
-          ],
-          "reason": "Copium cr153-no-python-vendoring.patch already restores the system Python path."
-        },
-        {
-          "name": "revert-tsgo-usage.patch",
+          "name": "chromium-153-revert-hermetic-python.patch",
           "state": "apply",
           "replacement": null,
           "affected_paths": [],
-          "reason": "Retain the portablelinux TypeScript generator compatibility change."
+          "reason": "Use the portable .gn change to select system Python; the older Copium patch overlaps it and its Siso changes do not apply to Chromium 156 (.gn:14)."
+        },
+        {
+          "name": "chromium-154-use-system-tsc.patch",
+          "state": "not-applicable",
+          "replacement": null,
+          "affected_paths": [
+            "third_party/devtools-frontend/src/scripts/build/typescript/typescript_vars.gni",
+            "third_party/devtools-frontend/src/third_party/typescript/typescript.py",
+            "ui/webui/webui_features.gni"
+          ],
+          "reason": "The desktop omits the DevTools frontend and uses the locked native TypeScript compiler for WebUI; the patch selects an unpinned system tsc and disables that compiler (ui/webui/webui_features.gni:36; scripts/linux_native_tools.py:82)."
+        },
+        {
+          "name": "chromium-155-use-system-esbuild.patch",
+          "state": "not-applicable",
+          "replacement": null,
+          "affected_paths": [
+            "third_party/devtools-frontend/src/front_end/core/host/DispatchHttpRequestClient.ts",
+            "third_party/devtools-frontend/src/scripts/build/esbuild.js",
+            "third_party/devtools-frontend/src/scripts/build/ninja/bundle.gni"
+          ],
+          "reason": "The desktop omits the DevTools frontend and installs the locked native esbuild; the patch selects an unpinned system esbuild and its bundle.gni hunk does not apply (third_party/devtools-frontend/src/scripts/build/ninja/bundle.gni:61)."
+        },
+        {
+          "name": "chromium-156-remove-private-verification-tokens.patch",
+          "state": "apply",
+          "replacement": null,
+          "affected_paths": [],
+          "reason": "Apply the portable Chromium 156 private verification token change (chrome/browser/devtools/chrome_devtools_session.cc:83)."
+        },
+        {
+          "name": "chromium-156-revert-crubit-changes.patch",
+          "state": "not-applicable",
+          "replacement": null,
+          "affected_paths": [
+            "components/cbor/BUILD.gn",
+            "components/web_package/BUILD.gn",
+            "third_party/blink/renderer/platform/fonts/web_font_decoder.cc"
+          ],
+          "reason": "The native Rust toolchain supplies Crubit bindings, so neither the Alpine CBOR workaround nor the broader portable reverts to web package and font behavior are needed (components/cbor/BUILD.gn:15; third_party/blink/renderer/platform/fonts/BUILD.gn:21)."
+        },
+        {
+          "name": "chromium-156-revert-use-typescript-go.patch",
+          "state": "not-applicable",
+          "replacement": null,
+          "affected_paths": [
+            "tools/typescript/ts_definitions.gni",
+            "tools/typescript/ts_definitions.py",
+            "tools/typescript/ts_library.gni",
+            "tools/typescript/ts_library.py"
+          ],
+          "reason": "The desktop uses the locked native TypeScript compiler; this patch reverts that path to the JavaScript compiler (tools/typescript/ts_library.gni:8)."
         }
       ]
     },
@@ -105,9 +130,12 @@
         },
         {
           "name": "fc-cache-version.patch",
-          "state": "apply",
+          "state": "not-applicable",
           "replacement": null,
-          "affected_paths": []
+          "affected_paths": [
+            "third_party/test_fonts/fontconfig/generate_fontconfig_caches.cc"
+          ],
+          "reason": "Chromium 156 already uses FC_CACHE_VERSION for the fontconfig cache filename (third_party/test_fonts/fontconfig/generate_fontconfig_caches.cc:60)."
         },
         {
           "name": "fix-ffmpeg-codec-list.patch",
@@ -133,9 +161,12 @@
         },
         {
           "name": "generic-sensor-include.patch",
-          "state": "apply",
+          "state": "not-applicable",
           "replacement": null,
-          "affected_paths": []
+          "affected_paths": [
+            "services/device/public/cpp/generic_sensor/sensor_reading.h"
+          ],
+          "reason": "Chromium 156 already includes stddef.h and stdint.h in this header (services/device/public/cpp/generic_sensor/sensor_reading.h:8)."
         },
         {
           "name": "headless-shell-no-license.patch",
@@ -147,16 +178,21 @@
         },
         {
           "name": "musl-reserved-stack-limit.patch",
-          "state": "apply",
+          "state": "not-applicable",
           "replacement": null,
-          "affected_paths": [],
-          "reason": "Alpine musl thread stack limit compatibility."
+          "affected_paths": [
+            "v8/src/base/platform/platform-posix.cc"
+          ],
+          "reason": "Chromium 156 already detects musl on the main thread and returns null for its unreliable reserved stack limit, preserving the fallback for that case (v8/src/base/platform/platform-posix.cc:1507)."
         },
         {
           "name": "musl-sandbox.patch",
-          "state": "apply",
-          "replacement": null,
-          "affected_paths": []
+          "state": "superseded",
+          "replacement": "musl-seccomp-clone-detached.patch and musl-seccomp-sched-get.patch",
+          "affected_paths": [
+            "sandbox/linux/seccomp-bpf-helpers/syscall_parameters_restrictions.cc"
+          ],
+          "reason": "The narrower local seccomp patches retain Chromium restrictions while supporting musl thread creation and scheduling queries (sandbox/linux/seccomp-bpf-helpers/syscall_parameters_restrictions.cc:142)."
         },
         {
           "name": "musl-tid-caching.patch",
@@ -182,15 +218,30 @@
         },
         {
           "name": "no-execinfo.patch",
-          "state": "apply",
-          "replacement": null,
-          "affected_paths": []
+          "state": "superseded",
+          "replacement": "musl-no-execinfo-156.patch",
+          "affected_paths": [
+            "v8/src/codegen/external-reference-table.cc",
+            "third_party/swiftshader/third_party/llvm-subzero/build/Linux/include/llvm/Config/config.h",
+            "base/debug/stack_trace.cc",
+            "base/debug/stack_trace_unittest.cc"
+          ],
+          "reason": "The local patch preserves the Alpine guards with Chromium 156 context changes (base/debug/stack_trace.cc:375)."
         },
         {
           "name": "no-mallinfo.patch",
-          "state": "apply",
-          "replacement": null,
-          "affected_paths": []
+          "state": "superseded",
+          "replacement": "musl-no-mallinfo-156.patch",
+          "affected_paths": [
+            "base/trace_event/malloc_dump_provider.cc",
+            "base/process/process_metrics_posix.cc",
+            "third_party/tflite/src/tensorflow/lite/profiling/memory_info.cc",
+            "third_party/swiftshader/third_party/llvm-subzero/lib/Support/Unix/Process.inc",
+            "third_party/swiftshader/third_party/llvm-10.0/configs/linux/include/llvm/Config/config.h",
+            "base/allocator/partition_allocator/src/partition_alloc/shim/allocator_shim_default_dispatch_to_partition_alloc.cc",
+            "base/allocator/partition_allocator/src/partition_alloc/shim/allocator_shim_default_dispatch_to_partition_alloc_unittest.cc"
+          ],
+          "reason": "The local patch preserves the Alpine mallinfo guards with Chromium 156 context changes (base/trace_event/malloc_dump_provider.cc:270)."
         },
         {
           "name": "no-res-ninit-nclose.patch",
@@ -206,28 +257,41 @@
         },
         {
           "name": "partalloc-no-tagging-arm64.patch",
-          "state": "apply",
-          "replacement": null,
-          "affected_paths": []
+          "state": "superseded",
+          "replacement": "musl-no-tagging-arm64-156.patch",
+          "affected_paths": [
+            "base/allocator/partition_allocator/partition_alloc.gni",
+            "base/allocator/partition_allocator/src/partition_alloc/aarch64_support.h"
+          ],
+          "reason": "The local patch preserves the Alpine musl memory-tagging guards with Chromium 156 context changes (base/allocator/partition_allocator/partition_alloc.gni:113)."
         },
         {
           "name": "pvalloc.patch",
-          "state": "apply",
-          "replacement": null,
-          "affected_paths": []
+          "state": "superseded",
+          "replacement": "musl-no-pvalloc-156.patch",
+          "affected_paths": [
+            "base/allocator/partition_allocator/src/partition_alloc/shim/allocator_shim_unittest.cc",
+            "base/process/memory_unittest.cc"
+          ],
+          "reason": "The local patch preserves the Alpine test guards with Chromium 156 context changes (base/allocator/partition_allocator/src/partition_alloc/shim/allocator_shim_unittest.cc:526)."
         },
         {
           "name": "rust-cbor.patch",
-          "state": "apply",
+          "state": "not-applicable",
           "replacement": null,
-          "affected_paths": [],
-          "reason": "Alpine Rust CBOR compatibility; replaces the portablelinux Crubit revert."
+          "affected_paths": [
+            "components/cbor/BUILD.gn"
+          ],
+          "reason": "The locked native Rust toolchain contains a working cc_bindings_from_rs and Crubit support, so Chromium 156 can retain its CBOR Rust bindings (components/cbor/BUILD.gn:15)."
         },
         {
           "name": "temp-failure-retry.patch",
-          "state": "apply",
+          "state": "not-applicable",
           "replacement": null,
-          "affected_paths": []
+          "affected_paths": [
+            "sandbox/linux/suid/process_util.h"
+          ],
+          "reason": "Chromium 156 sandbox/linux/suid no longer uses TEMP_FAILURE_RETRY (sandbox/linux/suid/process_util.h:11)."
         }
       ]
     },
@@ -255,9 +319,12 @@
         },
         {
           "name": "cr143-libsync-__BEGIN_DECLS.patch",
-          "state": "apply",
-          "replacement": null,
-          "affected_paths": []
+          "state": "superseded",
+          "replacement": "musl-libsync-decls-156.patch",
+          "affected_paths": [
+            "third_party/libsync/src/include/ndk/sync.h"
+          ],
+          "reason": "The local patch retains the Copium declaration fallback in the Chromium 156 header (third_party/libsync/src/include/ndk/sync.h:30)."
         },
         {
           "name": "cr145-iwyu-dev_t.patch",
@@ -287,9 +354,14 @@
         },
         {
           "name": "cr147-is-musl-libcxx.patch",
-          "state": "apply",
-          "replacement": null,
-          "affected_paths": []
+          "state": "superseded",
+          "replacement": "musl-libcxx-156.patch",
+          "affected_paths": [
+            "build/config/c++/BUILD.gn",
+            "build/config/linux/musl.gni",
+            "buildtools/third_party/libc++/__config_site"
+          ],
+          "reason": "The local patch retains the Copium musl libc++ configuration with Chromium 156 import context (build/config/c++/BUILD.gn:4)."
         },
         {
           "name": "cr147-simdutf-8.0-base-char.patch",
@@ -305,9 +377,12 @@
         },
         {
           "name": "cr148-v8-no-san-trap.patch",
-          "state": "apply",
+          "state": "not-applicable",
           "replacement": null,
-          "affected_paths": []
+          "affected_paths": [
+            "v8/src/sandbox/testing.cc"
+          ],
+          "reason": "The release graph uses trap-only undefined-behavior sanitizer without a sanitizer runtime (build/config/compiler/BUILD.gn:1621; v8/src/base/macros.h:225; v8/src/sandbox/testing.cc:53); musl-v8-sandbox-trap-ubsan.patch excludes that trap-only case while retaining ASan and MSan callbacks."
         },
         {
           "name": "cr149-musl-alloc-shim-dispatch.patch",
@@ -348,10 +423,13 @@
         },
         {
           "name": "cr152-ffmpeg-no-agtm.patch",
-          "state": "apply",
+          "state": "not-applicable",
           "replacement": null,
-          "affected_paths": [],
-          "reason": "System FFmpeg does not expose Chromium\u2019s bundled AV1 AGTM configuration."
+          "affected_paths": [
+            "media/ffmpeg/ffmpeg_common.cc",
+            "media/filters/ffmpeg_demuxer.cc"
+          ],
+          "reason": "The arm64 desktop keeps Chromium bundled FFmpeg (scripts/prepare-source.py:449); this patch adapts the system FFmpeg API and removes bundled AGTM handling."
         },
         {
           "name": "cr152-unbundle-minizip-undo-unicode.patch",
@@ -373,10 +451,13 @@
         },
         {
           "name": "cr153-no-python-vendoring.patch",
-          "state": "apply",
+          "state": "not-applicable",
           "replacement": null,
-          "affected_paths": [],
-          "reason": "Use the pinned image Python rather than a pruned Chromium Python distribution."
+          "affected_paths": [
+            ".gn",
+            "build/config/siso"
+          ],
+          "reason": "The portable chromium-153-revert-hermetic-python.patch selects system Python in .gn; the remaining Siso patch hunks no longer apply and this build uses GN and Ninja (.gn:14)."
         },
         {
           "name": "cr153-typescript-break-definitions.patch",
@@ -397,10 +478,14 @@
         },
         {
           "name": "cr153-uncrubit-blink-opentype.patch",
-          "state": "apply",
+          "state": "not-applicable",
           "replacement": null,
-          "affected_paths": [],
-          "reason": "Restore the source path needed by the Chromium 153 font graph."
+          "affected_paths": [
+            "third_party/blink/renderer/platform/BUILD.gn",
+            "third_party/blink/renderer/platform/fonts/BUILD.gn",
+            "third_party/blink/renderer/platform/fonts/opentype/format_check.rs"
+          ],
+          "reason": "The locked native Rust toolchain provides working Crubit bindings; retaining Chromium 156 bindings also preserves its new incremental-font-transfer target (third_party/blink/renderer/platform/fonts/BUILD.gn:21)."
         }
       ]
     }

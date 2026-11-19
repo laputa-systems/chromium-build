@@ -1,0 +1,11 @@
+--- a/build/config/rust.gni
++++ b/build/config/rust.gni
+@@ -202,7 +202,7 @@
+ rust_abi_target = ""
+ if (is_linux || is_chromeos) {
+   if (current_cpu == "arm64") {
+-    rust_abi_target = "aarch64-alpine-linux-musl"
++    rust_abi_target = "aarch64-unknown-linux-musl"
+   } else if (current_cpu == "x86") {
+     rust_abi_target = "i586-alpine-linux-musl"
+   } else if (current_cpu == "x64") {

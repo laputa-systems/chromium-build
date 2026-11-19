@@ -153,16 +153,25 @@ def prepare_chromium(root: Path, work: Path, inputs: Path, metadata: Path, sourc
     require_file(archive, "Chromium archive is missing")
     if source.exists():
         raise ScriptFailure("prepared source already exists; preserve or move it before preparing")
-    rust_target = {"arm64": "aarch64-alpine-linux-musl", "amd64": "x86_64-alpine-linux-musl"}.get(arch)
+    desktop = os.environ.get("CHROMIUM_PROFILE") == "chromium-wayland-release"
+    rust_target = ({"arm64": "aarch64-unknown-linux-musl"} if desktop else {"arm64": "aarch64-alpine-linux-musl", "amd64": "x86_64-alpine-linux-musl"}).get(arch)
     if rust_target is None:
         raise ScriptFailure(f"unsupported architecture {arch}")
     temp = Path(tempfile.mkdtemp(prefix="src.prepare.", dir=work))
     config = Path(tempfile.mkdtemp(prefix="prepare-inputs.", dir=work))
     try:
         extract(archive, temp)
-        for name in (entry["filename"] for entry in lock["source_inputs"].values()):
+        for key, entry in lock["source_inputs"].items():
+            name = entry["filename"]
+            if desktop and key == "linux_overlay":
+                continue
             extract(require_file(inputs / name, f"missing preparation input {name}"), config)
         source_dir = source_root(temp)
+        if desktop:
+            overlay = config / "linux-overlay"
+            name = lock["source_inputs"]["linux_overlay"]["filename"]
+            extract(require_file(inputs / name, "missing Linux overlay"), overlay)
+            shutil.copytree(archive_root(overlay), source_dir, dirs_exist_ok=True, symlinks=True)
         command = [
             "python3",
             str(root / "scripts/prepare-source.py"),
@@ -189,7 +198,37 @@ def prepare_chromium(root: Path, work: Path, inputs: Path, metadata: Path, sourc
             "--rust-target-triple",
             rust_target,
         ]
-        for patch in LOCAL_PATCHES:
+        if desktop:
+            command.extend(["--native-inputs", str(inputs), "--arch", arch])
+        desktop_patches = (
+            "gate-e-hermetic-smoke.patch",
+            "desktop-no-devtools-frontend.patch",
+            "desktop-no-dbus.patch",
+            "desktop-no-background-test-dep.patch",
+            "headless-no-web-app-dbus-portal.patch",
+            "headless-global-accelerator-no-dbus-return.patch",
+            "bounded-back-to-back-begin-frames.patch",
+            "musl-no-execinfo-156.patch",
+            "musl-no-mallinfo-156.patch",
+            "musl-mallinfo-function-156.patch",
+            "musl-swiftshader-mallinfo-156.patch",
+            "musl-no-tagging-arm64-156.patch",
+            "musl-no-pvalloc-156.patch",
+            "musl-libsync-decls-156.patch",
+            "musl-libcxx-156.patch",
+            "musl-v8-sandbox-trap-ubsan.patch",
+            "musl-rust-target-156.patch",
+            "headless-no-printing-linux-context.patch",
+            "desktop-no-printing-pref.patch",
+            "headless-no-printing-pdf-helpers.patch",
+            "desktop-pdf-without-printing.patch",
+            *json.loads((root / "config/helium.patch-disposition.json").read_text())["local_patches"],
+        )
+        desktop_patches = tuple(name for name in desktop_patches if not name.startswith("adblock-") or name in {p.name for p in (root / "config/patches").glob("adblock-*.patch")}) if desktop else ()
+        if desktop:
+            desktop_patches = tuple(name for name in desktop_patches if name not in ("musl-target-triple.patch", "musl-v8-sanitizer-header.patch", "musl-libsync-cdefs-include.patch", "musl-mallinfo-guard.patch", "musl-swiftshader-llvm-config.patch", "musl-v8-no-execinfo.patch") and (name.startswith(("musl-", "headless-no-printing-", "adblock-")) or name in ("gate-e-hermetic-smoke.patch", "desktop-no-devtools-frontend.patch", "desktop-no-dbus.patch", "desktop-no-background-test-dep.patch", "bounded-back-to-back-begin-frames.patch", "desktop-pdf-without-printing.patch", "desktop-no-printing-pref.patch", "headless-no-web-app-dbus-portal.patch", "headless-global-accelerator-no-dbus-return.patch")))
+            desktop_patches = tuple(dict.fromkeys(desktop_patches)) + ("adblock-offline-desktop.patch",)
+        for patch in desktop_patches if desktop else LOCAL_PATCHES:
             command.extend(["--local-patch", str(root / "config/patches" / patch)])
         run(command)
         source_dir.rename(source)
