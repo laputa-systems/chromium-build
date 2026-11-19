@@ -70,6 +70,21 @@ an appliance, and it is a thin series built to follow each Chromium release.
   ungoogled-chromium revisions, so bctl's native control is a same-build
   browser rather than stock Chromium.app.
 
+### A lean appliance profile
+
+The owner chose to build the lean profile directly, without a parity build. The
+first Hydrogen package is therefore compared with Helium r9 as one change:
+Helium removed and the following cut. Beyond what Helium already left out,
+`chromium-wayland-release` builds without printing (`enable_printing`, which
+also removes `Page.printToPDF`), the PDF viewer (`enable_pdf`), ALSA output,
+VA-API, the Screen AI service, background mode and native notifications. It
+also drops the DevTools frontend; raw CDP is unaffected. Packaging keeps only
+the en-US UI locale. Spellcheck is derived from `use_blink` and cannot be
+removed through GN, and `optimize_webui` stays off until its minifier toolchain
+is qualified on arm64 musl. VA-API returns with one GN flag if a guest ever
+exposes a hardware video decoder. GPU acceleration in the VM would come through
+virtio-gpu (Venus or virgl), not VA-API.
+
 ### Chromium revision
 
 Advance `config/inputs.lock` to the Chromium version the Helium line ships
