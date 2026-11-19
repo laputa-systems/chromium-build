@@ -18,7 +18,7 @@ class ImageJobsTests(unittest.TestCase):
 from pathlib import Path
 args = sys.argv[1:]
 if args[0] == 'info':
-    print('aarch64' if 'Architecture' in args[-1] else 8 * 1024**3)
+    print(os.environ['DOCKER_ARCH'] if 'Architecture' in args[-1] else 8 * 1024**3)
 elif args[0] == 'build':
     Path(os.environ['BUILD_ARGS']).write_text(json.dumps(args))
 elif args[:2] == ['image', 'inspect']:
@@ -45,9 +45,14 @@ else:
                                        'BUILD_ARGS': str(root / 'args.json'),
                                        'APK_FETCH_ARGS': str(root / 'apk-fetch.json'),
                                        'APK_CONTEXT': str(apk_context)}
-            for options, expected in ((['--jobs', '2'], '2'), ([], '')):
-                result = subprocess.run(['bash', str(ROOT / 'chromium-build'), '--product', 'helium',
-                                         '--arch', 'arm64', 'image', *options], env=environment,
+            for product, arch, package_lock, options, expected in (
+                ('helium', 'arm64', 'helium.packages.arm64.lock', ['--jobs', '2'], '2'),
+                ('helium', 'arm64', 'helium.packages.arm64.lock', [], ''),
+                ('chromium', 'amd64', 'packages.amd64.lock', [], ''),
+            ):
+                result = subprocess.run(['bash', str(ROOT / 'chromium-build'), '--product', product,
+                                         '--arch', arch, 'image', *options],
+                                        env=environment | {'DOCKER_ARCH': arch},
                                         text=True, capture_output=True, check=False)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 args = json.loads((root / 'args.json').read_text())
@@ -55,10 +60,11 @@ else:
                 self.assertEqual(args[index - 1], '--build-arg')
                 context = args.index('--build-context')
                 self.assertEqual(args[context + 1], f'locked-apks={apk_context}')
+                self.assertIn(f'PACKAGE_LOCK=config/{package_lock}', args)
                 self.assertEqual(json.loads((root / 'apk-fetch.json').read_text()), [
-                    '--lock', str(ROOT / 'config/helium.packages.arm64.lock'),
-                    '--inputs-root', str(ROOT / '.work/cache/helium-apks'),
-                    '--builder-apks', 'arm64',
+                    '--lock', str(ROOT / 'config' / package_lock),
+                    '--inputs-root', str(ROOT / '.work/cache' / f'{product}-apks'),
+                    '--builder-apks', arch,
                 ])
 
 

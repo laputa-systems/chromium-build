@@ -28,50 +28,12 @@ ARG CCACHE_MAXSIZE=10G
 COPY --from=host-runtime /rootfs/ /
 
 RUN --network=none --mount=type=bind,from=locked-apks,target=/locked-apks set -eux; \
-    if [ "$PRODUCT" = helium ]; then \
-        apk add --no-cache --repositories-file /dev/null /locked-apks/*.apk; \
-    fi
-RUN set -eux; \
-    if [ "$PRODUCT" != helium ]; then \
-        test "$PRODUCT" = chromium; \
-        apk add --no-cache \
-            bash=5.3.9-r1 \
-            bison=3.8.2-r3 \
-            bsd-compat-headers=0.7.2-r6 \
-            ca-certificates=20261020-r0 \
-            cargo=1.96.1-r0 \
-            ccache=4.13.6-r0 \
-            clang22-libclang=22.1.3-r2 \
-            curl=8.23.0-r0 \
-            expat-dev=2.10.0-r0 \
-            ffmpeg-dev=8.1.3-r0 \
-            file=5.47-r2 \
-            findutils=4.10.0-r1 \
-            flex=2.6.4-r8 \
-            font-noto=2026.11.01-r0 \
-            gn=0_git20260924-r0 \
-            go=1.26.10-r0 \
-            gperf=3.3-r0 \
-            libdrm-dev=2.4.134-r0 \
-            linux-headers=7.0.0-r1 \
-            mesa-dev=26.1.6-r0 \
-            musl-dev=1.2.6-r3 \
-            ninja-build=1.13.2-r1 \
-            nodejs=24.22.1-r1 \
-            nspr-dev=4.38.2-r0 \
-            nss-dev=3.124-r0 \
-            patch=2.8.1-r0 \
-            perl=5.42.3-r0 \
-            pkgconf=2.5.1-r0 \
-            python3=3.14.10-r1 \
-            rust=1.96.1-r0 \
-            rust-bindgen=0.72.1-r1 \
-            rustfmt=1.96.1-r0 \
-            tar=1.35-r5 \
-            util-linux-dev=2.42.3-r1 \
-            xz=5.8.4-r0 \
-            zstd=1.5.7-r2; \
-    fi
+    set -- /locked-apks/*.apk; \
+    if [ ! -f "$1" ]; then \
+        echo 'Missing verified Alpine packages. Run ./chromium-build image.' >&2; \
+        exit 1; \
+    fi; \
+    apk add --no-cache --repositories-file /dev/null "$@"
 COPY scripts/helium-crt.sh /opt/chromium-build/scripts/helium-crt.sh
 RUN set -eux; \
     if [ "$PRODUCT" = helium ]; then \
@@ -239,7 +201,9 @@ RUN set -eux; \
     rm -rf /opt/pure-runtime
 RUN set -eux; \
     mkdir -p /opt/chromium-build-metadata; \
-    apk info -v | sort > "/opt/chromium-build-metadata/packages.$TARGET_ARCH.txt"
+    apk info -v | sort > "/opt/chromium-build-metadata/packages.$TARGET_ARCH.txt"; \
+    python3 /opt/chromium-build/scripts/lockcheck.py packages \
+        "/opt/chromium-build/$PACKAGE_LOCK" "/opt/chromium-build-metadata/packages.$TARGET_ARCH.txt"
 RUN python3 /opt/chromium-build/scripts/write-environment-metadata.py "$TARGET_ARCH" \
     --inputs-lock "/opt/chromium-build/$INPUTS_LOCK" \
     --package-lock "/opt/chromium-build/$PACKAGE_LOCK" \

@@ -55,8 +55,13 @@ jobs:
         include:
           - runner: ubuntu-26.04-arm
             arch: arm64
+            product: helium
           - runner: ubuntu-26.04
             arch: amd64
+            product: helium
+          - runner: ubuntu-26.04
+            arch: amd64
+            product: chromium
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
     permissions:
@@ -65,5 +70,5 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - run: CHROMIUM_BUILDER_IMAGE=controller-tests ./chromium-build --product helium --platform linux --arch ${{ matrix.arch }} image
+      - run: CHROMIUM_BUILDER_IMAGE=controller-tests ./chromium-build --product ${{ matrix.product }} --platform linux --arch ${{ matrix.arch }} image
       - run: make test-ci IMAGE=controller-tests
