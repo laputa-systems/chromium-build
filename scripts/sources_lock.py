@@ -26,6 +26,7 @@ TARGETS = {"amd64": "x86_64-unknown-linux-musl", "arm64": "aarch64-unknown-linux
 BUILDER_APK_LOCKS = {
     ("linux", "amd64"): "config/packages.amd64.lock",
     **{("helium", architecture): f"config/helium.packages.{architecture}.lock" for architecture in TARGETS},
+    **{("wayland", architecture): f"config/packages.wayland.{architecture}.lock" for architecture in TARGETS},
 }
 SCOPE_TARGETS = {"linux": "x86_64-unknown-linux-musl", "macos": "aarch64-apple-darwin", "macos-helium": "aarch64-apple-darwin"}
 ROLES = {

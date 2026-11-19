@@ -185,12 +185,17 @@ class VerifyArgsTest(unittest.TestCase):
             text=True,
         )
 
-    def test_chromium_wayland_product_resolves_arm64_chrome(self):
+    def test_chromium_wayland_product_resolves_desktop_locks_on_both_architectures(self):
         import linux_product
 
-        product = linux_product.resolve("chromium", "arm64", "chromium-wayland-release", ROOT)
-        self.assertEqual(product.executable, "chrome")
-        self.assertEqual(product.arch, "arm64")
+        for arch in ("arm64", "amd64"):
+            product = linux_product.resolve("chromium", arch, "chromium-wayland-release", ROOT)
+            self.assertEqual(product.executable, "chrome")
+            self.assertEqual(product.arch, arch)
+            self.assertEqual(product.package_lock, ROOT / f"config/packages.wayland.{arch}.lock")
+            self.assertIn("wayland-dev", " ".join(linux_product.package_world(product.package_lock)))
+        headless = linux_product.resolve("chromium", "amd64", "headless-release", ROOT)
+        self.assertEqual(headless.package_lock, ROOT / "config/packages.amd64.lock")
 
     def test_chromium_wayland_profile_matches_arm64_contract(self):
         with tempfile.TemporaryDirectory() as directory:

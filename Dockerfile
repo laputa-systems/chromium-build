@@ -37,7 +37,7 @@ RUN --network=none --mount=type=bind,from=locked-apks,target=/locked-apks set -e
     apk add --no-cache --repositories-file /dev/null "$@"
 COPY scripts/helium-crt.sh /opt/chromium-build/scripts/helium-crt.sh
 RUN set -eux; \
-    if [ "$PRODUCT" = helium ] || [ "$PROFILE" = chromium-wayland-release ]; then \
+    if [ "$PRODUCT" = helium ] || { [ "$PROFILE" = chromium-wayland-release ] && [ "$TARGET_ARCH" = arm64 ]; }; then \
         mkdir -p /opt/chromium-llvm; \
         curl -fsSL "$LLVM_URL" -o /tmp/llvm.tar.xz; \
         test "$(stat -c %s /tmp/llvm.tar.xz)" = "$LLVM_SIZE"; \

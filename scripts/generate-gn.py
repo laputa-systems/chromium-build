@@ -66,7 +66,7 @@ def main() -> None:
     toolchain = lock["toolchain"]
     clang_major = toolchain["architectures"][arch].get("version", toolchain["version"]).split(".", 1)[0]
     use_alsa = "true"
-    if profile_name in ("helium-wayland-release", "chromium-wayland-release") and arch == "arm64":
+    if profile_name == "chromium-wayland-release" or (profile_name == "helium-wayland-release" and arch == "arm64"):
         use_alsa = "false"
     run(
         [

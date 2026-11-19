@@ -291,7 +291,7 @@ def main():
     parser.add_argument("--local-patch", type=Path, action="append", required=True)
     parser.add_argument("--rust-target-triple", required=True)
     parser.add_argument("--native-inputs", type=Path)
-    parser.add_argument("--arch", choices=("arm64",))
+    parser.add_argument("--arch", choices=("arm64", "amd64"))
     args = parser.parse_args()
 
     lock = read_json(args.lock)

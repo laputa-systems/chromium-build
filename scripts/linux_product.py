@@ -137,7 +137,11 @@ def resolve(product: str, arch: str, profile: str | None = None, root: Path | No
         if product == "chromium" and profile == "chromium-wayland-release"
         else CACHE_VOLUMES[product].format(arch=arch)
     )
-    package_lock = root / names["packages"].format(arch=arch)
+    package_lock = root / (
+        f"config/packages.wayland.{arch}.lock"
+        if product == "chromium" and profile == "chromium-wayland-release"
+        else names["packages"].format(arch=arch)
+    )
     return Product(
         name=product,
         arch=arch,
