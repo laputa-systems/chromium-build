@@ -11,9 +11,15 @@ from pathlib import Path
 
 TOOLCHAIN = "/opt/chromium-llvm"
 CCACHE = "/usr/bin/ccache"
-BUNDLED_FFMPEG = (
-    os.environ.get("CHROMIUM_PRODUCT") == "helium"
-    and os.environ.get("CHROMIUM_ARCH") == "arm64"
+
+
+def ffmpeg_bundled(unbundle_report):
+    libraries = json.loads(unbundle_report.read_text(encoding="utf-8"))["libraries"]
+    return any(library["name"] == "ffmpeg" and library["state"] == "bundled" for library in libraries)
+
+
+BUNDLED_FFMPEG = ffmpeg_bundled(
+    Path(os.environ.get("CHROMIUM_METADATA_ROOT", "/work/metadata")) / "system-unbundle.json"
 )
 COMPILERS = {"clang", "clang++"}
 ARCHIVERS = {"ar", "llvm-ar", "ranlib", "llvm-ranlib"}
