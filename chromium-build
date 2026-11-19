@@ -305,6 +305,7 @@ if [ "$command_name" = image ]; then
         --build-arg RUST_HOST_LINKER="$rust_host_linker"
         --build-arg CCACHE_MAXSIZE="$CCACHE_MAXSIZE"
         --build-arg PRODUCT="$PRODUCT"
+        --build-arg PROFILE="$PROFILE"
         --build-arg PURE_RUNTIME_JOBS="${JOBS:-}"
     )
     apk_context=$(NETWORK_MODE=fetch "${CHROMIUM_PYTHON:-python3}" "$ROOT/scripts/fetch-inputs.py" \
@@ -314,7 +315,7 @@ if [ "$command_name" = image ]; then
         --build-context "locked-apks=$apk_context"
         --build-arg PACKAGE_LOCK="config/$(basename -- "$PACKAGE_LOCK")"
     )
-    if [ "$PRODUCT" = helium ]; then
+    if [ "$PRODUCT" = helium ] || [ "$PROFILE" = chromium-wayland-release ]; then
         image_args+=(
             --build-arg INPUTS_LOCK="config/$(basename -- "$INPUTS_LOCK")"
             --build-arg PATCH_INVENTORY="config/$(basename -- "$PATCH_INVENTORY")"
@@ -330,7 +331,7 @@ if [ "$command_name" = image ]; then
                 --build-arg "PURE_${source_prefix}_SIZE=$source_size"
             )
         done < <("${CHROMIUM_PYTHON:-python3}" "$ROOT/scripts/linux_product.py" \
-            --product helium --arch "$ARCH" --profile "$PROFILE" --root "$ROOT" --runtime-sources)
+            --product "$PRODUCT" --arch "$ARCH" --profile "$PROFILE" --root "$ROOT" --runtime-sources)
     fi
     docker build "${image_args[@]}" -t "$IMAGE" "$ROOT"
     docker image inspect "$IMAGE" --format 'image={{.Id}}'

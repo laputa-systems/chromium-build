@@ -10082,6 +10082,83 @@
       "lock": "config/inputs.lock"
     },
     {
+      "name": "linux/runtime_sources/arm64/expat",
+      "version": "2.10.0",
+      "url": "https://github.com/libexpat/libexpat/releases/download/R_2_10_0/expat-2.10.0.tar.xz",
+      "sha256": "c624ba2998fc65df1163a49641ff3f9ab73138b11641d92c86bee0fb01b1bc7f",
+      "sha512": "bd61f361d823f67586dad246fa4d4abbe3d22f5a0f9a28401e7a2fc96753d5bae33fbe4068fae72f016998d0da9d8c92edc4abd2fe8a8e4aafc775a8ab547c44",
+      "size": 543404,
+      "role": "runtime",
+      "target": "aarch64-unknown-linux-musl",
+      "lock": "config/inputs.lock"
+    },
+    {
+      "name": "linux/runtime_sources/arm64/libffi",
+      "version": "3.5.2",
+      "url": "https://github.com/libffi/libffi/releases/download/v3.5.2/libffi-3.5.2.tar.gz",
+      "sha256": "f3a3082a23b37c293a4fcd1053147b371f2ff91fa7ea1b2a52e335676bac82dc",
+      "sha512": "76974a84e3aee6bbd646a6da2e641825ae0b791ca6efdc479b2d4cbcd3ad607df59cffcf5031ad5bd30822961a8c6de164ac8ae379d1804acd388b1975cdbf4d",
+      "size": 1423124,
+      "role": "runtime",
+      "target": "aarch64-unknown-linux-musl",
+      "lock": "config/inputs.lock"
+    },
+    {
+      "name": "linux/runtime_sources/arm64/nspr",
+      "version": "4.38.2",
+      "url": "https://ftp.mozilla.org/pub/nspr/releases/v4.38.2/src/nspr-4.38.2.tar.gz",
+      "sha256": "e4092faeab77bdc9b32db1113e4215948ee768e26c4666db3b5a60b35f2c9105",
+      "sha512": "f17302b0973ab006f9e6af70199ac6bb40d6266f96ab4d6692f56c24979907a7f0a20cf9d926aa80084f2e0ce7dfd56de89a7547b5e7e8caafa7afa5eb0b7bd8",
+      "size": 1025394,
+      "role": "runtime",
+      "target": "aarch64-unknown-linux-musl",
+      "lock": "config/inputs.lock"
+    },
+    {
+      "name": "linux/runtime_sources/arm64/nss",
+      "version": "3.133",
+      "url": "https://ftp.mozilla.org/pub/security/nss/releases/NSS_3_133_RTM/src/nss-3.133.tar.gz",
+      "sha256": "4d752526b9846a1d962588cfbd09b7cc2a4f6a4effbd9157d58a30e8a2573065",
+      "sha512": "0ee463238456df344f49ea0ceda1a206b093285f66a5cc88c4977121ed7f874348dfae6612e1d715bad598126e1cdfd6a1ba5835b210234e1206690528df5d6a",
+      "size": 87844450,
+      "role": "runtime",
+      "target": "aarch64-unknown-linux-musl",
+      "lock": "config/inputs.lock"
+    },
+    {
+      "name": "linux/runtime_sources/arm64/sqlite",
+      "version": "3.53.4",
+      "url": "https://www.sqlite.org/2026/sqlite-autoconf-3530400.tar.gz",
+      "sha256": "0e9483900e92cd5de8fd48d16bf9200145a61f7fd5be542a5ac81d8a9516eb9c",
+      "sha512": "c24374e9393a943157f533f96e89e6c5743e5f5aad169d8393cff3088ca5ccbe5cc0561681ace49c349d0fe402298ee2624d319f422967247ce0792e3b3aa01e",
+      "size": 3283177,
+      "role": "runtime",
+      "target": "aarch64-unknown-linux-musl",
+      "lock": "config/inputs.lock"
+    },
+    {
+      "name": "linux/runtime_sources/arm64/xkbcommon",
+      "version": "1.13.1",
+      "url": "https://github.com/xkbcommon/libxkbcommon/archive/refs/tags/xkbcommon-1.13.1.tar.gz",
+      "sha256": "aeb951964c2f7ecc08174cb5517962d157595e9e3f38fc4a130b91dc2f9fec18",
+      "sha512": "450c33fe26af6b847cf7516685d0df63c2ba0126887e27595c40fe80e4d0487009aa6cdf38ff1270d595c7900cbf3c11e7aa4f9cff80fa361742b5ebb10d83bd",
+      "size": 1234661,
+      "role": "runtime",
+      "target": "aarch64-unknown-linux-musl",
+      "lock": "config/inputs.lock"
+    },
+    {
+      "name": "linux/runtime_sources/arm64/zlib",
+      "version": "1.4",
+      "url": "https://zlib.net/zlib-1.4.tar.gz",
+      "sha256": "02dd159783677a749c04adbdd02b55b8a2bcc7e054f51b76b549199a916ad584",
+      "sha512": "13f02285da85956ff722d814695b96807aff7a511ebf4b6d98cf708c353920666093cc18b6653cd7992c8e75c103f7b4baf2de3a105c2db9dcd62bab2c940859",
+      "size": 1507140,
+      "role": "runtime",
+      "target": "aarch64-unknown-linux-musl",
+      "lock": "config/inputs.lock"
+    },
+    {
       "name": "linux/source_inputs/alpine",
       "version": "4a3cc589c1e0ad0f7a26b519014e6322e1d5c419",
       "url": "https://gitlab.alpinelinux.org/alpine/aports/-/archive/4a3cc589c1e0ad0f7a26b519014e6322e1d5c419/aports-4a3cc589c1e0ad0f7a26b519014e6322e1d5c419.tar.gz",
@@ -10155,6 +10232,16 @@
       "size": 59131228,
       "role": "toolchain",
       "target": "x86_64-unknown-linux-musl",
+      "lock": "config/inputs.lock"
+    },
+    {
+      "name": "linux/toolchain/architectures/arm64",
+      "version": "23.1.5",
+      "url": "https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/release-10dbf21a8bc2ec9a7f60d2f15eed2307c52c290f/llvm-23.1.5-aarch64-unknown-linux-musl.tar.xz",
+      "sha256": "975da816c5519b62f6960b35ec0f862498c90abaccb06d9a100848bf02020e31",
+      "size": 93823420,
+      "role": "toolchain",
+      "target": "aarch64-unknown-linux-musl",
       "lock": "config/inputs.lock"
     },
     {

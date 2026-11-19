@@ -96,6 +96,20 @@
         "archive_size": 59131228,
         "archive_url": "https://commondatastorage.googleapis.com/chromium-browser-clang/Linux_x64/clang-llvmorg-24-init-3796-g20e97c4b-2.tar.xz",
         "archive_sha256": "86d53b33007a35695645e3867589a20f6f8aeedd146331e1a2ec8fd371e05ea2"
+      },
+      "arm64": {
+        "linux_arch": "aarch64",
+        "chromium_cpu": "arm64",
+        "target_triple": "aarch64-unknown-linux-musl",
+        "revision": "release-10dbf21a8bc2ec9a7f60d2f15eed2307c52c290f",
+        "archive_filename": "llvm-23.1.5-aarch64-unknown-linux-musl.tar.xz",
+        "archive_size": 93823420,
+        "archive_url": "https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/release-10dbf21a8bc2ec9a7f60d2f15eed2307c52c290f/llvm-23.1.5-aarch64-unknown-linux-musl.tar.xz",
+        "archive_sha256": "975da816c5519b62f6960b35ec0f862498c90abaccb06d9a100848bf02020e31",
+        "version": "23.1.5",
+        "lld_version": "23.1.5",
+        "clang_cfg_sha256": "c229db2318937ef017eec2d5d3c746af712cfde35bc304d107740689e518ad5b",
+        "clangxx_cfg_sha256": "4e48721b71aa07596a47e464beaad72e977831f95b226976e33929917fb7ead9"
       }
     }
   },
@@ -173,6 +187,59 @@
           "contains": "version:3@0.28.2.chromium"
         },
         "version_output": "0.28.2"
+      }
+    }
+  },
+  "runtime_sources": {
+    "arm64": {
+      "nss": {
+        "version": "3.133",
+        "filename": "nss-3.133.tar.gz",
+        "url": "https://ftp.mozilla.org/pub/security/nss/releases/NSS_3_133_RTM/src/nss-3.133.tar.gz",
+        "size": 87844450,
+        "sha512": "0ee463238456df344f49ea0ceda1a206b093285f66a5cc88c4977121ed7f874348dfae6612e1d715bad598126e1cdfd6a1ba5835b210234e1206690528df5d6a"
+      },
+      "nspr": {
+        "version": "4.38.2",
+        "filename": "nspr-4.38.2.tar.gz",
+        "url": "https://ftp.mozilla.org/pub/nspr/releases/v4.38.2/src/nspr-4.38.2.tar.gz",
+        "size": 1025394,
+        "sha512": "f17302b0973ab006f9e6af70199ac6bb40d6266f96ab4d6692f56c24979907a7f0a20cf9d926aa80084f2e0ce7dfd56de89a7547b5e7e8caafa7afa5eb0b7bd8"
+      },
+      "sqlite": {
+        "version": "3.53.4",
+        "filename": "sqlite-autoconf-3530400.tar.gz",
+        "url": "https://www.sqlite.org/2026/sqlite-autoconf-3530400.tar.gz",
+        "size": 3283177,
+        "sha512": "c24374e9393a943157f533f96e89e6c5743e5f5aad169d8393cff3088ca5ccbe5cc0561681ace49c349d0fe402298ee2624d319f422967247ce0792e3b3aa01e"
+      },
+      "expat": {
+        "version": "2.10.0",
+        "filename": "expat-2.10.0.tar.xz",
+        "url": "https://github.com/libexpat/libexpat/releases/download/R_2_10_0/expat-2.10.0.tar.xz",
+        "size": 543404,
+        "sha512": "bd61f361d823f67586dad246fa4d4abbe3d22f5a0f9a28401e7a2fc96753d5bae33fbe4068fae72f016998d0da9d8c92edc4abd2fe8a8e4aafc775a8ab547c44"
+      },
+      "xkbcommon": {
+        "version": "1.13.1",
+        "filename": "xkbcommon-1.13.1.tar.gz",
+        "url": "https://github.com/xkbcommon/libxkbcommon/archive/refs/tags/xkbcommon-1.13.1.tar.gz",
+        "size": 1234661,
+        "sha512": "450c33fe26af6b847cf7516685d0df63c2ba0126887e27595c40fe80e4d0487009aa6cdf38ff1270d595c7900cbf3c11e7aa4f9cff80fa361742b5ebb10d83bd"
+      },
+      "zlib": {
+        "version": "1.4",
+        "filename": "zlib-1.4.tar.gz",
+        "url": "https://zlib.net/zlib-1.4.tar.gz",
+        "size": 1507140,
+        "sha512": "13f02285da85956ff722d814695b96807aff7a511ebf4b6d98cf708c353920666093cc18b6653cd7992c8e75c103f7b4baf2de3a105c2db9dcd62bab2c940859"
+      },
+      "libffi": {
+        "version": "3.5.2",
+        "filename": "libffi-3.5.2.tar.gz",
+        "url": "https://github.com/libffi/libffi/releases/download/v3.5.2/libffi-3.5.2.tar.gz",
+        "size": 1423124,
+        "sha512": "76974a84e3aee6bbd646a6da2e641825ae0b791ca6efdc479b2d4cbcd3ad607df59cffcf5031ad5bd30822961a8c6de164ac8ae379d1804acd388b1975cdbf4d"
       }
     }
   }

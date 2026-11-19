@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ "${PRODUCT:-}" != helium ] || [ "${TARGET_ARCH:-}" != arm64 ]; then
+if { [ "${PRODUCT:-}" != helium ] && [ "${PROFILE:-}" != chromium-wayland-release ]; } || [ "${TARGET_ARCH:-}" != arm64 ]; then
     mkdir -p /opt/pure-runtime
     exit 0
 fi

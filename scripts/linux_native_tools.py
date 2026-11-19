@@ -36,7 +36,7 @@ def install_rust_toolchain(source: Path, inputs: Path, lock: dict, arch: str) ->
     expected = {
         "commit-hash": item["revision"],
         "host": lock["toolchain"]["architectures"][arch]["target_triple"],
-        "LLVM version": lock["toolchain"]["version"],
+        "LLVM version": lock["toolchain"]["architectures"][arch].get("version", lock["toolchain"]["version"]),
     }
     reported = dict(line.split(": ", 1) for line in rustc.splitlines() if ": " in line)
     mismatched = {key: reported.get(key) for key, value in expected.items() if reported.get(key) != value}
