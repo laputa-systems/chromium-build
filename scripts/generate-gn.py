@@ -65,7 +65,7 @@ def main() -> None:
         raise ScriptFailure(f"unsupported architecture {arch}")
     clang_major = lock["toolchain"]["version"].split(".", 1)[0]
     use_alsa = "true"
-    if profile_name == "helium-wayland-release" and arch == "arm64":
+    if profile_name in ("helium-wayland-release", "chromium-wayland-release") and arch == "arm64":
         use_alsa = "false"
     run(
         [

@@ -135,7 +135,7 @@ class VerifyArgsTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("GN arg", result.stderr)
 
-    def run_contract(self, root: Path, target_cpu: str) -> subprocess.CompletedProcess[str]:
+    def run_contract(self, root: Path, target_cpu: str, profile: str = "helium-wayland-release") -> subprocess.CompletedProcess[str]:
         verify_args = load_verify_args()
         args_file = root / f"{target_cpu}-args.gn"
         probe = root / f"{target_cpu}-probe.json"
@@ -144,7 +144,7 @@ class VerifyArgsTest(unittest.TestCase):
                 sys.executable,
                 str(GENERATE_ARGS),
                 "--source-root", str(ROOT),
-                "--profile", str(HELIUM_PROFILE),
+                "--profile", str(ROOT / "config/profiles" / f"{profile}.gn"),
                 "--target-cpu", target_cpu,
                 "--clang-major", "24",
                 "--use-alsa", "false" if target_cpu == "arm64" else "true",
@@ -177,13 +177,25 @@ class VerifyArgsTest(unittest.TestCase):
                 "--probe", str(probe),
                 "--target-cpu", target_cpu,
                 "--clang-major", "24",
-                "--profile", "helium-wayland-release",
+                "--profile", profile,
                 "--output", str(root / f"{target_cpu}-verify.json"),
             ],
             check=False,
             capture_output=True,
             text=True,
         )
+
+    def test_chromium_wayland_product_resolves_arm64_chrome(self):
+        import linux_product
+
+        product = linux_product.resolve("chromium", "arm64", "chromium-wayland-release", ROOT)
+        self.assertEqual(product.executable, "chrome")
+        self.assertEqual(product.arch, "arm64")
+
+    def test_chromium_wayland_profile_matches_arm64_contract(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = self.run_contract(Path(directory), "arm64", "chromium-wayland-release")
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_helium_profile_matches_the_effective_contract(self):
         with tempfile.TemporaryDirectory() as directory:

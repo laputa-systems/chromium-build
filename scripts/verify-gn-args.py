@@ -55,6 +55,7 @@ def parse_value(value):
 DEBUG_BY_PROFILE = {"headless-debug": True, "headless-release": False}
 HEADLESS_PROFILES = tuple(sorted(DEBUG_BY_PROFILE))
 HELIUM_PROFILE = "helium-wayland-release"
+CHROMIUM_WAYLAND_PROFILE = "chromium-wayland-release"
 
 
 def helium_expected(args):
@@ -135,12 +136,12 @@ def main():
     parser.add_argument("--probe", type=Path, required=True)
     parser.add_argument("--target-cpu", required=True)
     parser.add_argument("--clang-major", required=True)
-    parser.add_argument("--profile", choices=[*HEADLESS_PROFILES, HELIUM_PROFILE], required=True)
+    parser.add_argument("--profile", choices=[*HEADLESS_PROFILES, HELIUM_PROFILE, CHROMIUM_WAYLAND_PROFILE], required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
     values = parse_args(args.args)
-    if args.profile == HELIUM_PROFILE:
+    if args.profile in (HELIUM_PROFILE, CHROMIUM_WAYLAND_PROFILE):
         expected = helium_expected(args)
     else:
         expected = {

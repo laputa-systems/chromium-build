@@ -16,7 +16,7 @@ from script_support import ScriptFailure
 
 PRODUCTS = ("chromium", "helium")
 PROFILES = {
-    "chromium": ("headless-debug", "headless-release"),
+    "chromium": ("headless-debug", "headless-release", "chromium-wayland-release"),
     "helium": ("helium-wayland-release",),
 }
 DEFAULT_PROFILES = {"chromium": "headless-debug", "helium": "helium-wayland-release"}
