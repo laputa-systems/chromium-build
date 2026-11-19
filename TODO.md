@@ -1,5 +1,5 @@
 Prefix: CHB
-Next: 21
+Next: 22
 
 ### CHB-7 · P1 · qualify the Helium package on the owner's Alpine dwl desktop
 
@@ -22,6 +22,16 @@ Next: 21
 
 
 
+### CHB-21 · P1 · Replace the Helium build with ungoogled Chromium for Wayland on arm64 and amd64
+
+- **Area:** Build
+- **Where:** config/inputs.lock (Chromium 153), config/helium.inputs.lock (Helium 0.20.3.1, Chromium 156), config/patches/helium/, scripts/linux_product.py PRODUCTS and PROFILES, scripts/prepare-helium.py, config/profiles/helium-wayland-release.gn
+- **Problem:** Two browser lines track two Chromium versions (153 for ungoogled Chromium, 156 through Helium), and only the Helium line builds the linux/arm64 Wayland desktop that joshuarli/bctl runs. Most of Helium (256 of 346 patches) is branding, UI, settings, services and features that bctl disables or that local patches undo, and its rounded contents cost bctl a render pass per headed frame (bctl BCTL-48). The owner accepted retiring the Helium build on 2026-11-19 and made it the browser-build priority.
+- **Recommendation:** Follow docs/rfc/CHB-21-chromium-replaces-helium.md: advance the chromium product to Chromium 156 or newer with matching ungoogled-chromium, add a chromium-wayland-release profile and the linux/arm64 builder from the Helium product, carry the adblock-rust series, the begin-frame fix and the needed musl patches, qualify the package in bctl, then remove the helium product and re-target its tickets.
+- **Fix with:** none
+- **Effort:** L
+- **Design:** docs/rfc/CHB-21-chromium-replaces-helium.md
+
 ### CHB-2 · P2 · restore the DevTools frontend after the first lean package
 
 - **Area:** Build
@@ -40,6 +50,9 @@ Next: 21
 - **Fix with:** none
 - **Effort:** M
 
+
+
+
 ### CHB-6 · P2 · verify VA-API decode on the Broadwell target
 
 - **Area:** Tests
@@ -48,8 +61,6 @@ Next: 21
 - **Recommendation:** In the owner's dwl session, run `vainfo` and require `VAProfileH264Main`/`VAProfileH264High`, play a local H.264 or VP8 file in the packaged browser, and check `chrome://media-internals` for `VaapiVideoDecoder`. Force H.264 on VP9-only sites rather than treating a software VP9 fallback as failure. If initialization fails, capture the browser log and test `LIBVA_DRIVER_NAME=i965` before changing the build.
 - **Fix with:** CHB-7
 - **Effort:** S
-
-
 
 
 ### CHB-8 · P2 · complete the Helium behavior acceptance matrix
@@ -62,6 +73,8 @@ Next: 21
 - **Effort:** L
 
 
+
+
 ### CHB-9 · P2 · forward-port Helium's native adblock-rust experiment
 
 - **Area:** Build
@@ -70,8 +83,6 @@ Next: 21
 - **Recommendation:** Move the 41 crate downloads and `helium-filters` into `fetch` with lockfile checksums, refresh the three hunks, add the series behind `ENABLE_ADBLOCK` in `prepare-helium.py`, and prove it compiles incrementally on the existing `out/helium-wayland-release` before a full package build. Drop the `ublock_origin` component from the native build so only one engine runs; compare the current uBlock package with the native build, pref on and off (`helium.adblock.enabled`), rather than adding a build-time selector. Add the missing tests (frames and workers, redirects, scriptlets, cosmetic), and decide on WebTransport and CNAME uncloaking before it replaces uBlock. Status (2026-11-10): forward-ported and off by default (`8e21451`); a native `r7` candidate qualifies and blocks in bctl, measured in `docs/helium-adblock-rust.md`. Generic hiding now uses one native stylesheet and no isolated world, which cut the Speedometer cost from about 13 to about 6 percent (pending a quiet rerun). Open: the remaining 6 percent, most likely the per-request async engine hop; about 170 MiB of VM memory for the engine; `about:blank`/`data:` documents are unfiltered, hydrogen's `dev/helium-rootfs.sh` pins the r5 archive by digest, and no profile enables the flag.
 - **Fix with:** none
 - **Effort:** L
-
-
 
 
 ### CHB-10 · P2 · stop exact Alpine package pins from rotting against the live v3.24 repository
