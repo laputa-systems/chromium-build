@@ -22,17 +22,19 @@ directly require glibc, libstdc++, or libgcc. Chromium's in-tree libc++ provides
 the C++ runtime. The audited FFmpeg runtime closure is the only bundled GNU
 runtime exception.
 
-### Helium builder packages
+### Builder packages
 
-The ARM64 and AMD64 package locks record the dependency closure
-on their digest-pinned Alpine 3.24.2 images. Each lock also records
-the URL, byte count and hashes for the exact APK files needed
-beyond that base image.
+The AMD64 Chromium lock and the ARM64 and AMD64 Helium locks record
+the dependency closures for their digest-pinned Alpine 3.24.2 images.
+Each lock includes the URL, byte count, and hashes for the exact APKs
+needed beyond its base image.
 
 `chromium-build image` verifies those archives in its worktree
 cache and passes them to the Docker build. The installation
 runs with networking disabled and an empty APK repository list.
-The installed package manifest must match the owning lock.
+The installed package manifest must match the owning lock. A cold cache
+requires the exact archive URLs to remain available. When upstream removes
+an archive, refresh the closure from the same stable branch.
 
 To refresh the closure, resolve the supported stable branch in
 a disposable container from the same base digest. Capture the

@@ -239,6 +239,7 @@ if [ "$PRODUCT" = helium ]; then
         esac
     done <<< "$resolve_output"
 else
+    PACKAGE_LOCK="$ROOT/config/packages.$ARCH.lock"
     IMAGE=${IMAGE:-ungoogled-chromium-builder:153.0.8010.52-$ARCH}
     WORK_VOLUME=${WORK_VOLUME:-ungoogled-chromium-153-work-$ARCH}
     CACHE_VOLUME=${CACHE_VOLUME:-ungoogled-chromium-153-ccache-$ARCH}
@@ -306,13 +307,15 @@ if [ "$command_name" = image ]; then
         --build-arg PRODUCT="$PRODUCT"
         --build-arg PURE_RUNTIME_JOBS="${JOBS:-}"
     )
+    apk_context=$(NETWORK_MODE=fetch "${CHROMIUM_PYTHON:-python3}" "$ROOT/scripts/fetch-inputs.py" \
+        --lock "$PACKAGE_LOCK" --inputs-root "$ROOT/.work/cache/$PRODUCT-apks" --builder-apks "$ARCH") \
+        || fail "could not stage the locked $PRODUCT builder APKs"
+    image_args+=(
+        --build-context "locked-apks=$apk_context"
+        --build-arg PACKAGE_LOCK="config/$(basename -- "$PACKAGE_LOCK")"
+    )
     if [ "$PRODUCT" = helium ]; then
-        apk_context=$(NETWORK_MODE=fetch "${CHROMIUM_PYTHON:-python3}" "$ROOT/scripts/fetch-inputs.py" \
-            --lock "$PACKAGE_LOCK" --inputs-root "$ROOT/.work/cache/helium-apks" --builder-apks "$ARCH") \
-            || fail 'could not stage the locked Helium APKs'
         image_args+=(
-            --build-context "locked-apks=$apk_context"
-            --build-arg PACKAGE_LOCK="config/$(basename -- "$PACKAGE_LOCK")"
             --build-arg INPUTS_LOCK="config/$(basename -- "$INPUTS_LOCK")"
             --build-arg PATCH_INVENTORY="config/$(basename -- "$PATCH_INVENTORY")"
             --build-arg PATCH_DISPOSITION="config/$(basename -- "$PATCH_DISPOSITION")"
