@@ -7,13 +7,46 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from script_support import ScriptFailure
+
 ROOT = Path(__file__).resolve().parents[1]
 FETCH = runpy.run_path(str(ROOT / "scripts/fetch-inputs.py"))
 FETCH_ONE = FETCH["fetch_one"]
 LOCKED_INPUTS = FETCH["locked_inputs"]
+STAGE_BUILDER_APKS = FETCH["stage_builder_apks"]
 
 
 class FetchInputsTest(unittest.TestCase):
+    def test_builder_context_rechecks_exact_archive_bytes_and_rejects_unlocked_packages(self):
+        package = "openssl-3.5.9-r1"
+        content = b"test package bytes"
+        archive = {
+            "url": f"https://dl-cdn.alpinelinux.org/alpine/v3.24/main/aarch64/{package}.apk",
+            "sha512": hashlib.sha512(content).hexdigest(), "size": len(content),
+        }
+        lock = {"status": "resolved", "architecture": "arm64", "base_release": "3.24.2",
+                "archives": {package: archive}, "resolved": [package]}
+        with tempfile.TemporaryDirectory() as directory:
+            cache = Path(directory)
+            identity = json.dumps(lock["archives"], sort_keys=True, separators=(",", ":"))
+            staged = cache / hashlib.sha256(identity.encode()).hexdigest()
+            staged.mkdir()
+            path = staged / f"{package}.apk"
+            path.write_bytes(content)
+            self.assertEqual(STAGE_BUILDER_APKS(lock, "fixture lock", "arm64", cache), staged)
+
+            path.write_bytes(b"?" * len(content))
+            with self.assertRaisesRegex(ScriptFailure, "SHA-512 mismatch"):
+                STAGE_BUILDER_APKS(lock, "fixture lock", "arm64", cache)
+            path.write_bytes(content)
+            (staged / "extra.apk").touch()
+            with self.assertRaisesRegex(ScriptFailure, "unexpected builder APK"):
+                STAGE_BUILDER_APKS(lock, "fixture lock", "arm64", cache)
+
+        archive["url"] = archive["url"].replace("/v3.24/", "/edge/")
+        with self.assertRaisesRegex(ScriptFailure, "invalid builder APK archive"):
+            STAGE_BUILDER_APKS(lock, "fixture lock", "arm64", cache)
+
     def test_reused_verified_extension_is_readable_by_browser_user(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
