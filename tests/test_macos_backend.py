@@ -114,10 +114,15 @@ class MacOSBackendTests(unittest.TestCase):
             backend.validate_work_root(alias, self.repo)
 
     def test_acceptance_target_uses_the_sibling_shadowdriver_checkout(self):
-        layout = backend.WorkLayout(self.root, self.repo)
+        repository = self.root / "checkout"
+        shadowdriver = self.root / "shadowdriver"
+        (shadowdriver / "tests").mkdir(parents=True)
+        (shadowdriver / "Cargo.toml").touch()
+        (shadowdriver / "tests" / "chromium_acceptance.rs").touch()
+        layout = backend.WorkLayout(repository / ".work" / "macos-arm64", repository)
         manifest, test_source = backend.shadowdriver_acceptance_target(layout)
-        self.assertEqual(manifest, self.repo.parent / "shadowdriver" / "Cargo.toml")
-        self.assertEqual(test_source, self.repo.parent / "shadowdriver" / "tests" / "chromium_acceptance.rs")
+        self.assertEqual(manifest, shadowdriver / "Cargo.toml")
+        self.assertEqual(test_source, shadowdriver / "tests" / "chromium_acceptance.rs")
 
     def test_required_references_use_sibling_checkouts_and_fail_when_missing(self):
         repository = self.root / "checkout"
@@ -313,6 +318,16 @@ class MacOSBackendTests(unittest.TestCase):
         self.assertEqual(selected["root"], str(bundled))
         self.assertEqual(selected["source"], "bundled")
 
+    def fixture_node_toolchain(self):
+        tools = {
+            "node": self.root / "node-bin" / "node",
+            "pnpm": self.root / "pnpm-bin" / "pnpm",
+        }
+        for executable in tools.values():
+            executable.parent.mkdir()
+            executable.touch()
+        return {name: str(executable) for name, executable in tools.items()}
+
     def test_native_stealth_harness_uses_vanilla_node_not_deno(self):
         layout = backend.WorkLayout(self.root, self.repo)
         layout.ensure()
@@ -324,11 +339,12 @@ class MacOSBackendTests(unittest.TestCase):
             "Test Files  1 passed (1)\nTests  1 passed (1)\n", encoding="utf-8"
         )
         fake_manifest = self.repo.parent / "shadowdriver" / "Cargo.toml"
+        toolchain = self.fixture_node_toolchain()
         with mock.patch.object(backend, "isolated_environment", return_value={}), \
              mock.patch.object(backend, "load_lock", return_value={}), \
              mock.patch.object(backend, "shadowdriver_acceptance_target", return_value=(fake_manifest, fake_manifest.parent / "tests" / "chromium_acceptance.rs")), \
              mock.patch.object(backend, "shadowdriver_test_identity", return_value={"revision": "r", "source_sha256": "s"}), \
-             mock.patch.object(backend, "command_path", side_effect=lambda name, env=None: "/opt/homebrew/bin/pnpm" if name == "pnpm" else ("/Users/josh/.local/bin/node" if name == "node" else None)), \
+             mock.patch.object(backend, "command_path", side_effect=lambda name, env=None: toolchain.get(name)), \
              mock.patch.object(backend, "stream_command", return_value=None) as stream, \
              mock.patch.object(backend, "read_json", return_value={"status": "passed", "compatibility_required": True, "observations": [{"mode": name} for name in ["headed-base", "headless-base", "automation-control", "native-automation-control", "native-direct", "native-passive", "native-passive-restart", "native-instrumented"]]}), \
              mock.patch.object(backend, "sha256", return_value="0" * 64):
@@ -342,26 +358,21 @@ class MacOSBackendTests(unittest.TestCase):
         self.assertNotIn(" -- ", f" {command_text} ")
         stealth_env = stream.call_args[1]["env"]
         stealth_path = stealth_env["PATH"].split(os.pathsep)
-        self.assertEqual(stealth_path[0], "/Users/josh/.local/bin")
-        self.assertIn("/opt/homebrew/bin", stealth_path)
+        self.assertEqual(stealth_path[0], str(Path(toolchain["node"]).parent))
+        self.assertIn(str(Path(toolchain["pnpm"]).parent), stealth_path)
         self.assertNotIn("CHROMIUM_SANDBOX_PROFILE", stealth_env)
 
     def test_fetch_acceptance_uses_node_toolchain_without_deno_lock(self):
         layout = backend.WorkLayout(self.root, self.repo)
         layout.ensure()
         lock_without_deno = {"test_inputs": {"ublock_origin": {"filename": "u.x", "url": "https://example.invalid/u.x", "size": 1, "sha512": "a" * 128}}}
-        def fake_path(name, env=None):
-            if name == "pnpm":
-                return "/opt/homebrew/bin/pnpm"
-            if name == "node":
-                return "/Users/josh/.local/bin/node"
-            return None
+        toolchain = self.fixture_node_toolchain()
         with mock.patch.object(backend, "load_lock", return_value=lock_without_deno), \
              mock.patch.object(backend, "shadowdriver_acceptance_target", return_value=(self.root / "Cargo.toml", self.root / "t.rs")), \
              mock.patch.object(backend, "cargo_executable", return_value=self.root / "cargo"), \
              mock.patch.object(backend, "shadowdriver_rust_wrapper", return_value="kache"), \
              mock.patch.object(backend, "stream_command", return_value=None), \
-             mock.patch.object(backend, "command_path", side_effect=fake_path):
+             mock.patch.object(backend, "command_path", side_effect=lambda name, env=None: toolchain.get(name)):
             harness = backend.fetch_acceptance_dependencies(layout, {})
         self.assertEqual(harness["status"], "complete")
         self.assertNotIn("deno", harness)

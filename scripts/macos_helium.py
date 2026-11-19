@@ -10,6 +10,7 @@ from typing import Any
 
 import macos_backend as backend
 
+
 def local_patches(layout: backend.WorkLayout) -> list[str]:
     path = layout.repo_root / "config" / "macos-helium.patch-disposition.json"
     disposition = backend.read_json(path, "macOS Helium patch disposition")

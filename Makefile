@@ -47,7 +47,7 @@ DOCKER ?= docker
 .NOTPARALLEL:
 .PHONY: image fetch prepare gate-a gate-b gate-c gate-d gate-e gate-f gates
 .PHONY: release-linux package install
-.PHONY: bootstrap full-build resume-build build-target stage-runtime test-fast test-functional test-staged cache-stats resume-check graph-breakdown check-py lint test build verify clean
+.PHONY: bootstrap full-build resume-build build-target stage-runtime test-fast test-functional test-staged cache-stats resume-check graph-breakdown check-py lint test test-ci build verify clean
 .PHONY: macos-doctor macos-smoke-preflight macos-update-lock macos-fetch macos-prepare macos-configure macos-cache-stats macos-build macos-stage-runtime macos-test-staged
 
 check-py: lint
@@ -58,7 +58,16 @@ lint:
 	uv run python scripts/sources_lock.py check
 
 test:
-	PYTHONPATH=scripts:tests uv run python -m unittest discover -s tests -p 'test_*.py'
+	mkdir -p .work/tmp
+	TMPDIR="$(CURDIR)/.work/tmp" PYTHONPATH=scripts:tests uv run python tests/run_controller_tests.py $(if $(filter Darwin,$(shell uname -s)),macos,linux)
+
+test-ci:
+	mkdir -p .work/tmp
+	$(DOCKER) run --rm --network=none --entrypoint /bin/sh \
+		--mount type=bind,source="$(CURDIR)",target=/repo,readonly \
+		--tmpfs /repo/.work/tmp:exec -e TMPDIR=/repo/.work/tmp \
+		-e PYTHONPATH=/repo/scripts:/repo/tests "$(IMAGE)" \
+		-c 'cd /repo && python3 tests/run_controller_tests.py linux-builder'
 
 build:
 ifeq ($(PLATFORM),macos)

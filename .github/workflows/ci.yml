@@ -32,3 +32,38 @@ jobs:
       - run: uv python install 3.15
       - name: lint
         run: make lint
+      - name: controller tests
+        run: make test
+  macos-tests:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: 0.13.8
+      - run: uv python install 3.15
+      - run: make test
+  linux-builder-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-26.04-arm
+            arch: arm64
+          - runner: ubuntu-26.04
+            arch: amd64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: CHROMIUM_BUILDER_IMAGE=controller-tests ./chromium-build --product helium --platform linux --arch ${{ matrix.arch }} image
+      - run: make test-ci IMAGE=controller-tests
