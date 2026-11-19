@@ -50,6 +50,7 @@ jobs:
       - run: make test
   linux-builder-tests:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - runner: ubuntu-26.04-arm
