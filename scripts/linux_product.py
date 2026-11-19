@@ -132,7 +132,11 @@ def resolve(product: str, arch: str, profile: str | None = None, root: Path | No
     ) or defaults["work"]
     cache_volume = os.environ.get("CHROMIUM_CACHE_VOLUME") or (
         os.environ.get("HELIUM_CACHE") if product == "helium" else ""
-    ) or CACHE_VOLUMES[product].format(arch=arch)
+    ) or (
+        f"ungoogled-chromium-{chromium_version.split('.')[0]}-ccache-{arch}"
+        if product == "chromium" and profile == "chromium-wayland-release"
+        else CACHE_VOLUMES[product].format(arch=arch)
+    )
     package_lock = root / names["packages"].format(arch=arch)
     return Product(
         name=product,

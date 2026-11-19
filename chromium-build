@@ -219,12 +219,12 @@ case "$ARCH" in
         ;;
 esac
 
-if [ "$PRODUCT" = helium ]; then
+if [ "$PRODUCT" = helium ] || [ "$PROFILE" = chromium-wayland-release ]; then
     python=${CHROMIUM_PYTHON:-python3}
-    command -v "$python" >/dev/null 2>&1 || fail "Helium requires host Python 3 as $python"
+    command -v "$python" >/dev/null 2>&1 || fail "product resolution requires host Python 3 as $python"
     resolve_output=$("$python" "$ROOT/scripts/linux_product.py" \
-        --product helium --arch "$ARCH" --profile "$PROFILE" --root "$ROOT") \
-        || fail 'could not resolve Helium product configuration'
+        --product "$PRODUCT" --arch "$ARCH" --profile "$PROFILE" --root "$ROOT") \
+        || fail "could not resolve $PRODUCT product configuration"
     while IFS=$'\t' read -r key value; do
         case "$key" in
             image) IMAGE=$value ;;
