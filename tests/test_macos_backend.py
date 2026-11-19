@@ -114,10 +114,15 @@ class MacOSBackendTests(unittest.TestCase):
             backend.validate_work_root(alias, self.repo)
 
     def test_acceptance_target_uses_the_sibling_shadowdriver_checkout(self):
-        layout = backend.WorkLayout(self.root, self.repo)
+        repository = self.root / "checkout"
+        shadowdriver = self.root / "shadowdriver"
+        (shadowdriver / "tests").mkdir(parents=True)
+        (shadowdriver / "Cargo.toml").touch()
+        (shadowdriver / "tests" / "chromium_acceptance.rs").touch()
+        layout = backend.WorkLayout(repository / ".work" / "macos-arm64", repository)
         manifest, test_source = backend.shadowdriver_acceptance_target(layout)
-        self.assertEqual(manifest, self.repo.parent / "shadowdriver" / "Cargo.toml")
-        self.assertEqual(test_source, self.repo.parent / "shadowdriver" / "tests" / "chromium_acceptance.rs")
+        self.assertEqual(manifest, shadowdriver / "Cargo.toml")
+        self.assertEqual(test_source, shadowdriver / "tests" / "chromium_acceptance.rs")
 
     def test_required_references_use_sibling_checkouts_and_fail_when_missing(self):
         repository = self.root / "checkout"
