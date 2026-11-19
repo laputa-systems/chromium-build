@@ -7552,6 +7552,39 @@
       "lock": "config/helium.inputs.lock"
     },
     {
+      "name": "linux/architecture_inputs/arm64/esbuild_native",
+      "version": "0.28.2",
+      "url": "https://registry.npmjs.org/@esbuild/linux-arm64/-/linux-arm64-0.28.2.tgz",
+      "sha256": "a96dbfa41d3ef5dbd1ef22b1c10d5187be9267e86093a870f06402a7ec931596",
+      "sha512": "a56e000b43f78adf1cedda3d315338a79d45cc7cdd33f4d9adeaeeae045c1c9d964dad55435088ab5f319dc7e9049c38a23922659aca5b6c8805604ff768fa52",
+      "size": 4283627,
+      "role": "toolchain",
+      "target": "aarch64-unknown-linux-musl",
+      "lock": "config/inputs.lock"
+    },
+    {
+      "name": "linux/architecture_inputs/arm64/rust_toolchain",
+      "version": "1edd55dcfcd573872c727fa3e086369a71661ee0",
+      "url": "https://github.com/laputa-systems/chromium-build/releases/download/rust-toolchain-1edd55dcfcd5-aarch64-linux-musl/rust-toolchain-1edd55dcfcd573872c727fa3e086369a71661ee0-aarch64-linux-musl.tar.xz",
+      "sha256": "78709990ac69e2fbf165bee384aac4ab02c182a52444b42c671df164bcc4294f",
+      "sha512": "c81271746c60ce73a079febf8905eb3cedf9a2692c319c6120d25d755ad24145ebcf1d3ad20c5d061eaac6378c01a6c4376cda36c0286d962e61d3cdcb4fe377",
+      "size": 242825052,
+      "role": "toolchain",
+      "target": "aarch64-unknown-linux-musl",
+      "lock": "config/inputs.lock"
+    },
+    {
+      "name": "linux/architecture_inputs/arm64/typescript_native",
+      "version": "7.0.2",
+      "url": "https://registry.npmjs.org/@typescript/typescript-linux-arm64/-/typescript-linux-arm64-7.0.2.tgz",
+      "sha256": "c83d931ac9dd7549cde6e71246aa9d6a9812843023df3e277fe3b5dcf41dd0ea",
+      "sha512": "421e1e538ff2df20e39df8e3c8f62284c8f9fce0c8966b7e073bb5ece23e7e24910d6e7b4265394a237addec4f44d24f294cdc73520d6b535776b27e32a1e351",
+      "size": 8900516,
+      "role": "toolchain",
+      "target": "aarch64-unknown-linux-musl",
+      "lock": "config/inputs.lock"
+    },
+    {
       "name": "linux/builder_apks/amd64/acl-libs-2.3.2-r1",
       "version": "2.3.2-r1",
       "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/acl-libs-2.3.2-r1.apk",
@@ -10039,11 +10072,11 @@
     },
     {
       "name": "linux/chromium",
-      "version": "153.0.8010.52",
-      "url": "https://github.com/chromium-linux-tarballs/chromium-tarballs/releases/download/153.0.8010.52/chromium-153.0.8010.52-linux.tar.xz",
-      "sha256": "3233497c752d44bf1c6ee654bc85ed506d75638e386309439730f62424c29a1b",
-      "sha512": "144667ff65b4018b9afd911bd9acfa83f8e396b984d03b5b0f5588c46f36989e5d523522b1cfb471d2cef0f29a60b7ea3e7ec21f3cae100ca65835be1c023d17",
-      "size": 1878470976,
+      "version": "156.0.8078.79",
+      "url": "https://tarballs.imput.net/chromium-156.0.8078.79/chromium-156.0.8078.79-base.tar.zst",
+      "sha256": "114d5110f0ac4248434e23cd97c50380dc49c438e6d9657d6b4e6542576c81af",
+      "sha512": "da9336d2e161f9133bdf120136e855a0e4fa0a2bd5d3f236b30187f18731c5d6803aa3f2b78f1510fa9dfc88c779e4f10bf9123b826b28c18ceef97e83cf3c30",
+      "size": 1983333568,
       "role": "source",
       "target": "x86_64-unknown-linux-musl",
       "lock": "config/inputs.lock"
@@ -10071,23 +10104,34 @@
       "lock": "config/inputs.lock"
     },
     {
+      "name": "linux/source_inputs/linux_overlay",
+      "version": "156.0.8078.79",
+      "url": "https://tarballs.imput.net/chromium-156.0.8078.79/chromium-156.0.8078.79-linux-x64.tar.zst",
+      "sha256": "372a08accf4fef2717959b5f06e1da4f6ca991033ce6848cab63c4ebab37e459",
+      "sha512": "47141b7d106929b0e02051bd11ec6327aa819a0995732b4401ba8d2e9f13f8fc99fd4b139b93c4937317e0567838f9fbd383eafc06fd1a51fef57f68a5086d22",
+      "size": 1198388088,
+      "role": "source",
+      "target": "x86_64-unknown-linux-musl",
+      "lock": "config/inputs.lock"
+    },
+    {
       "name": "linux/source_inputs/portablelinux",
-      "version": "effeae1d0728db00ed21cbf603af88e0fc38f97b",
-      "url": "https://github.com/ungoogled-software/ungoogled-chromium-portablelinux/archive/effeae1d0728db00ed21cbf603af88e0fc38f97b.tar.gz",
-      "sha256": "3cebad563abb2f5c9629b844067604b5fac3532d5a28eeff289f835448ab64a7",
-      "sha512": "ac297490b0eaa8a21451508888fb5ea168591e20c7110cf533026a8ab56eca3a29f3dbb177b63e224c3e7e5a1a3f76e9502c366dab24126cde6152efb6a3cc8a",
-      "size": 16799,
+      "version": "6f0aa178c2394fc0a177edc0fd64e41f402a0418",
+      "url": "https://github.com/ungoogled-software/ungoogled-chromium-portablelinux/archive/6f0aa178c2394fc0a177edc0fd64e41f402a0418.tar.gz",
+      "sha256": "fda12f2c45132a360f46ccf1d9e1de84f1786b988ee0a3b4a619418fe1805b38",
+      "sha512": "c5e6477fbf67920983346c553937b4986c60007c5da93ae2b019b8ce7f0ba72a0c7f16f66febf8e6fcadd17e25f2848d47e5775371fbb970f3afecef47c4ea61",
+      "size": 33832,
       "role": "source",
       "target": "x86_64-unknown-linux-musl",
       "lock": "config/inputs.lock"
     },
     {
       "name": "linux/source_inputs/ungoogled",
-      "version": "a638756eb14c8b6ce64b4b2a067afea5d4207bf4",
-      "url": "https://github.com/ungoogled-software/ungoogled-chromium/archive/a638756eb14c8b6ce64b4b2a067afea5d4207bf4.tar.gz",
-      "sha256": "c2f502c6d4a40ebb3cfac12e83676ee1efc47ed59e61a8cc00f1c4cf0577497b",
-      "sha512": "0b0bbeb1d213cc6ae1764ea628ae32fb2762419b4a554f0a4f6ba40d56df103e67ea0972cbbb5f4c0954fd6c22913badc081dcb6ebc87a3152b65f617a854efb",
-      "size": 671665,
+      "version": "28a211ab4ab6b83d919966a4f58a6df23cf4fb29",
+      "url": "https://github.com/ungoogled-software/ungoogled-chromium/archive/28a211ab4ab6b83d919966a4f58a6df23cf4fb29.tar.gz",
+      "sha256": "5dfe5048274e5d35b2881af6f23491609a9d13e5efb608c1db8eb503864a40e4",
+      "sha512": "c76bab2452b95e83e624b52c688babd26bc84016c438ca17d38fbd498cec8db16da96db09e76da1766ef0291a73b7b7091a031ed28107a9ffdab38c191fb1f42",
+      "size": 685920,
       "role": "source",
       "target": "x86_64-unknown-linux-musl",
       "lock": "config/inputs.lock"

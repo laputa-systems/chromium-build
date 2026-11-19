@@ -1,27 +1,28 @@
 {
   "schema": 1,
   "chromium": {
-    "version": "153.0.8010.52",
-    "devtools_revision": "511172b786248e29d7493bf954faa57f834dc5b3",
-    "archive_filename": "chromium-153.0.8010.52-linux.tar.xz",
-    "archive_url": "https://github.com/chromium-linux-tarballs/chromium-tarballs/releases/download/153.0.8010.52/chromium-153.0.8010.52-linux.tar.xz",
-    "archive_size": 1878470976,
-    "archive_sha512": "144667ff65b4018b9afd911bd9acfa83f8e396b984d03b5b0f5588c46f36989e5d523522b1cfb471d2cef0f29a60b7ea3e7ec21f3cae100ca65835be1c023d17"
+    "version": "156.0.8078.79",
+    "devtools_revision": "8c62f844ad8e0664ff41a633bfc17c472f1c5fd6",
+    "archive_filename": "chromium-156.0.8078.79-base.tar.zst",
+    "archive_url": "https://tarballs.imput.net/chromium-156.0.8078.79/chromium-156.0.8078.79-base.tar.zst",
+    "archive_size": 1983333568,
+    "archive_sha512": "da9336d2e161f9133bdf120136e855a0e4fa0a2bd5d3f236b30187f18731c5d6803aa3f2b78f1510fa9dfc88c779e4f10bf9123b826b28c18ceef97e83cf3c30",
+    "upstream_sha256": "114d5110f0ac4248434e23cd97c50380dc49c438e6d9657d6b4e6542576c81af"
   },
   "source_inputs": {
     "ungoogled": {
-      "revision": "a638756eb14c8b6ce64b4b2a067afea5d4207bf4",
-      "filename": "ungoogled-a638756eb14c8b6ce64b4b2a067afea5d4207bf4.tar.gz",
-      "url": "https://github.com/ungoogled-software/ungoogled-chromium/archive/a638756eb14c8b6ce64b4b2a067afea5d4207bf4.tar.gz",
-      "size": 671665,
-      "sha512": "0b0bbeb1d213cc6ae1764ea628ae32fb2762419b4a554f0a4f6ba40d56df103e67ea0972cbbb5f4c0954fd6c22913badc081dcb6ebc87a3152b65f617a854efb"
+      "revision": "28a211ab4ab6b83d919966a4f58a6df23cf4fb29",
+      "filename": "ungoogled-28a211ab4ab6b83d919966a4f58a6df23cf4fb29.tar.gz",
+      "url": "https://github.com/ungoogled-software/ungoogled-chromium/archive/28a211ab4ab6b83d919966a4f58a6df23cf4fb29.tar.gz",
+      "size": 685920,
+      "sha512": "c76bab2452b95e83e624b52c688babd26bc84016c438ca17d38fbd498cec8db16da96db09e76da1766ef0291a73b7b7091a031ed28107a9ffdab38c191fb1f42"
     },
     "portablelinux": {
-      "revision": "effeae1d0728db00ed21cbf603af88e0fc38f97b",
-      "filename": "portablelinux-effeae1d0728db00ed21cbf603af88e0fc38f97b.tar.gz",
-      "url": "https://github.com/ungoogled-software/ungoogled-chromium-portablelinux/archive/effeae1d0728db00ed21cbf603af88e0fc38f97b.tar.gz",
-      "size": 16799,
-      "sha512": "ac297490b0eaa8a21451508888fb5ea168591e20c7110cf533026a8ab56eca3a29f3dbb177b63e224c3e7e5a1a3f76e9502c366dab24126cde6152efb6a3cc8a"
+      "revision": "6f0aa178c2394fc0a177edc0fd64e41f402a0418",
+      "filename": "portablelinux-6f0aa178c2394fc0a177edc0fd64e41f402a0418.tar.gz",
+      "url": "https://github.com/ungoogled-software/ungoogled-chromium-portablelinux/archive/6f0aa178c2394fc0a177edc0fd64e41f402a0418.tar.gz",
+      "size": 33832,
+      "sha512": "c5e6477fbf67920983346c553937b4986c60007c5da93ae2b019b8ce7f0ba72a0c7f16f66febf8e6fcadd17e25f2848d47e5775371fbb970f3afecef47c4ea61"
     },
     "alpine": {
       "revision": "4a3cc589c1e0ad0f7a26b519014e6322e1d5c419",
@@ -36,6 +37,15 @@
       "url": "https://codeberg.org/selfisekai/copium/archive/153.0.tar.gz",
       "size": 30571,
       "sha512": "6f8286defd231a589f4f042019a90595050c08821f8c1cfec843345ef724b4fc7233162f9a6da0857b838fccb8d36961eb28189ff0589abbe19e021dea64aff4"
+    },
+    "linux_overlay": {
+      "revision": "156.0.8078.79",
+      "filename": "chromium-156.0.8078.79-linux-x64.tar.zst",
+      "url": "https://tarballs.imput.net/chromium-156.0.8078.79/chromium-156.0.8078.79-linux-x64.tar.zst",
+      "size": 1198388088,
+      "sha512": "47141b7d106929b0e02051bd11ec6327aa819a0995732b4401ba8d2e9f13f8fc99fd4b139b93c4937317e0567838f9fbd383eafc06fd1a51fef57f68a5086d22",
+      "upstream_sha256": "372a08accf4fef2717959b5f06e1da4f6ca991033ce6848cab63c4ebab37e459",
+      "extract_after": "chromium"
     }
   },
   "test_inputs": {
@@ -49,8 +59,8 @@
   },
   "source_identity": {
     "schema": 1,
-    "chromium_version": "153.0.8010.52",
-    "devtools_revision": "511172b786248e29d7493bf954faa57f834dc5b3"
+    "chromium_version": "156.0.8078.79",
+    "devtools_revision": "8c62f844ad8e0664ff41a633bfc17c472f1c5fd6"
   },
   "build_tools": {
     "ninja": {
@@ -105,9 +115,65 @@
   },
   "system_library_policy": {
     "schema": 1,
-    "ffmpeg_roots": ["libavcodec.so", "libavformat.so", "libavutil.so"],
-    "forbidden_sonames": ["libc.so.6", "libstdc++.so.6", "libgcc_s.so.1"],
-    "builder_only_sonames": ["libstdc++.so.6", "libgcc_s.so.1"],
-    "exception_descendants": ["libavcodec.so", "libavformat.so", "libavutil.so"]
+    "ffmpeg_roots": [
+      "libavcodec.so",
+      "libavformat.so",
+      "libavutil.so"
+    ],
+    "forbidden_sonames": [
+      "libc.so.6",
+      "libstdc++.so.6",
+      "libgcc_s.so.1"
+    ],
+    "builder_only_sonames": [
+      "libstdc++.so.6",
+      "libgcc_s.so.1"
+    ],
+    "exception_descendants": [
+      "libavcodec.so",
+      "libavformat.so",
+      "libavutil.so"
+    ]
+  },
+  "architecture_inputs": {
+    "amd64": {},
+    "arm64": {
+      "rust_toolchain": {
+        "revision": "1edd55dcfcd573872c727fa3e086369a71661ee0",
+        "filename": "rust-toolchain-1edd55dcfcd573872c727fa3e086369a71661ee0-aarch64-linux-musl.tar.xz",
+        "url": "https://github.com/laputa-systems/chromium-build/releases/download/rust-toolchain-1edd55dcfcd5-aarch64-linux-musl/rust-toolchain-1edd55dcfcd573872c727fa3e086369a71661ee0-aarch64-linux-musl.tar.xz",
+        "size": 242825052,
+        "sha512": "c81271746c60ce73a079febf8905eb3cedf9a2692c319c6120d25d755ad24145ebcf1d3ad20c5d061eaac6378c01a6c4376cda36c0286d962e61d3cdcb4fe377",
+        "destination": "third_party/rust-toolchain"
+      },
+      "typescript_native": {
+        "version": "7.0.2",
+        "filename": "typescript-linux-arm64-7.0.2.tgz",
+        "url": "https://registry.npmjs.org/@typescript/typescript-linux-arm64/-/typescript-linux-arm64-7.0.2.tgz",
+        "size": 8900516,
+        "sha512": "421e1e538ff2df20e39df8e3c8f62284c8f9fce0c8966b7e073bb5ece23e7e24910d6e7b4265394a237addec4f44d24f294cdc73520d6b535776b27e32a1e351",
+        "member": "package/lib/tsc",
+        "destination": "third_party/typescript/linux-amd64/src/lib/tsc",
+        "chromium_pin": {
+          "path": "third_party/typescript/linux-amd64/src/package.json",
+          "contains": "\"version\": \"7.0.2\""
+        },
+        "version_output": "Version 7.0.2"
+      },
+      "esbuild_native": {
+        "version": "0.28.2",
+        "filename": "esbuild-linux-arm64-0.28.2.tgz",
+        "url": "https://registry.npmjs.org/@esbuild/linux-arm64/-/linux-arm64-0.28.2.tgz",
+        "size": 4283627,
+        "sha512": "a56e000b43f78adf1cedda3d315338a79d45cc7cdd33f4d9adeaeeae045c1c9d964dad55435088ab5f319dc7e9049c38a23922659aca5b6c8805604ff768fa52",
+        "member": "package/bin/esbuild",
+        "destination": "third_party/devtools-frontend/src/third_party/esbuild/esbuild",
+        "chromium_pin": {
+          "path": "third_party/devtools-frontend/src/DEPS",
+          "contains": "version:3@0.28.2.chromium"
+        },
+        "version_output": "0.28.2"
+      }
+    }
   }
 }
