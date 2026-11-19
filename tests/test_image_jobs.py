@@ -33,7 +33,7 @@ else:
             for options, expected in ((['--jobs', '2'], '2'), ([], '')):
                 result = subprocess.run(['bash', str(ROOT / 'chromium-build'), '--product', 'helium',
                                          '--arch', 'arm64', 'image', *options], env=environment,
-                                        text=True, capture_output=True)
+                                        text=True, capture_output=True, check=False)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 args = json.loads((root / 'args.json').read_text())
                 index = args.index(f'PURE_RUNTIME_JOBS={expected}')
