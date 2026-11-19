@@ -102,6 +102,85 @@ LOCAL_PATCHES = (
     "musl-clang23-omnibox-nodiscard.patch",
 )
 
+DESKTOP_PATCHES = (
+    "gate-e-hermetic-smoke.patch",
+    "desktop-no-devtools-frontend.patch",
+    "desktop-no-dbus.patch",
+    "desktop-no-background-test-dep.patch",
+    "headless-no-web-app-dbus-portal.patch",
+    "headless-global-accelerator-no-dbus-return.patch",
+    "bounded-back-to-back-begin-frames.patch",
+    "musl-no-execinfo-156.patch",
+    "musl-no-mallinfo-156.patch",
+    "musl-mallinfo-function-156.patch",
+    "musl-swiftshader-mallinfo-156.patch",
+    "musl-no-tagging-arm64-156.patch",
+    "musl-no-pvalloc-156.patch",
+    "musl-libsync-decls-156.patch",
+    "musl-libcxx-156.patch",
+    "musl-v8-sandbox-trap-ubsan.patch",
+    "musl-rust-target-156.patch",
+    "headless-no-printing-linux-context.patch",
+    "desktop-no-printing-pref.patch",
+    "headless-no-printing-pdf-helpers.patch",
+    "desktop-pdf-without-printing.patch",
+    "desktop-no-pdf-deps.patch",
+    "desktop-no-printing-deps.patch",
+    "musl-sched-param-initializer.patch",
+    "musl-allocator-cdefs.patch",
+    "musl-allocator-cpp-noexcept.patch",
+    "musl-allocator-libc-noexcept.patch",
+    "musl-perfetto-cmsg-sign-compare.patch",
+    "musl-unix-domain-socket-types.patch",
+    "musl-stack-trace-noexecinfo.patch",
+    "musl-cookie-string-view-iterator.patch",
+    "musl-udp-cmsg-sign-compare.patch",
+    "musl-mojo-cmsg-sign-compare.patch",
+    "musl-mojo-vector-bool-clone.patch",
+    "musl-raw-ref-transparent-const.patch",
+    "musl-private-key-find-iterator.patch",
+    "musl-webrtc-physical-socket.patch",
+    "musl-sandbox-cmsg-sign-compare.patch",
+    "musl-sys-poll-compat-overlay.patch",
+    "musl-fontconfig-no-nls.patch",
+    "musl-fontconfig-random.patch",
+    "musl-expat-hash-salt-2-8.patch",
+    "musl-libsync-no-cdefs.patch",
+    "musl-bindgen-clang22.patch",
+    "musl-crashpad-cmsg.patch",
+    "musl-native-egl-share-group.patch",
+    "musl-native-egl-semaphore-share-group.patch",
+    "musl-gpu-sandbox-tsync.patch",
+    "musl-gpu-sched-affinity-errno.patch",
+    "musl-gpu-sandbox-broker-tsync.patch",
+    "musl-gpu-pwritev2-sandbox.patch",
+    "musl-pwritev2-sandbox.patch",
+    "musl-seccomp-sched-get.patch",
+    "musl-seccomp-membarrier.patch",
+    "musl-seccomp-clone-detached.patch",
+    "musl-clang23-function-view-pointer-bool.patch",
+    "musl-clang23-omnibox-nodiscard.patch",
+    "musl-bindgen-libclang-flags.patch",
+    "musl-fontconfig-strerror-r.patch",
+    "adblock-rust-engine.patch",
+    "adblock-rust-gn.patch",
+    "adblock-buildflags.patch",
+    "adblock-filter-sources.patch",
+    "adblock-engine-bridge.patch",
+    "adblock-core-api.patch",
+    "adblock-engine-lifecycle.patch",
+    "adblock-service.patch",
+    "adblock-service-filtering.patch",
+    "adblock-service-refresh.patch",
+    "adblock-bundled-filters.patch",
+    "adblock-chrome-runtime.patch",
+    "adblock-chrome-network.patch",
+    "adblock-blink-cosmetic-filtering.patch",
+    "adblock-review-fixes.patch",
+    "adblock-native-cosmetic-css.patch",
+    "adblock-offline-desktop.patch",
+)
+
 
 def extract(archive: Path, destination: Path) -> None:
     destination.mkdir(parents=True, exist_ok=True)
@@ -200,35 +279,7 @@ def prepare_chromium(root: Path, work: Path, inputs: Path, metadata: Path, sourc
         ]
         if desktop:
             command.extend(["--native-inputs", str(inputs), "--arch", arch])
-        desktop_patches = (
-            "gate-e-hermetic-smoke.patch",
-            "desktop-no-devtools-frontend.patch",
-            "desktop-no-dbus.patch",
-            "desktop-no-background-test-dep.patch",
-            "headless-no-web-app-dbus-portal.patch",
-            "headless-global-accelerator-no-dbus-return.patch",
-            "bounded-back-to-back-begin-frames.patch",
-            "musl-no-execinfo-156.patch",
-            "musl-no-mallinfo-156.patch",
-            "musl-mallinfo-function-156.patch",
-            "musl-swiftshader-mallinfo-156.patch",
-            "musl-no-tagging-arm64-156.patch",
-            "musl-no-pvalloc-156.patch",
-            "musl-libsync-decls-156.patch",
-            "musl-libcxx-156.patch",
-            "musl-v8-sandbox-trap-ubsan.patch",
-            "musl-rust-target-156.patch",
-            "headless-no-printing-linux-context.patch",
-            "desktop-no-printing-pref.patch",
-            "headless-no-printing-pdf-helpers.patch",
-            "desktop-pdf-without-printing.patch",
-            *json.loads((root / "config/helium.patch-disposition.json").read_text())["local_patches"],
-        )
-        desktop_patches = tuple(name for name in desktop_patches if not name.startswith("adblock-") or name in {p.name for p in (root / "config/patches").glob("adblock-*.patch")}) if desktop else ()
-        if desktop:
-            desktop_patches = tuple(name for name in desktop_patches if name not in ("musl-target-triple.patch", "musl-v8-sanitizer-header.patch", "musl-libsync-cdefs-include.patch", "musl-mallinfo-guard.patch", "musl-swiftshader-llvm-config.patch", "musl-v8-no-execinfo.patch") and (name.startswith(("musl-", "headless-no-printing-", "adblock-")) or name in ("gate-e-hermetic-smoke.patch", "desktop-no-devtools-frontend.patch", "desktop-no-dbus.patch", "desktop-no-background-test-dep.patch", "bounded-back-to-back-begin-frames.patch", "desktop-pdf-without-printing.patch", "desktop-no-printing-pref.patch", "headless-no-web-app-dbus-portal.patch", "headless-global-accelerator-no-dbus-return.patch")))
-            desktop_patches = tuple(dict.fromkeys(desktop_patches)) + ("adblock-offline-desktop.patch",)
-        for patch in desktop_patches if desktop else LOCAL_PATCHES:
+        for patch in DESKTOP_PATCHES if desktop else LOCAL_PATCHES:
             command.extend(["--local-patch", str(root / "config/patches" / patch)])
         run(command)
         source_dir.rename(source)
