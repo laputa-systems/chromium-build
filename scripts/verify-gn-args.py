@@ -58,6 +58,17 @@ HELIUM_PROFILE = "helium-wayland-release"
 CHROMIUM_WAYLAND_PROFILE = "chromium-wayland-release"
 
 
+LEAN_DESKTOP = {
+    "use_alsa": False,
+    "use_vaapi": False,
+    "enable_printing": False,
+    "enable_pdf": False,
+    "enable_screen_ai_service": False,
+    "enable_background_mode": False,
+    "enable_chrome_notifications": False,
+}
+
+
 def helium_expected(args):
     pure_arm64 = args.target_cpu == "arm64"
     return {
@@ -141,8 +152,10 @@ def main():
     args = parser.parse_args()
 
     values = parse_args(args.args)
-    if args.profile in (HELIUM_PROFILE, CHROMIUM_WAYLAND_PROFILE):
+    if args.profile == HELIUM_PROFILE:
         expected = helium_expected(args)
+    elif args.profile == CHROMIUM_WAYLAND_PROFILE:
+        expected = helium_expected(args) | LEAN_DESKTOP
     else:
         expected = {
             "target_os": "linux",

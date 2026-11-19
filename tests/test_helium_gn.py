@@ -197,6 +197,20 @@ class VerifyArgsTest(unittest.TestCase):
             result = self.run_contract(Path(directory), "arm64", "chromium-wayland-release")
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_chromium_wayland_profile_is_the_lean_desktop_on_both_architectures(self):
+        verify_args = load_verify_args()
+        lean = {
+            "use_alsa": False, "use_vaapi": False, "enable_printing": False, "enable_pdf": False,
+            "enable_screen_ai_service": False, "enable_background_mode": False, "enable_chrome_notifications": False,
+        }
+        profile = (ROOT / "config/profiles/chromium-wayland-release.gn").read_text(encoding="utf-8")
+        for name, value in lean.items():
+            self.assertIn(f"{name} = {gn_value(value)}\n", profile)
+        self.assertEqual(verify_args.LEAN_DESKTOP, lean)
+        with tempfile.TemporaryDirectory() as directory:
+            result = self.run_contract(Path(directory), "x64", "chromium-wayland-release")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_helium_profile_matches_the_effective_contract(self):
         with tempfile.TemporaryDirectory() as directory:
             result = self.run_contract(Path(directory), "x64")

@@ -52,14 +52,15 @@ use_libpci = false
 use_system_minigbm = @USE_SYSTEM_MINIGBM@
 
 use_kerberos = false
-use_alsa = @USE_ALSA@
+use_alsa = false
 use_pulseaudio = false
 rtc_use_pipewire = false
 rtc_link_pipewire = false
-use_vaapi = @USE_VAAPI@
+use_vaapi = false
 enable_vulkan = false
 enable_swiftshader = @ENABLE_SWIFTSHADER@
-enable_printing = true
+enable_printing = false
+enable_pdf = false
 use_cups = false
 
 ffmpeg_branding = "Chrome"
@@ -88,3 +89,6 @@ optimize_webui = false
 
 v8_use_metagen_instance_types = false
 enable_native_adblock = true
+enable_screen_ai_service = false
+enable_background_mode = false
+enable_chrome_notifications = false
