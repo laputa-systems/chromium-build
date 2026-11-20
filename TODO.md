@@ -1,5 +1,5 @@
 Prefix: CHB
-Next: 22
+Next: 23
 
 ### CHB-7 · P1 · qualify the Helium package on the owner's Alpine dwl desktop
 
@@ -18,9 +18,6 @@ Next: 22
 - **Recommendation:** Add a Helium patch that stops the back-to-back source spinning on an observer that did not produce a frame: either re-arm that observer only after its pending frame is acknowledged or new damage arrives, or apply a small minimum interval (for example 1 ms) between back-to-back ticks. Keep screenshot and input latency unthrottled, since bctl adopted the unbounded source for those. Build an archive, then A/B it in bctl with `tests/bench/kernel_experiment.py` on warm news open/click and VM CPU, and confirm with a trace that the browser-main `CompositorFrameSinkClient` count drops to native scale.
 - **Fix with:** make-it-fast
 - **Effort:** L
-
-
-
 
 ### CHB-21 · P1 · Replace the Helium build with ungoogled Chromium for Wayland on arm64 and amd64
 
@@ -50,9 +47,6 @@ Next: 22
 - **Fix with:** none
 - **Effort:** M
 
-
-
-
 ### CHB-6 · P2 · verify VA-API decode on the Broadwell target
 
 - **Area:** Tests
@@ -61,7 +55,6 @@ Next: 22
 - **Recommendation:** In the owner's dwl session, run `vainfo` and require `VAProfileH264Main`/`VAProfileH264High`, play a local H.264 or VP8 file in the packaged browser, and check `chrome://media-internals` for `VaapiVideoDecoder`. Force H.264 on VP9-only sites rather than treating a software VP9 fallback as failure. If initialization fails, capture the browser log and test `LIBVA_DRIVER_NAME=i965` before changing the build.
 - **Fix with:** CHB-7
 - **Effort:** S
-
 
 ### CHB-8 · P2 · complete the Helium behavior acceptance matrix
 
@@ -72,9 +65,6 @@ Next: 22
 - **Fix with:** CHB-7
 - **Effort:** L
 
-
-
-
 ### CHB-9 · P2 · forward-port Helium's native adblock-rust experiment
 
 - **Area:** Build
@@ -83,7 +73,6 @@ Next: 22
 - **Recommendation:** Move the 41 crate downloads and `helium-filters` into `fetch` with lockfile checksums, refresh the three hunks, add the series behind `ENABLE_ADBLOCK` in `prepare-helium.py`, and prove it compiles incrementally on the existing `out/helium-wayland-release` before a full package build. Drop the `ublock_origin` component from the native build so only one engine runs; compare the current uBlock package with the native build, pref on and off (`helium.adblock.enabled`), rather than adding a build-time selector. Add the missing tests (frames and workers, redirects, scriptlets, cosmetic), and decide on WebTransport and CNAME uncloaking before it replaces uBlock. Status (2026-11-10): forward-ported and off by default (`8e21451`); a native `r7` candidate qualifies and blocks in bctl, measured in `docs/helium-adblock-rust.md`. Generic hiding now uses one native stylesheet and no isolated world, which cut the Speedometer cost from about 13 to about 6 percent (pending a quiet rerun). Open: the remaining 6 percent, most likely the per-request async engine hop; about 170 MiB of VM memory for the engine; `about:blank`/`data:` documents are unfiltered, hydrogen's `dev/helium-rootfs.sh` pins the r5 archive by digest, and no profile enables the flag.
 - **Fix with:** none
 - **Effort:** L
-
 
 ### CHB-10 · P2 · stop exact Alpine package pins from rotting against the live v3.24 repository
 
@@ -94,7 +83,6 @@ Next: 22
 - **Fix with:** none
 - **Effort:** M
 
-
 ### CHB-5 · P3 · offer accessibility without requiring a session bus
 
 - **Area:** Operability
@@ -103,7 +91,6 @@ Next: 22
 - **Recommendation:** Add an opt-in launch path for accessibility on systems that provide a session bus, or build a non-D-Bus accessibility path. Keep the D-Bus-free default documented.
 - **Fix with:** none
 - **Effort:** M
-
 
 ### CHB-16 · P3 · replace the default HarfBuzz OpenType shaping path with HarfRust
 
@@ -114,7 +101,6 @@ Next: 22
 - **Fix with:** `reference-parity`
 - **Effort:** L
 
-
 ### CHB-18 · P3 · qualify browser payload reductions against required appliance capabilities
 
 - **Area:** Build
@@ -124,7 +110,6 @@ Next: 22
 - **Fix with:** `blast-radius`
 - **Effort:** L
 
-
 ### CHB-20 · P3 · native adblock refreshes its filter catalog from Helium's services at startup
 
 - **Area:** Helium
@@ -133,4 +118,13 @@ Next: 22
 - **Recommendation:** Decide where refreshed lists come from: bundled-only, which disables the remote refresh source, or the upstream list URLs fetched directly. Then default the Helium services prefs accordingly in a local patch, and prove with a net log that a fresh profile makes no request to imput.net.
 - **Fix with:** none
 - **Effort:** S
+
+### CHB-22 · P4 · Hydrogen's allocator is unguarded and alternatives are unmeasured; keep PartitionAlloc unless a workload shows a large win
+
+- **Area:** Browser / Allocator
+- **Where:** config/profiles/chromium-wayland-release.gn; scripts/verify-gn-args.py (LEAN_DESKTOP, helium_expected: no allocator keys); Gate D metadata gn-args.canonical.txt for chromium-wayland-release (use_partition_alloc, use_partition_alloc_as_malloc, use_allocator_shim, enable_backup_ref_ptr_support, use_raw_ptr_backup_ref_impl all true, is_musl true); config/patches/helium/helium-partitionalloc-musl-ifunc.patch
+- **Problem:** Hydrogen builds against musl but does not use musl's malloc: the effective GN args of the first chromium-wayland-release build keep PartitionAlloc-Everywhere with the allocator shim and BackupRefPtr (MiraclePtr) use-after-free mitigation. Nothing asserts this, so a future profile or patch change could silently drop to musl's mallocng and lose BackupRefPtr. Separately, mimalloc 3.7.0 is a credible challenger for ordinary allocations, but replacing PartitionAlloc would lose or weaken BackupRefPtr's protection, and Blink's direct PartitionAlloc use, Oilpan and V8's heaps would be unaffected, so a win must be large and measured on real workloads to justify it.
+- **Recommendation:** Now: add use_partition_alloc_as_malloc, use_allocator_shim and enable_backup_ref_ptr_support = true to the chromium-wayland-release contract in scripts/verify-gn-args.py so Gate D fails if they change. Later, only after BCTL-59 qualifies Hydrogen and only if bctl attributes browser memory or CPU to the general allocator: build three variants from one pinned revision (A production PartitionAlloc; B use_partition_alloc_as_malloc=false and use_allocator_shim=false, musl mallocng for ordinary allocations; C as B with mimalloc 3.7.0 linked or preloaded, confirming actual malloc/free dispatch in browser, zygote and renderer processes, in default and MI_SECURE=CHECKED), compare natively on Linux x86_64 and then in Reactor on bctl's workflow, headed and density benchmarks (workflow time, browser and renderer CPU, p95 action latency, host VM footprint with corrected accounting, retained memory after cycles, renderer churn and stability), and validate sandbox, CDP, adblock and site isolation. Change the default only for a substantial, repeatable per-workload win that justifies giving up BackupRefPtr.
+- **Fix with:** none
+- **Effort:** M
 
