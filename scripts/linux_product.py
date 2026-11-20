@@ -48,6 +48,7 @@ CACHE_VOLUMES = {
 class Desktop:
     name: str
     executable: str
+    launcher: str
     crashpad: str
     desktop_entry: str
     icon: str
@@ -58,9 +59,9 @@ class Desktop:
 
 def desktop(product: str, profile: str) -> Desktop | None:
     if product == "helium" and profile == "helium-wayland-release":
-        return Desktop("helium", "helium", "helium_crashpad_handler", "helium.desktop", "helium.png", "Helium", "helium-fast.html", "config/helium.inputs.lock")
+        return Desktop("helium", "helium", "helium-wrapper", "helium_crashpad_handler", "helium.desktop", "helium.png", "Helium", "helium-fast.html", "config/helium.inputs.lock")
     if product == "chromium" and profile == "chromium-wayland-release":
-        return Desktop("chromium", "chrome", "chrome_crashpad_handler", "chromium.desktop", "chromium.png", "Chrome", "desktop-fast.html", "config/inputs.lock")
+        return Desktop("chromium", "chrome", "chromium", "chrome_crashpad_handler", "chromium.desktop", "chromium.png", "Chrome", "desktop-fast.html", "config/inputs.lock")
     return None
 
 

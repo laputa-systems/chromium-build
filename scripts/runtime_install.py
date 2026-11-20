@@ -17,6 +17,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
+import linux_product
 import linux_runtime
 
 
@@ -59,14 +60,29 @@ def sidecar_digest(archive: Path) -> str:
     return actual
 
 
+def desktop_for(product: object) -> linux_product.Desktop:
+    if not isinstance(product, str):
+        raise InstallError(f"unsupported desktop product: {product!r}")
+    desktop = linux_product.desktop(product, f"{product}-wayland-release")
+    if desktop is None:
+        raise InstallError(f"unsupported desktop product: {product!r}")
+    return desktop
+
+
+def archive_product(archive: Path, desktop: linux_product.Desktop) -> None:
+    if not archive.name.startswith(f"{desktop.name}-"):
+        archive_name = archive.name.split("-", 1)[0]
+        raise InstallError(f"archive is not {desktop.name}; acceptance is for {desktop.name!r}, not {archive_name}")
+
+
 def acceptance(archive: Path, archive_digest: str) -> dict:
     path = archive.with_name(archive.name + ".acceptance.json")
     require_regular_file(path, "archive acceptance sidecar")
     report = json.loads(path.read_text(encoding="utf-8"))
     if report.get("schema") != 1 or report.get("status") != "complete":
         raise InstallError("archive acceptance report is incomplete or has an unsupported schema")
-    if report.get("product") != "helium":
-        raise InstallError(f"archive acceptance is for {report.get('product')!r}, not helium")
+    desktop = desktop_for(report.get("product"))
+    archive_product(archive, desktop)
     if report.get("archive_sha256") != archive_digest:
         raise InstallError("archive acceptance does not bind this archive digest")
     if report.get("archive") not in (None, archive.name):
@@ -107,14 +123,16 @@ def manifest_for(root: Path, report: dict, archive: Path) -> dict:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if manifest.get("schema") != 1 or manifest.get("status") != "complete":
         raise InstallError("package manifest is incomplete or has an unsupported schema")
-    if manifest.get("product") != "helium":
-        raise InstallError(f"package manifest is for {manifest.get('product')!r}, not helium")
+    desktop = desktop_for(report.get("product"))
+    archive_product(archive, desktop)
+    if manifest.get("product") != desktop.name:
+        raise InstallError("package manifest product does not match the acceptance report")
     if manifest.get("product_version") != report["product_version"]:
         raise InstallError("package manifest version does not match the acceptance report")
     if manifest.get("architecture") != report["architecture"]:
         raise InstallError("package manifest architecture does not match the acceptance report")
-    if manifest.get("launcher") != "helium-wrapper" or manifest.get("executable") != "helium":
-        raise InstallError("package manifest has the wrong Helium entry points")
+    if manifest.get("launcher") != desktop.launcher or manifest.get("executable") != desktop.executable:
+        raise InstallError(f"package manifest has the wrong {desktop.name.capitalize()} entry points")
     entries = manifest.get("files")
     if not isinstance(entries, list) or not entries:
         raise InstallError("package manifest has no files")
@@ -130,7 +148,7 @@ def manifest_for(root: Path, report: dict, archive: Path) -> dict:
         require_regular_file(path, f"package file {relative}")
         if digest(path) != entry.get("sha256"):
             raise InstallError(f"package file digest does not match: {relative}")
-    for required in ("helium", "helium-wrapper", "package-manifest.json"):
+    for required in (desktop.executable, desktop.launcher, "package-manifest.json"):
         if required != "package-manifest.json" and required not in names:
             raise InstallError(f"package manifest does not list {required}")
     actual = set()
@@ -213,10 +231,10 @@ def validate_previous(path: Path, versions: Path) -> None:
         raise InstallError(f"previous slot is not a managed symlink: {path}")
 
 
-def validate_launcher(path: Path, prefix: Path) -> None:
+def validate_launcher(path: Path, prefix: Path, launcher: str = "helium-wrapper") -> None:
     if path.is_symlink():
         target = path.resolve()
-        expected = (prefix / "helium-wrapper").resolve()
+        expected = (prefix / launcher).resolve()
         if target != expected:
             raise InstallError(f"launcher points to a foreign target: {path} -> {target}")
     elif path.exists():
@@ -277,15 +295,16 @@ def install(archive: Path, prefix: Path, bin_dir: Path, home: Path, probe_comman
         if not directory.exists():
             directory.mkdir(parents=True, mode=0o755)
     validate_parent(prefix, "prefix")
-    validate_parent(bin_dir / "helium", "launcher")
     versions = Path(str(prefix) + ".versions")
     validate_managed_directory(versions, "versions directory")
     validate_previous(Path(str(prefix) + ".previous"), versions)
     validate_prefix(prefix)
-    validate_launcher(bin_dir / "helium", prefix)
     if not (prefix.is_symlink() or not prefix.exists()):
         raise InstallError(f"prefix is not a managed installation: {prefix}")
     with verified_archive(archive) as (package, source):
+        desktop = desktop_for(package.manifest["product"])
+        validate_parent(bin_dir / desktop.name, "launcher")
+        validate_launcher(bin_dir / desktop.name, prefix, desktop.launcher)
         slot_name = f"{package.version}-{package.digest[:12]}"
         versions = Path(str(prefix) + ".versions")
         versions.mkdir(mode=0o755, exist_ok=True)
@@ -306,7 +325,7 @@ def install(archive: Path, prefix: Path, bin_dir: Path, home: Path, probe_comman
                     raise InstallError(f"installed file digest does not match: {entry['path']}")
             os.replace(temporary, slot)
         try:
-            probe(slot / "helium-wrapper", home / ".install-probe", os.environ, probe_command)
+            probe(slot / desktop.launcher, home / ".install-probe", os.environ, probe_command)
         except BaseException:
             if created_slot:
                 remove_owned(slot)
@@ -315,10 +334,10 @@ def install(archive: Path, prefix: Path, bin_dir: Path, home: Path, probe_comman
         old_target = prefix.resolve() if prefix.is_symlink() else None
         if old_target is not None and old_target != slot:
             symlink_atomic(old_target, previous)
-        launcher = bin_dir / "helium"
+        launcher = bin_dir / desktop.name
         old_launcher = launcher.resolve() if launcher.is_symlink() else None
         symlink_atomic(slot, prefix)
-        symlink_atomic(prefix / "helium-wrapper", launcher)
+        symlink_atomic(prefix / desktop.launcher, launcher)
         try:
             probe(launcher, home / ".install-probe-final", os.environ, probe_command)
         except BaseException:
@@ -348,16 +367,18 @@ def rollback(prefix: Path, bin_dir: Path, home: Path, probe_command: Path | None
     if not previous_target.is_dir() or not previous_target.is_relative_to(versions) or not owned(previous_target, os.geteuid()):
         raise InstallError(f"previous slot is not an owned version: {previous_target}")
     current = prefix.resolve() if prefix.is_symlink() else None
-    validate_launcher(bin_dir / "helium", prefix)
+    manifest = json.loads((previous_target / "package-manifest.json").read_text(encoding="utf-8"))
+    desktop = desktop_for(manifest.get("product"))
+    validate_launcher(bin_dir / desktop.name, prefix, desktop.launcher)
     symlink_atomic(previous_target, prefix)
-    launcher = bin_dir / "helium"
-    symlink_atomic(prefix / "helium-wrapper", launcher)
+    launcher = bin_dir / desktop.name
+    symlink_atomic(prefix / desktop.launcher, launcher)
     try:
         probe(launcher, home / ".rollback-probe", os.environ, probe_command)
     except BaseException:
         if current is not None:
             symlink_atomic(current, prefix)
-        symlink_atomic(prefix / "helium-wrapper", launcher)
+        symlink_atomic(prefix / desktop.launcher, launcher)
         raise
     if current is not None and current != previous_target:
         symlink_atomic(current, previous)
@@ -397,7 +418,9 @@ def main() -> int:
         if not args.rollback and args.archive is None:
             raise InstallError("--archive is required unless --rollback is selected")
         home = args.home
-        prefix = args.prefix or home / ".local/opt/helium-wayland-release"
+        product = acceptance(args.archive, sidecar_digest(args.archive))["product"] if args.archive else os.environ.get("CHROMIUM_PRODUCT", "helium")
+        desktop = desktop_for(product)
+        prefix = args.prefix or home / f".local/opt/{desktop.name}-wayland-release"
         bin_dir = args.bin_dir or home / ".local/bin"
         if args.rollback:
             rollback(prefix, bin_dir, home, args.probe)
