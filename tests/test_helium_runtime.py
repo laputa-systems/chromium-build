@@ -400,6 +400,7 @@ class PackageTests(unittest.TestCase):
     def test_archive_name_and_launcher_contract(self):
         self.assertEqual(PACKAGE["archive_name"]("0.20.3.1", 2), "helium-0.20.3.1-r2-linux-x86_64-musl")
         self.assertEqual(PACKAGE["archive_name"]("0.20.3.1", 2, "arm64"), "helium-0.20.3.1-r2-linux-aarch64-musl")
+        self.assertEqual(PACKAGE["archive_name"]("156.0.8078.79", 1, "arm64", "chromium"), "chromium-156.0.8078.79-r1-linux-aarch64-musl")
         launcher = PACKAGE["HELIUM_LAUNCHER"]
         self.assertIn('exec "$root/helium" "$@"', launcher)
         self.assertIn('LD_LIBRARY_PATH="$root/lib', launcher)

@@ -198,9 +198,9 @@ def product_identity() -> tuple[str, int, str]:
     return product.product_version, revision, product.arch
 
 
-def archive_name(version: str, revision: int, architecture: str = "amd64") -> str:
+def archive_name(version: str, revision: int, architecture: str = "amd64", product: str = "helium") -> str:
     linux_arch = {"amd64": "x86_64", "arm64": "aarch64"}.get(architecture, architecture)
-    return f"helium-{version}-r{revision}-linux-{linux_arch}-musl"
+    return f"{product}-{version}-r{revision}-linux-{linux_arch}-musl"
 
 
 def archive_package(
@@ -260,7 +260,8 @@ def package_helium(stage: Path, output: Path, artifacts: Path, desktop: linux_pr
         version, revision, architecture = product_identity()
     else:
         product = linux_product.resolve(desktop.name, os.environ.get("CHROMIUM_ARCH", "amd64"), "chromium-wayland-release")
-        version, revision, architecture = product.chromium_version, None, product.arch
+        revision = json.loads(product.inputs_lock.read_text(encoding="utf-8"))["chromium"]["package_revision"]
+        version, architecture = product.chromium_version, product.arch
     manifest = stage_manifest(stage, "helium" if desktop.name == "helium" else "chromium-desktop")
     launcher_name = "helium-wrapper" if desktop.name == "helium" else "chromium"
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -312,14 +313,13 @@ def package_helium(stage: Path, output: Path, artifacts: Path, desktop: linux_pr
             ],
         }
         (temporary / "package-manifest.json").write_text(json.dumps(packaged, indent=2) + "\n", encoding="utf-8")
-        if revision is not None:
-            archive_root = archive_name(version, revision, architecture)
-            archive, checksum = archive_package(
-                temporary,
-                archive_root,
-                artifacts,
-                lambda path: verify_archive(path, archive_root, packaged),
-            )
+        archive_root = archive_name(version, revision, architecture, desktop.name)
+        archive, checksum = archive_package(
+            temporary,
+            archive_root,
+            artifacts,
+            lambda path: verify_archive(path, archive_root, packaged),
+        )
         if output.exists():
             shutil.rmtree(output)
         os.replace(temporary, output)
@@ -327,8 +327,7 @@ def package_helium(stage: Path, output: Path, artifacts: Path, desktop: linux_pr
         shutil.rmtree(temporary, ignore_errors=True)
         raise
     print(f"package: {len(packaged['bundled_libraries'])} libraries and {len(files)} files at {output}")
-    if revision is not None:
-        print(f"package: {archive} ({checksum})")
+    print(f"package: {archive} ({checksum})")
 
 
 def main() -> None:
