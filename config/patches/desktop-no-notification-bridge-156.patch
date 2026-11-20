@@ -1,0 +1,60 @@
+--- a/chrome/browser/notifications/notification_platform_bridge_delegator.cc
++++ b/chrome/browser/notifications/notification_platform_bridge_delegator.cc
+@@ -12,6 +12,7 @@
+ #include "base/check.h"
+ #include "base/functional/bind.h"
+ #include "base/metrics/histogram_functions.h"
++#include "base/task/sequenced_task_runner.h"
+ #include "build/build_config.h"
+ #include "build/buildflag.h"
+ #include "chrome/browser/browser_process.h"
+@@ -117,7 +118,9 @@
+     const message_center::Notification& notification,
+     std::unique_ptr<NotificationCommon::Metadata> metadata) {
+   NotificationPlatformBridge* bridge = GetBridgeForType(notification_type);
+-  DCHECK(bridge);
++  if (!bridge) {
++    return;
++  }
+   bridge->Display(notification_type, profile_, notification,
+                   std::move(metadata));
+ }
+@@ -126,7 +129,9 @@
+     NotificationHandler::Type notification_type,
+     const std::string& notification_id) {
+   NotificationPlatformBridge* bridge = GetBridgeForType(notification_type);
+-  DCHECK(bridge);
++  if (!bridge) {
++    return;
++  }
+   bridge->Close(profile_, notification_id);
+ }
+ 
+@@ -137,7 +142,12 @@
+   // there would be only one bridge to query from.
+   NotificationPlatformBridge* bridge =
+       system_bridge_ ? system_bridge_.get() : message_center_bridge_.get();
+-  DCHECK(bridge);
++  if (!bridge) {
++    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
++        FROM_HERE, base::BindOnce(std::move(callback), std::set<std::string>(),
++                                  /*supports_synchronization=*/false));
++    return;
++  }
+   bridge->GetDisplayed(profile_, std::move(callback));
+ }
+ 
+@@ -149,7 +159,12 @@
+   // there would be only one bridge to query from.
+   NotificationPlatformBridge* bridge =
+       system_bridge_ ? system_bridge_.get() : message_center_bridge_.get();
+-  DCHECK(bridge);
++  if (!bridge) {
++    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
++        FROM_HERE, base::BindOnce(std::move(callback), std::set<std::string>(),
++                                  /*supports_synchronization=*/false));
++    return;
++  }
+   bridge->GetDisplayedForOrigin(profile_, origin, std::move(callback));
+ }
+ 
