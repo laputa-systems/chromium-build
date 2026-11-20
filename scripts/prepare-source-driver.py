@@ -126,6 +126,7 @@ DESKTOP_PATCHES = (
     "desktop-no-pdf-browser-ui-156.patch",
     "desktop-no-notification-bridge-156.patch",
     "helium/helium-devtools-policy-prefs.patch",
+    "helium/helium-hid-without-platform-backend.patch",
     "headless-no-printing-linux-context.patch",
     "desktop-no-printing-pref.patch",
     "headless-no-printing-pdf-helpers.patch",
