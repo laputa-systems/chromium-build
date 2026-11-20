@@ -13,6 +13,11 @@ bctl qualifies the new package, the `helium` product, its locks, its builder
 and its documentation are removed. Helium itself stays an end-user browser,
 used from upstream releases.
 
+The owner calls the new browser **Hydrogen**. The name is for prose only: the
+product id stays `chromium`, the executable stays `chrome`, and the browser
+keeps Chromium's branding. bctl's kernel, formerly called Hydrogen, is now
+Reactor.
+
 ## Motivation
 
 Two lines track two Chromium versions. `config/inputs.lock` pins Chromium
@@ -55,13 +60,31 @@ an appliance, and it is a thin series built to follow each Chromium release.
   `config/profiles/helium-wayland-release.gn` without Helium's arguments: Ozone
   Wayland only, musl, ThinLTO with PGO phase 2, no D-Bus, and the hermetic
   smoke target.
+  linux/amd64 serves bctl's Linux x86_64 appliance; linux/arm64 serves the
+  macOS appliance and is built first.
 - **linux/arm64 joins the `chromium` product.** The `helium` product already
   proves an aarch64 musl builder with a pinned Rust, Crubit and bindgen
   toolchain under `architecture_inputs.arm64`. Move that builder, its inputs
   and its pure-runtime build into the `chromium` product unchanged.
-- **macOS** stays on its native backend and uses the same Chromium and
-  ungoogled-chromium revisions, so bctl's native control is a same-build
-  browser rather than stock Chromium.app.
+- **macOS:** the owner deferred a macOS Hydrogen build on 2026-11-19. The macOS
+  backend keeps its current revision until then. The amd64 Hydrogen build
+  runs on the threadripper Linux x86_64 host, which can also run it natively
+  as bctl's same-build control.
+
+### A lean appliance profile
+
+The owner chose to build the lean profile directly, without a parity build. The
+first Hydrogen package is therefore compared with Helium r9 as one change:
+Helium removed and the following cut. Beyond what Helium already left out,
+`chromium-wayland-release` builds without printing (`enable_printing`, which
+also removes `Page.printToPDF`), the PDF viewer (`enable_pdf`), ALSA output,
+VA-API, the Screen AI service, background mode and native notifications. It
+also drops the DevTools frontend; raw CDP is unaffected. Packaging keeps only
+the en-US UI locale. Spellcheck is derived from `use_blink` and cannot be
+removed through GN, and `optimize_webui` stays off until its minifier toolchain
+is qualified on arm64 musl. VA-API returns with one GN flag if a guest ever
+exposes a hardware video decoder. GPU acceleration in the VM would come through
+virtio-gpu (Venus or virgl), not VA-API.
 
 ### Chromium revision
 
@@ -123,8 +146,8 @@ Re-target or close the Helium tickets:
 - **CHB-9** and **CHB-20** (adblock) carry over with the renamed pref and
   locked filter sources.
 - **CHB-11** carries over with its patch.
-- **CHB-7** (the owner's Alpine dwl desktop) depends on the open question
-  below.
+- **CHB-7** (the owner's Alpine dwl desktop) and the desktop-only CHB-3, CHB-5
+  and CHB-6 are closed: the owner dropped that target on 2026-11-19.
 
 ## Alternatives considered
 
@@ -140,13 +163,9 @@ Re-target or close the Helium tickets:
 
 ## Open questions
 
-1. **The Alpine dwl desktop.** Upstream Helium ships only glibc Linux builds,
-   and CHB-7 qualifies this repository's musl Helium package on that machine.
-   Should the new Chromium Wayland package replace Helium there, or does that
-   machine keep a Helium build?
-2. **Helium-core privacy patches.** Which, if any, does acceptance show bctl
+1. **Helium-core privacy patches.** Which, if any, does acceptance show bctl
    needs? Decide by the outbound-traffic audit and the behavior matrix.
-3. **The adblock pref and filter source.** What names and locked filter-list
+2. **The adblock pref and filter source.** What names and locked filter-list
    inputs replace `helium.adblock.enabled` and Helium's filter services?
 
 ## Decision
