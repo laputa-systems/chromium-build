@@ -139,13 +139,18 @@ def make_archive(
     extra: dict[str, bytes] | None = None,
     symlink: str | None = None,
 ) -> Path:
-    root_name = f"helium-{version}-linux-{HOST_LINUX_ARCH}-musl"
+    desktop_name = "chromium" if product == "chromium" else "helium"
+    executable = "chrome" if desktop_name == "chromium" else "helium"
+    launcher = "chromium" if desktop_name == "chromium" else "helium-wrapper"
+    arch_name = {"amd64": "x86_64", "arm64": "aarch64"}.get(HOST_ARCH, HOST_LINUX_ARCH)
+    revision = "-r1" if desktop_name == "chromium" else ""
+    root_name = f"{desktop_name}-{version}{revision}-linux-{arch_name}-musl"
     payload = root / root_name
     payload.mkdir(parents=True)
-    (payload / "helium").write_bytes(Path("/bin/true").read_bytes())
-    (payload / "helium").chmod(0o755)
-    (payload / "helium-wrapper").write_text("#!/bin/sh\nprintf 'Helium 0.20.3.1\\n'\n", encoding="utf-8")
-    (payload / "helium-wrapper").chmod(0o755)
+    (payload / executable).write_bytes(b"#!/bin/sh\nexit 0\n")
+    (payload / executable).chmod(0o755)
+    (payload / launcher).write_text("#!/bin/sh\nprintf 'Helium 0.20.3.1\\n'\n", encoding="utf-8")
+    (payload / launcher).chmod(0o755)
     (payload / "helium.desktop").write_text("[Desktop Entry]\nName=Helium\n", encoding="utf-8")
     for name, content in (extra or {}).items():
         target = payload / name
@@ -170,14 +175,14 @@ def make_archive(
         "product": product,
         "product_version": version,
         "architecture": HOST_ARCH,
-        "launcher": "helium-wrapper",
-        "executable": "helium",
+        "launcher": launcher,
+        "executable": executable,
         "files": files,
     }
     if include_manifest:
         (payload / "package-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     if corrupt_file:
-        (payload / "helium").write_bytes(b"corrupt")
+        (payload / executable).write_bytes(b"corrupt")
     archive = root / f"{root_name}.tar.xz"
     with tarfile.open(archive, "w:xz") as bundle:
         bundle.add(payload, arcname=root_name)
@@ -400,6 +405,7 @@ class PackageTests(unittest.TestCase):
     def test_archive_name_and_launcher_contract(self):
         self.assertEqual(PACKAGE["archive_name"]("0.20.3.1", 2), "helium-0.20.3.1-r2-linux-x86_64-musl")
         self.assertEqual(PACKAGE["archive_name"]("0.20.3.1", 2, "arm64"), "helium-0.20.3.1-r2-linux-aarch64-musl")
+        self.assertEqual(PACKAGE["archive_name"]("156.0.8078.79", 1, "arm64", "chromium"), "chromium-156.0.8078.79-r1-linux-aarch64-musl")
         launcher = PACKAGE["HELIUM_LAUNCHER"]
         self.assertIn('exec "$root/helium" "$@"', launcher)
         self.assertIn('LD_LIBRARY_PATH="$root/lib', launcher)

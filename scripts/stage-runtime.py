@@ -12,6 +12,7 @@ import subprocess
 import tempfile
 from pathlib import Path, PurePosixPath
 
+import linux_product
 import linux_runtime
 
 DESKTOP_ENTRY = """[Desktop Entry]
@@ -263,7 +264,7 @@ def system_seeds(architecture: str) -> tuple[str, ...]:
     return NSS_SEEDS + MESA_SEEDS
 
 
-def copy_system_closure(stage: Path, architecture: str) -> list[str]:
+def copy_system_closure(stage: Path, architecture: str, executable: str = "helium") -> list[str]:
     directories = (Path("/usr/lib"), Path("/lib"))
     seeds = []
     for name in system_seeds(architecture):
@@ -277,7 +278,7 @@ def copy_system_closure(stage: Path, architecture: str) -> list[str]:
         dri_root = Path("/usr/lib/dri")
         if dri_root.is_dir():
             seeds.extend(sorted(dri_root.rglob("*_dri.so")))
-    browser = linux_runtime.inspect_elf(stage / "helium", stage)
+    browser = linux_runtime.inspect_elf(stage / executable, stage)
     for needed in browser.needed:
         if needed in linux_runtime.MUSL_LIBRARIES:
             continue
@@ -324,15 +325,21 @@ def collect_helium_files(
     chrome: Path,
     runtime_deps: Path,
     source_root: Path,
+    desktop: linux_product.Desktop | None = None,
 ) -> tuple[dict[PurePosixPath, Path], dict[PurePosixPath, str], list[dict[str, str]]]:
+    desktop = desktop or linux_product.desktop("helium", "helium-wayland-release")
+    assert desktop is not None
     out = chrome.parent
     files: dict[PurePosixPath, Path] = {}
     generated: dict[PurePosixPath, str] = {}
     omitted = [dict(entry) for entry in EXCLUDED_UPSTREAM]
     allowed = (out,)
     for relative in linux_runtime.read_runtime_deps(runtime_deps):
+        if desktop.name == "chromium" and relative.parts[0] == "locales" and relative.name != "en-US.pak":
+            continue
         add_file(files, relative, out / relative, allowed)
-    for name in HELIUM_REQUIRED:
+    required = (desktop.executable, desktop.crashpad, *HELIUM_REQUIRED[2:])
+    for name in required:
         add_file(files, PurePosixPath(name), out / name, allowed)
     for name in HELIUM_OPTIONAL:
         if (out / name).is_file():
@@ -344,6 +351,8 @@ def collect_helium_files(
     if not any(path.name == "en-US.pak" for path in locales):
         raise RuntimeError("the generated runtime has no locales/en-US.pak")
     for locale in locales:
+        if desktop.name == "chromium" and locale.name != "en-US.pak":
+            continue
         add_file(files, PurePosixPath("locales") / locale.name, locale, allowed)
     snapshots = [name for name in ("v8_context_snapshot.bin", "snapshot_blob.bin") if (out / name).is_file()]
     if not snapshots:
@@ -351,15 +360,17 @@ def collect_helium_files(
     icon = source_root / "chrome/app/theme/chromium/linux/product_logo_256.png"
     if not icon.is_file():
         raise RuntimeError(f"missing branding icon: {icon}")
-    add_file(files, PurePosixPath("helium.png"), icon, (source_root,))
-    generated[PurePosixPath("helium.desktop")] = DESKTOP_ENTRY
+    add_file(files, PurePosixPath(desktop.icon), icon, (source_root,))
+    generated[PurePosixPath(desktop.desktop_entry)] = DESKTOP_ENTRY if desktop.name == "helium" else DESKTOP_ENTRY.replace("Helium", "Chromium").replace("helium", "chromium")
     return files, generated, omitted
 
 
-def stage_helium(chrome: Path, output: Path, runtime_deps: Path, source_root: Path) -> None:
+def stage_helium(chrome: Path, output: Path, runtime_deps: Path, source_root: Path, desktop: linux_product.Desktop | None = None) -> None:
+    desktop = desktop or linux_product.desktop("helium", "helium-wayland-release")
+    assert desktop is not None
     architecture = os.environ.get("CHROMIUM_ARCH", "amd64")
     ensure_runtime_deps(chrome, runtime_deps)
-    files, generated, omitted = collect_helium_files(chrome, runtime_deps, source_root)
+    files, generated, omitted = collect_helium_files(chrome, runtime_deps, source_root, desktop)
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = Path(tempfile.mkdtemp(prefix=f".{output.name}.", dir=output.parent))
     try:
@@ -372,10 +383,10 @@ def stage_helium(chrome: Path, output: Path, runtime_deps: Path, source_root: Pa
             target = temporary / destination
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content, encoding="utf-8")
-        libraries = copy_system_closure(temporary, architecture)
-        browser = linux_runtime.inspect_elf(temporary / "helium", temporary)
+        libraries = copy_system_closure(temporary, architecture, desktop.executable)
+        browser = linux_runtime.inspect_elf(temporary / desktop.executable, temporary)
         if browser.interpreter != linux_runtime.MUSL_INTERPRETERS[architecture]:
-            raise RuntimeError(f"helium uses the wrong ELF interpreter: {browser.interpreter}")
+            raise RuntimeError(f"{desktop.executable} uses the wrong ELF interpreter: {browser.interpreter}")
         audit = linux_runtime.audit_tree(
             temporary,
             architecture,
@@ -386,7 +397,7 @@ def stage_helium(chrome: Path, output: Path, runtime_deps: Path, source_root: Pa
                 path.chmod(0o755)
             elif path.name == "chrome_sandbox":
                 path.chmod(0o4755)
-            elif linux_runtime.is_elf(path) or path.name == "helium.desktop":
+            elif linux_runtime.is_elf(path) or path.name == desktop.desktop_entry:
                 path.chmod(0o755)
             else:
                 path.chmod(0o644)
@@ -394,8 +405,8 @@ def stage_helium(chrome: Path, output: Path, runtime_deps: Path, source_root: Pa
         manifest = {
             "schema": 1,
             "status": "complete",
-            "product": "helium",
-            "chrome": "helium",
+            "product": desktop.name,
+            "chrome": desktop.executable,
             "source": str(chrome),
             "runtime_deps": str(runtime_deps),
             "elf": {"interpreter": browser.interpreter, "needed": list(browser.needed)},
@@ -430,9 +441,11 @@ def main() -> None:
     parser.add_argument("--runtime-deps", type=Path)
     parser.add_argument("--source-root", type=Path)
     args = parser.parse_args()
-    if args.product == "helium":
+    profile = os.environ.get("CHROMIUM_PROFILE", linux_product.DEFAULT_PROFILES[args.product])
+    desktop = linux_product.desktop(args.product, profile)
+    if desktop:
         runtime_deps = args.runtime_deps or args.chrome.parent / f"{args.chrome.name}.runtime_deps"
-        stage_helium(args.chrome, args.output, runtime_deps, find_source_root(args.chrome, args.source_root))
+        stage_helium(args.chrome, args.output, runtime_deps, find_source_root(args.chrome, args.source_root), desktop)
     else:
         stage_chromium(args.chrome, args.output)
 

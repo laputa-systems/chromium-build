@@ -135,7 +135,7 @@ class VerifyArgsTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("GN arg", result.stderr)
 
-    def run_contract(self, root: Path, target_cpu: str) -> subprocess.CompletedProcess[str]:
+    def run_contract(self, root: Path, target_cpu: str, profile: str = "helium-wayland-release") -> subprocess.CompletedProcess[str]:
         verify_args = load_verify_args()
         args_file = root / f"{target_cpu}-args.gn"
         probe = root / f"{target_cpu}-probe.json"
@@ -144,7 +144,7 @@ class VerifyArgsTest(unittest.TestCase):
                 sys.executable,
                 str(GENERATE_ARGS),
                 "--source-root", str(ROOT),
-                "--profile", str(HELIUM_PROFILE),
+                "--profile", str(ROOT / "config/profiles" / f"{profile}.gn"),
                 "--target-cpu", target_cpu,
                 "--clang-major", "24",
                 "--use-alsa", "false" if target_cpu == "arm64" else "true",
@@ -177,13 +177,44 @@ class VerifyArgsTest(unittest.TestCase):
                 "--probe", str(probe),
                 "--target-cpu", target_cpu,
                 "--clang-major", "24",
-                "--profile", "helium-wayland-release",
+                "--profile", profile,
                 "--output", str(root / f"{target_cpu}-verify.json"),
             ],
             check=False,
             capture_output=True,
             text=True,
         )
+
+    def test_chromium_wayland_product_resolves_desktop_locks_on_both_architectures(self):
+        import linux_product
+
+        for arch in ("arm64", "amd64"):
+            product = linux_product.resolve("chromium", arch, "chromium-wayland-release", ROOT)
+            self.assertEqual(product.executable, "chrome")
+            self.assertEqual(product.arch, arch)
+            self.assertEqual(product.package_lock, ROOT / f"config/packages.wayland.{arch}.lock")
+            self.assertIn("wayland-dev", " ".join(linux_product.package_world(product.package_lock)))
+        headless = linux_product.resolve("chromium", "amd64", "headless-release", ROOT)
+        self.assertEqual(headless.package_lock, ROOT / "config/packages.amd64.lock")
+
+    def test_chromium_wayland_profile_matches_arm64_contract(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = self.run_contract(Path(directory), "arm64", "chromium-wayland-release")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_chromium_wayland_profile_is_the_lean_desktop_on_both_architectures(self):
+        verify_args = load_verify_args()
+        lean = {
+            "use_alsa": False, "use_vaapi": False, "enable_printing": False, "enable_pdf": False,
+            "enable_screen_ai_service": False, "enable_background_mode": False, "enable_chrome_notifications": False,
+        }
+        profile = (ROOT / "config/profiles/chromium-wayland-release.gn").read_text(encoding="utf-8")
+        for name, value in lean.items():
+            self.assertIn(f"{name} = {gn_value(value)}\n", profile)
+        self.assertEqual(verify_args.LEAN_DESKTOP, lean)
+        with tempfile.TemporaryDirectory() as directory:
+            result = self.run_contract(Path(directory), "x64", "chromium-wayland-release")
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_helium_profile_matches_the_effective_contract(self):
         with tempfile.TemporaryDirectory() as directory:

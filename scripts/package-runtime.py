@@ -14,6 +14,7 @@ import tarfile
 import tempfile
 from pathlib import Path, PurePosixPath
 
+import linux_product
 import linux_runtime
 
 HOST_LIBRARIES = linux_runtime.MUSL_LIBRARIES
@@ -126,6 +127,8 @@ def stage_manifest(stage: Path, product: str) -> dict:
         raise RuntimeError("staged runtime is incomplete; run stage-runtime first")
     if product == "helium" and manifest.get("product") != "helium":
         raise RuntimeError("staged runtime is not a Helium runtime")
+    if product == "chromium-desktop" and manifest.get("product") != "chromium":
+        raise RuntimeError("staged runtime is not a Chromium desktop runtime")
     return manifest
 
 
@@ -195,9 +198,9 @@ def product_identity() -> tuple[str, int, str]:
     return product.product_version, revision, product.arch
 
 
-def archive_name(version: str, revision: int, architecture: str = "amd64") -> str:
+def archive_name(version: str, revision: int, architecture: str = "amd64", product: str = "helium") -> str:
     linux_arch = {"amd64": "x86_64", "arm64": "aarch64"}.get(architecture, architecture)
-    return f"helium-{version}-r{revision}-linux-{linux_arch}-musl"
+    return f"{product}-{version}-r{revision}-linux-{linux_arch}-musl"
 
 
 def archive_package(
@@ -250,23 +253,31 @@ def verify_archive(archive: Path, archive_root: str, expected: dict) -> None:
         )
 
 
-def package_helium(stage: Path, output: Path, artifacts: Path) -> None:
-    version, revision, architecture = product_identity()
-    manifest = stage_manifest(stage, "helium")
+def package_helium(stage: Path, output: Path, artifacts: Path, desktop: linux_product.Desktop | None = None) -> None:
+    desktop = desktop or linux_product.desktop("helium", "helium-wayland-release")
+    assert desktop is not None
+    if desktop.name == "helium":
+        version, revision, architecture = product_identity()
+    else:
+        product = linux_product.resolve(desktop.name, os.environ.get("CHROMIUM_ARCH", "amd64"), "chromium-wayland-release")
+        revision = json.loads(product.inputs_lock.read_text(encoding="utf-8"))["chromium"]["package_revision"]
+        version, architecture = product.chromium_version, product.arch
+    manifest = stage_manifest(stage, "helium" if desktop.name == "helium" else "chromium-desktop")
+    launcher_name = "helium-wrapper" if desktop.name == "helium" else "chromium"
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = Path(tempfile.mkdtemp(prefix=f".{output.name}.", dir=output.parent))
     try:
         temporary.chmod(0o755)
         copy_staged(stage, temporary, manifest)
         bundle_fonts(temporary)
-        launcher = temporary / "helium-wrapper"
-        launcher.write_text(HELIUM_LAUNCHER, encoding="utf-8")
+        launcher = temporary / launcher_name
+        launcher.write_text(HELIUM_LAUNCHER if desktop.name == "helium" else LAUNCHER, encoding="utf-8")
         for path in temporary.rglob("*"):
             if path.is_dir():
                 path.chmod(0o755)
             elif path.name == "chrome_sandbox":
                 path.chmod(0o4755)
-            elif path.name == "helium-wrapper" or path.name == "helium" or is_elf(path):
+            elif path.name == launcher_name or path.name == desktop.executable or is_elf(path):
                 path.chmod(0o755)
             else:
                 path.chmod(0o644)
@@ -275,16 +286,16 @@ def package_helium(stage: Path, output: Path, artifacts: Path) -> None:
             architecture,
             gnu_runtime_allowed=linux_runtime.graphics_gnu_allowlist(temporary),
         )
-        browser = linux_runtime.inspect_elf(temporary / "helium", temporary)
+        browser = linux_runtime.inspect_elf(temporary / desktop.executable, temporary)
         files = sorted(path for path in temporary.rglob("*") if path.is_file())
         packaged = {
             "schema": 1,
             "status": "complete",
-            "product": "helium",
+            "product": desktop.name,
             "product_version": version,
             "architecture": architecture,
-            "launcher": "helium-wrapper",
-            "executable": "helium",
+            "launcher": launcher_name,
+            "executable": desktop.executable,
             "stage": str(stage),
             "host_requirements": sorted(HOST_LIBRARIES & set(browser.needed)),
             "bundled_libraries": sorted(
@@ -302,7 +313,7 @@ def package_helium(stage: Path, output: Path, artifacts: Path) -> None:
             ],
         }
         (temporary / "package-manifest.json").write_text(json.dumps(packaged, indent=2) + "\n", encoding="utf-8")
-        archive_root = archive_name(version, revision, architecture)
+        archive_root = archive_name(version, revision, architecture, desktop.name)
         archive, checksum = archive_package(
             temporary,
             archive_root,
@@ -326,8 +337,10 @@ def main() -> None:
     parser.add_argument("--product", choices=("chromium", "helium"), default=os.environ.get("CHROMIUM_PRODUCT", "chromium"))
     parser.add_argument("--artifacts", type=Path, default=Path(os.environ.get("CHROMIUM_ARTIFACTS_ROOT", "/work/artifacts")))
     args = parser.parse_args()
-    if args.product == "helium":
-        package_helium(args.stage, args.output, args.artifacts)
+    profile = os.environ.get("CHROMIUM_PROFILE", linux_product.DEFAULT_PROFILES[args.product])
+    desktop = linux_product.desktop(args.product, profile)
+    if desktop:
+        package_helium(args.stage, args.output, args.artifacts, desktop)
     else:
         package_chromium(args.stage, args.output)
 

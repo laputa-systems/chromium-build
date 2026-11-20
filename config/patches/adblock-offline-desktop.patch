@@ -1,0 +1,379 @@
+--- a/components/helium_adblock/core/BUILD.gn
++++ b/components/helium_adblock/core/BUILD.gn
+@@ -30,7 +30,6 @@
+     "//components/helium_adblock/core/resolver",
+     "//components/helium_adblock/core/source",
+     "//components/helium_adblock/rs:adblock_engine_rs",
+-    "//components/helium_services",
+     "//components/keyed_service/core",
+     "//components/prefs",
+     "//crypto",
+--- a/components/helium_adblock/core/helium_adblock_service.cc
++++ b/components/helium_adblock/core/helium_adblock_service.cc
+@@ -19,7 +19,6 @@
+ #include "components/helium_adblock/core/pref_names.h"
+ #include "components/helium_adblock/core/source/adblock_source_downloader.h"
+ #include "components/helium_adblock/rs/src/lib.rs.h"
+-#include "components/helium_services/helium_services_helpers.h"
+ #include "components/prefs/pref_service.h"
+ 
+ namespace helium_adblock {
+@@ -358,8 +357,7 @@
+   EngineConfiguration configuration = desired_;
+   configuration.locale = client_->GetApplicationLocale();
+   configuration.mobile = client_->IsMobilePlatform();
+-  configuration.use_service_catalog =
+-      helium::ShouldAccessUBlockAssets(*prefs_);
++  configuration.use_service_catalog = false;
+   EngineConfiguration snapshot = configuration;
+   base::ThreadPool::PostTaskAndReplyWithResult(
+       FROM_HERE,
+--- a/components/helium_adblock/core/helium_adblock_service_refresh.cc
++++ b/components/helium_adblock/core/helium_adblock_service_refresh.cc
+@@ -1,266 +1,11 @@
+-// Copyright 2026 The Helium Authors
+-// Use of this source code is governed by a BSD-style license that can be
+-// found in the LICENSE file.
+-
+ #include "components/helium_adblock/core/helium_adblock_service.h"
+ 
+-#include <algorithm>
+ #include <utility>
+ 
+-#include "base/check.h"
+-#include "base/functional/bind.h"
+-#include "base/logging.h"
+-#include "base/numerics/safe_conversions.h"
+-#include "components/helium_adblock/core/source/adblock_source_downloader.h"
+-#include "components/helium_services/helium_services_helpers.h"
+-#include "components/prefs/pref_service.h"
+-#include "url/origin.h"
+-
+ namespace helium_adblock {
+-namespace {
+-
+-constexpr char kCatalogCacheId[] = "catalog-snapshot";
+-constexpr int kMaxParallelSourceDownloads = 4;
+-
+-}  // namespace
+ 
+ void HeliumAdBlockService::Refresh(bool force, CompletionCallback completion) {
+-  if (shutting_down_) {
+-    std::move(completion).Run(false);
+-    return;
+-  }
+-  refresh_completions_.push_back(std::move(completion));
+-  if (refresh_in_progress_) {
+-    refresh_pending_ = true;
+-    refresh_pending_force_ |= force;
+-    return;
+-  }
+-  refresh_in_progress_ = true;
+-  refresh_failures_ = 0;
+-  state_.update_total = 0;
+-  state_.update_completed = 0;
+-  UpdateVisibleState();
+-  NotifyObservers();
+-  StartRefreshCycle(force);
++  std::move(completion).Run(false);
+ }
+ 
+-void HeliumAdBlockService::StartRefreshCycle(bool force) {
+-  refresh_force_ = force;
+-  if (helium::ShouldAccessUBlockAssets(*prefs_)) {
+-    StartCatalogRefresh();
+-    return;
+-  }
+-  BuildDownloadQueue();
+ }
+-
+-void HeliumAdBlockService::StartCatalogRefresh() {
+-  worker_.AsyncCall(&AdBlockEngineWorker::ValidatorsFor)
+-      .WithArgs(std::string(kCatalogCacheId))
+-      .Then(base::BindOnce(&HeliumAdBlockService::OnCatalogValidators,
+-                           weak_ptr_factory_.GetWeakPtr()));
+-}
+-
+-void HeliumAdBlockService::OnCatalogValidators(SourceValidators validators) {
+-  refresh_downloader_ =
+-      std::make_unique<SourceDownloader>(client_->GetURLLoaderFactory());
+-  refresh_downloader_->Download(
+-      helium::GetUBlockAssetsURL(*prefs_), SourceKind::kBuiltIn,
+-      std::move(validators),
+-      base::BindOnce(&HeliumAdBlockService::OnCatalogDownloaded,
+-                     weak_ptr_factory_.GetWeakPtr()));
+-}
+-
+-void HeliumAdBlockService::OnCatalogDownloaded(SourceDownloadResult result) {
+-  refresh_downloader_.reset();
+-  VLOG(1) << "helium-adblock: catalog download status="
+-          << static_cast<int>(result.status)
+-          << " net_error=" << result.net_error
+-          << " http_status=" << result.http_status
+-          << " bytes=" << result.contents.size();
+-  const bool catalog_changed =
+-      result.status == SourceDownloadResult::Status::kSuccess;
+-  worker_.AsyncCall(&AdBlockEngineWorker::ApplyCatalogDownload)
+-      .WithArgs(std::move(result))
+-      .Then(base::BindOnce(&HeliumAdBlockService::OnCatalogDownloadRecorded,
+-                           weak_ptr_factory_.GetWeakPtr(), catalog_changed));
+-}
+-
+-void HeliumAdBlockService::OnCatalogDownloadRecorded(
+-    bool catalog_changed,
+-    DownloadApplyResult result) {
+-  if (!result.persisted || !result.source_available) {
+-    ++refresh_failures_;
+-  }
+-  if (!catalog_changed || !result.source_available) {
+-    BuildDownloadQueue();
+-    return;
+-  }
+-  RequestRebuild(base::BindOnce(
+-      [](base::WeakPtr<HeliumAdBlockService> service, bool success) {
+-        if (!service) {
+-          return;
+-        }
+-        if (!success) {
+-          ++service->refresh_failures_;
+-        }
+-        service->BuildDownloadQueue();
+-      },
+-      weak_ptr_factory_.GetWeakPtr()));
+-}
+-
+-void HeliumAdBlockService::BuildDownloadQueue() {
+-  const bool proxied_only = helium::ShouldAccessUBlockAssets(*prefs_);
+-  const GURL services_origin =
+-      proxied_only ? helium::GetServicesBaseURL(*prefs_) : GURL();
+-  refresh_queue_.clear();
+-  for (const SourceState& source : sources_) {
+-    const bool needs_update =
+-        refresh_force_ || source.update_state == SourceUpdateState::kPending ||
+-        source.update_state == SourceUpdateState::kBundled ||
+-        source.update_state == SourceUpdateState::kStale ||
+-        source.update_state == SourceUpdateState::kFailed;
+-    if (!source.effective_enabled || !source.url || !needs_update) {
+-      continue;
+-    }
+-    if (proxied_only && source.built_in &&
+-        !url::Origin::Create(*source.url)
+-             .IsSameOriginWith(url::Origin::Create(services_origin))) {
+-      ++refresh_failures_;
+-      VLOG(1) << "helium-adblock: deferring " << source.id
+-              << " until the service catalog provides a proxied URL";
+-      continue;
+-    }
+-    refresh_queue_.push_back(source);
+-  }
+-  state_.update_total =
+-      state_.update_completed + base::checked_cast<int>(refresh_queue_.size());
+-  for (const SourceState& source : refresh_queue_) {
+-    SetSourceUpdating(source.id, true);
+-  }
+-  if (!refresh_queue_.empty()) {
+-    NotifyObservers();
+-  }
+-  VLOG(1) << "helium-adblock: queued " << refresh_queue_.size()
+-          << " filter-list downloads";
+-  PumpDownloadQueue();
+-}
+-
+-void HeliumAdBlockService::PumpDownloadQueue() {
+-  if (shutting_down_) {
+-    return;
+-  }
+-  while (!refresh_queue_.empty() &&
+-         active_source_downloads_ < kMaxParallelSourceDownloads) {
+-    SourceState source = std::move(refresh_queue_.back());
+-    refresh_queue_.pop_back();
+-    CHECK(source.url);
+-    ++active_source_downloads_;
+-    worker_.AsyncCall(&AdBlockEngineWorker::ValidatorsFor)
+-        .WithArgs(source.id)
+-        .Then(base::BindOnce(&HeliumAdBlockService::OnRefreshValidators,
+-                             weak_ptr_factory_.GetWeakPtr(),
+-                             std::move(source)));
+-  }
+-  if (refresh_queue_.empty() && active_source_downloads_ == 0) {
+-    FinishRefreshCycle();
+-  }
+-}
+-
+-void HeliumAdBlockService::OnRefreshValidators(
+-    SourceState source,
+-    SourceValidators validators) {
+-  auto downloader =
+-      std::make_unique<SourceDownloader>(client_->GetURLLoaderFactory());
+-  SourceDownloader* downloader_ptr = downloader.get();
+-  const GURL url = *source.url;
+-  const SourceKind source_kind =
+-      source.built_in ? SourceKind::kBuiltIn : SourceKind::kCustom;
+-  downloader_ptr->Download(
+-      url, source_kind, std::move(validators),
+-      base::BindOnce(&HeliumAdBlockService::OnSourceDownloaded,
+-                     weak_ptr_factory_.GetWeakPtr(), std::move(source),
+-                     std::move(downloader)));
+-}
+-
+-void HeliumAdBlockService::OnSourceDownloaded(
+-    SourceState source,
+-    std::unique_ptr<SourceDownloader>,
+-    SourceDownloadResult result) {
+-  VLOG(1) << "helium-adblock: source " << source.id
+-          << " download status=" << static_cast<int>(result.status)
+-          << " net_error=" << result.net_error
+-          << " http_status=" << result.http_status
+-          << " bytes=" << result.contents.size();
+-  std::string id = source.id;
+-  worker_.AsyncCall(&AdBlockEngineWorker::ApplyFilterListDownload)
+-      .WithArgs(std::move(source.id), *source.url,
+-                client_->IsMobilePlatform(), std::move(result),
+-                source.update_after)
+-      .Then(base::BindOnce(&HeliumAdBlockService::OnSourceDownloadRecorded,
+-                           weak_ptr_factory_.GetWeakPtr(), std::move(id)));
+-}
+-
+-void HeliumAdBlockService::OnSourceDownloadRecorded(
+-    std::string id,
+-    DownloadApplyResult result) {
+-  if (!result.persisted || !result.source_available) {
+-    ++refresh_failures_;
+-  }
+-  --active_source_downloads_;
+-  ++state_.update_completed;
+-  SetSourceUpdating(id, false);
+-  NotifyObservers();
+-  PumpDownloadQueue();
+-}
+-
+-void HeliumAdBlockService::FinishRefreshCycle() {
+-  refresh_downloader_.reset();
+-  if (refresh_pending_) {
+-    refresh_pending_ = false;
+-    const bool force = refresh_pending_force_;
+-    refresh_pending_force_ = false;
+-    StartRefreshCycle(force);
+-    return;
+-  }
+-  refresh_in_progress_ = false;
+-  state_.update_total = 0;
+-  state_.update_completed = 0;
+-  for (const std::string& id : refreshing_ids_) {
+-    auto source = std::ranges::find(sources_, id, &SourceState::id);
+-    if (source != sources_.end()) {
+-      source->updating = false;
+-    }
+-  }
+-  refreshing_ids_.clear();
+-
+-  const bool downloads_succeeded = refresh_failures_ == 0;
+-  refresh_failures_ = 0;
+-  std::vector<CompletionCallback> completions =
+-      std::move(refresh_completions_);
+-  RequestRebuild(base::BindOnce(
+-      [](std::vector<CompletionCallback> completions,
+-         bool downloads_succeeded, bool rebuild_succeeded) {
+-        const bool success = downloads_succeeded && rebuild_succeeded;
+-        for (CompletionCallback& completion : completions) {
+-          std::move(completion).Run(success);
+-        }
+-      },
+-      std::move(completions), downloads_succeeded));
+-  UpdateVisibleState();
+-}
+-
+-void HeliumAdBlockService::SetSourceUpdating(
+-    const std::string& id,
+-    bool updating) {
+-  if (updating) {
+-    refreshing_ids_.insert(id);
+-  } else {
+-    refreshing_ids_.erase(id);
+-  }
+-  auto source = std::ranges::find(sources_, id, &SourceState::id);
+-  if (source != sources_.end()) {
+-    source->updating = updating;
+-  }
+-}
+-
+-}  // namespace helium_adblock
+--- a/components/helium_adblock/core/pref_names.cc
++++ b/components/helium_adblock/core/pref_names.cc
+@@ -6,7 +6,7 @@
+ 
+ namespace prefs {
+ 
+-const char kHeliumAdBlockEnabled[] = "helium.adblock.enabled";
++const char kHeliumAdBlockEnabled[] = "adblock.enabled";
+ const char kHeliumAdBlockSourceOverrides[] = "helium.adblock.source_overrides";
+ const char kHeliumAdBlockCustomSources[] = "helium.adblock.custom_sources";
+ const char kHeliumAdBlockSiteExceptions[] = "helium.adblock.site_exceptions";
+--- a/components/helium_adblock/resources/BUILD.gn
++++ b/components/helium_adblock/resources/BUILD.gn
+@@ -7,20 +7,20 @@
+ 
+ assert(enable_native_adblock)
+ 
+-helium_filters_dir = "//third_party/helium_filters"
+-adblock_resources_json = "$helium_filters_dir/resources.json"
++adblock_filters_dir = "//third_party/adblock_filters"
++adblock_resources_json = "$adblock_filters_dir/resources.json"
+ adblock_filters_grd = "$target_gen_dir/adblock_filters.grd"
+ 
+ action("adblock_filters_grd") {
+   script = "make_filters_grd.py"
+   inputs = [
+-    "$helium_filters_dir/assets/assets.json",
+-    "$helium_filters_dir/manifest.json",
++    "$adblock_filters_dir/assets/assets.json",
++    "$adblock_filters_dir/manifest.json",
+     adblock_resources_json,
+   ]
+   outputs = [ adblock_filters_grd ]
+   args = [
+-    rebase_path("$helium_filters_dir/manifest.json", root_build_dir),
++    rebase_path("$adblock_filters_dir/manifest.json", root_build_dir),
+     rebase_path(adblock_filters_grd, root_build_dir),
+   ]
+ }
+@@ -45,7 +45,7 @@
+ if (!is_android && !is_ios) {
+   if (is_mac) {
+     bundle_data("adblock_desktop_catalog") {
+-      sources = [ "$helium_filters_dir/assets/assets.json" ]
++      sources = [ "$adblock_filters_dir/assets/assets.json" ]
+       outputs = [
+         "{{bundle_resources_dir}}/helium_adblock/assets/{{source_file_part}}",
+       ]
+@@ -59,7 +59,7 @@
+     }
+   } else {
+     copy("adblock_desktop_catalog") {
+-      sources = [ "$helium_filters_dir/assets/assets.json" ]
++      sources = [ "$adblock_filters_dir/assets/assets.json" ]
+       outputs = [
+         "$root_out_dir/resources/helium_adblock/assets/{{source_file_part}}",
+       ]
+--- a/components/helium_adblock/resources/make_filters_grd.py
++++ b/components/helium_adblock/resources/make_filters_grd.py
+@@ -23,16 +23,16 @@
+ '''
+ 
+ _INCLUDE = ('      <include name="IDR_HELIUM_ADBLOCK_FILTER_{index}" '
+-            'file="${{root_src_dir}}/third_party/helium_filters/{path}" '
++            'file="${{root_src_dir}}/third_party/adblock_filters/{path}" '
+             'resource_path="{path}" use_base_dir="false" type="BINDATA" '
+             'compress="brotli" />\n')
+ 
+ _BUNDLED_ASSETS = '''      <include name="IDR_HELIUM_ADBLOCK_CATALOG"
+-               file="${root_src_dir}/third_party/helium_filters/assets/assets.json"
++               file="${root_src_dir}/third_party/adblock_filters/assets/assets.json"
+                resource_path="assets/assets.json" use_base_dir="false"
+                type="BINDATA" compress="brotli" />
+       <include name="IDR_HELIUM_ADBLOCK_RESOURCES"
+-               file="${root_src_dir}/third_party/helium_filters/resources.json"
++               file="${root_src_dir}/third_party/adblock_filters/resources.json"
+                resource_path="resources.json" use_base_dir="false"
+                type="BINDATA" compress="brotli" />
+ '''

@@ -11,6 +11,12 @@ from pathlib import Path
 VERSION_RE = re.compile(r"^(MAJOR|MINOR|BUILD|PATCH)=(\d+)\s*$", re.MULTILINE)
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 STATES = {"apply", "superseded", "not-applicable"}
+MUSL_RUST_TARGETS = {
+    "aarch64-unknown-linux-musl",
+    "x86_64-unknown-linux-musl",
+    "aarch64-alpine-linux-musl",
+    "x86_64-alpine-linux-musl",
+}
 
 
 class Failure(Exception):
@@ -171,7 +177,7 @@ def toolchain_checks(args):
         value = selection.get(key, "")
         require(value.startswith("/opt/chromium-llvm/"), f"toolchain selection {key} is outside Chromium LLVM")
     require(
-        selection.get("rust_target_triple") in {"aarch64-unknown-linux-musl", "x86_64-unknown-linux-musl"},
+        selection.get("rust_target_triple") in MUSL_RUST_TARGETS,
         "Rust target triple is not an approved musl target",
     )
 
@@ -183,6 +189,7 @@ def unbundle_checks(args):
     libraries = report.get("libraries", [])
     require(libraries, "system-unbundle report contains no libraries")
     for library in libraries:
+        require(library.get("state") in {"bundled", "system"}, f"system-unbundle report has no state for {library.get('name')}")
         replacement = args.source_root / library["gn_replacement"]
         require(replacement.exists(), f"missing GN replacement for {library['name']}: {replacement}")
         for removed in library.get("removed_source_trees", []):

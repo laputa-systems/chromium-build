@@ -134,6 +134,18 @@ headless-release path through installation.
 `make verify TARGET=x86_64-unknown-linux-musl` runs `test-staged`. Pass
 `NINJA_TARGET` to `make build-target`.
 
+## Chromium desktop package
+
+The `chromium-wayland-release` desktop profile produces a
+`chromium-<version>-r<revision>-linux-<arch>-musl.tar.xz` archive. Qualify it
+with `scripts/qualify-package.py` using its Chromium browser report; a host
+headless report can be supplied with `--host-headless-report` after running
+`helium_test_fast.py --product chromium --headless-only`. Archive installation
+verifies the acceptance and manifest identities, installs under
+`~/.local/opt/chromium-wayland-release`, and links `~/.local/bin/chromium`.
+Use `./chromium-build --product chromium --profile chromium-wayland-release install`
+to install the qualified builder archive or pass `--archive` for a local one.
+
 ## Helium desktop package
 
 The Helium product is a Linux musl desktop build (amd64 and arm64). The image, source
@@ -333,3 +345,11 @@ test_workflow.WorkflowTests.test_linux_release_qualifies_a_real_archive_and_retu
 `RUNNER_TEMP` and the checkout must be visible at identical paths to Docker.
 This runs the full three-instance, 180-second headless check and verifies the
 acceptance report and restored ownership. It never rebuilds or publishes.
+
+For the Chromium Wayland desktop, packaging must trim locale packs to en-US.
+
+The `chromium-wayland-release` profile stages the Chromium desktop runtime with
+`chrome`, `chrome_crashpad_handler`, `chrome_sandbox`, and only the en-US locale.
+Its package launcher is `chromium`. Both `test-fast` and `test-staged` run the
+headless checks followed by the owned Sway session, checking `Chrome/<version>`
+against `config/inputs.lock`. FFmpeg is statically linked in the browser.

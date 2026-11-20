@@ -55,6 +55,18 @@ def parse_value(value):
 DEBUG_BY_PROFILE = {"headless-debug": True, "headless-release": False}
 HEADLESS_PROFILES = tuple(sorted(DEBUG_BY_PROFILE))
 HELIUM_PROFILE = "helium-wayland-release"
+CHROMIUM_WAYLAND_PROFILE = "chromium-wayland-release"
+
+
+LEAN_DESKTOP = {
+    "use_alsa": False,
+    "use_vaapi": False,
+    "enable_printing": False,
+    "enable_pdf": False,
+    "enable_screen_ai_service": False,
+    "enable_background_mode": False,
+    "enable_chrome_notifications": False,
+}
 
 
 def helium_expected(args):
@@ -135,13 +147,15 @@ def main():
     parser.add_argument("--probe", type=Path, required=True)
     parser.add_argument("--target-cpu", required=True)
     parser.add_argument("--clang-major", required=True)
-    parser.add_argument("--profile", choices=[*HEADLESS_PROFILES, HELIUM_PROFILE], required=True)
+    parser.add_argument("--profile", choices=[*HEADLESS_PROFILES, HELIUM_PROFILE, CHROMIUM_WAYLAND_PROFILE], required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
     values = parse_args(args.args)
     if args.profile == HELIUM_PROFILE:
         expected = helium_expected(args)
+    elif args.profile == CHROMIUM_WAYLAND_PROFILE:
+        expected = helium_expected(args) | LEAN_DESKTOP
     else:
         expected = {
             "target_os": "linux",

@@ -63,9 +63,10 @@ def main() -> None:
     target_cpu = {"arm64": "arm64", "amd64": "x64"}.get(arch)
     if target_cpu is None:
         raise ScriptFailure(f"unsupported architecture {arch}")
-    clang_major = lock["toolchain"]["version"].split(".", 1)[0]
+    toolchain = lock["toolchain"]
+    clang_major = toolchain["architectures"][arch].get("version", toolchain["version"]).split(".", 1)[0]
     use_alsa = "true"
-    if profile_name == "helium-wayland-release" and arch == "arm64":
+    if profile_name == "chromium-wayland-release" or (profile_name == "helium-wayland-release" and arch == "arm64"):
         use_alsa = "false"
     run(
         [

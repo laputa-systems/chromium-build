@@ -16,7 +16,7 @@ from script_support import ScriptFailure
 
 PRODUCTS = ("chromium", "helium")
 PROFILES = {
-    "chromium": ("headless-debug", "headless-release"),
+    "chromium": ("headless-debug", "headless-release", "chromium-wayland-release"),
     "helium": ("helium-wayland-release",),
 }
 DEFAULT_PROFILES = {"chromium": "headless-debug", "helium": "helium-wayland-release"}
@@ -42,6 +42,27 @@ CACHE_VOLUMES = {
     "chromium": "ungoogled-chromium-153-ccache-{arch}",
     "helium": "ungoogled-chromium-153-ccache-{arch}",
 }
+
+
+@dataclass(frozen=True)
+class Desktop:
+    name: str
+    executable: str
+    launcher: str
+    crashpad: str
+    desktop_entry: str
+    icon: str
+    browser_prefix: str
+    fixture: str
+    inputs: str
+
+
+def desktop(product: str, profile: str) -> Desktop | None:
+    if product == "helium" and profile == "helium-wayland-release":
+        return Desktop("helium", "helium", "helium-wrapper", "helium_crashpad_handler", "helium.desktop", "helium.png", "Helium", "helium-fast.html", "config/helium.inputs.lock")
+    if product == "chromium" and profile == "chromium-wayland-release":
+        return Desktop("chromium", "chrome", "chromium", "chrome_crashpad_handler", "chromium.desktop", "chromium.png", "Chrome", "desktop-fast.html", "config/inputs.lock")
+    return None
 
 
 @dataclass(frozen=True)
@@ -132,8 +153,16 @@ def resolve(product: str, arch: str, profile: str | None = None, root: Path | No
     ) or defaults["work"]
     cache_volume = os.environ.get("CHROMIUM_CACHE_VOLUME") or (
         os.environ.get("HELIUM_CACHE") if product == "helium" else ""
-    ) or CACHE_VOLUMES[product].format(arch=arch)
-    package_lock = root / names["packages"].format(arch=arch)
+    ) or (
+        f"ungoogled-chromium-{chromium_version.split('.')[0]}-ccache-{arch}"
+        if product == "chromium" and profile == "chromium-wayland-release"
+        else CACHE_VOLUMES[product].format(arch=arch)
+    )
+    package_lock = root / (
+        f"config/packages.wayland.{arch}.lock"
+        if product == "chromium" and profile == "chromium-wayland-release"
+        else names["packages"].format(arch=arch)
+    )
     return Product(
         name=product,
         arch=arch,

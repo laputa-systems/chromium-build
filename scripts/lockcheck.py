@@ -67,7 +67,7 @@ def environment(lock_path, metadata_path, architecture):
         "linux_arch": arch["linux_arch"],
         "chromium_cpu": arch["chromium_cpu"],
         "target_triple": arch["target_triple"],
-        "toolchain_version": toolchain["version"],
+        "toolchain_version": arch.get("version", toolchain["version"]),
         "toolchain_root": toolchain["root"],
         "toolchain_sha256": arch["archive_sha256"],
     }

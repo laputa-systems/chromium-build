@@ -1,0 +1,199 @@
+--- a/chrome/browser/about_flags.cc
++++ b/chrome/browser/about_flags.cc
+@@ -11208,7 +11208,7 @@
+      kOsMac | kOsWin | kOsLinux,
+      FEATURE_VALUE_TYPE(features::kGlicPrintMenuItem)},
+ 
+-#if !BUILDFLAG(IS_ANDROID)
++#if !BUILDFLAG(IS_ANDROID) && BUILDFLAG(ENABLE_PDF)
+     {"glic-pdf-summarize", flag_descriptions::kGlicPdfSummarizeName,
+      flag_descriptions::kGlicPdfSummarizeDescription, kOsDesktop,
+      FEATURE_WITH_PARAMS_VALUE_TYPE(features::kPdfGlicSummarize,
+@@ -11652,12 +11652,14 @@
+      FEATURE_VALUE_TYPE(
+          enterprise::webstore::kChromeWebStoreNavigationThrottle)},
+ #endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
++#if BUILDFLAG(ENABLE_PRINTING)
+     {"align-pdf-default-print-settings-with-html",
+      flag_descriptions::kAlignPdfDefaultPrintSettingsWithHTMLName,
+      flag_descriptions::kAlignPdfDefaultPrintSettingsWithHTMLDescription,
+      kOsAll,
+      FEATURE_VALUE_TYPE(
+          printing::features::kAlignPdfDefaultPrintSettingsWithHTML)},
++#endif  // BUILDFLAG(ENABLE_PRINTING)
+ 
+ #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+     BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_ANDROID)
+--- a/chrome/browser/plugins/plugin_response_interceptor_url_loader_throttle.cc
++++ b/chrome/browser/plugins/plugin_response_interceptor_url_loader_throttle.cc
+@@ -131,6 +131,15 @@
+   void SetPriority(net::RequestPriority priority,
+                    int32_t intra_priority_value) override {}
+ };
++
++bool IsOopifPdfMimeType(const std::string& mime_type) {
++#if BUILDFLAG(ENABLE_PDF)
++  return mime_type == pdf::kPDFMimeType &&
++         chrome_pdf::features::IsOopifPdfEnabled();
++#else
++  return false;
++#endif
++}
+ 
+ }  // namespace
+ 
+@@ -197,6 +206,7 @@
+ 
+   std::string extension_id;
+   std::optional<MimeHandlerStreamManager::CachedFallbackBody> cached_body;
++#if BUILDFLAG(ENABLE_PDF)
+   if (response_head->mime_type == pdf::kPDFMimeType) {
+     // A generic MIME handler extension called
+     // chrome.mimeHandler.abortAndFallbackToNativeHandler() on a prior
+@@ -221,6 +231,7 @@
+       }
+     }
+   }
++#endif  // BUILDFLAG(ENABLE_PDF)
+ 
+   if (extension_id.empty()) {
+     extension_id = PluginUtils::GetExtensionIdForMimeType(
+@@ -413,8 +424,7 @@
+     // forwarding-pipe creation failure the original source handle is
+     // returned via `forwarding_pipe`, so the body is never lost.
+     if (is_for_generic_mime_handler &&
+-        original_mime_type == pdf::kPDFMimeType &&
+-        chrome_pdf::features::IsOopifPdfEnabled()) {
++        IsOopifPdfMimeType(original_mime_type)) {
+       mojo::ScopedDataPipeConsumerHandle forwarding_pipe;
+       body_cache = extensions::MimeHandlerBodyCache::Create(
+           std::move(consumer_handle), &forwarding_pipe);
+--- a/chrome/browser/ui/read_anything/read_anything_entry_point_controller.cc
++++ b/chrome/browser/ui/read_anything/read_anything_entry_point_controller.cc
+@@ -85,8 +85,9 @@
+   base::UmaHistogramEnumeration(kOmniboxDecisionHistogram, decision);
+ }
+ 
+-#if BUILDFLAG(ENABLE_PDF)
+ size_t g_min_pdf_text_length_for_omnibox = 1100;
++
++#if BUILDFLAG(ENABLE_PDF)
+ constexpr float kMaxNonAlphaFraction = 0.33;
+ 
+ bool IsMostlyAlphaChars(const std::u16string& text) {
+@@ -136,13 +137,11 @@
+ }
+ #endif
+ 
+-pdf::PDFDocumentHelper* GetPdf(content::WebContents& contents) {
+ #if BUILDFLAG(ENABLE_PDF)
++pdf::PDFDocumentHelper* GetPdf(content::WebContents& contents) {
+   return pdf::PDFDocumentHelper::MaybeGetForWebContents(contents);
+-#else
+-  return nullptr;
+-#endif
+ }
++#endif
+ 
+ void OnReadabilityDecision(base::OnceCallback<void(bool)> result_callback,
+                            bool should_show) {
+@@ -174,10 +173,12 @@
+ 
+   // This check is already done in CheckIfShouldSuggestReadingMode but it's
+   // possible that the page was not detected as a PDF yet so check again.
++#if BUILDFLAG(ENABLE_PDF)
+   if (auto* pdf_helper = GetPdf(*contents)) {
+     RunPdfDistillableHeuristic(pdf_helper, std::move(result_callback));
+     return;
+   }
++#endif
+ 
+   switch (decision) {
+     case optimization_guide::OptimizationGuideDecision::kFalse:
+@@ -449,10 +450,12 @@
+     return;
+   }
+   content::WebContents* contents = tab->GetContents();
++#if BUILDFLAG(ENABLE_PDF)
+   if (auto* pdf_helper = GetPdf(*contents)) {
+     RunPdfDistillableHeuristic(pdf_helper, std::move(result_callback));
+     return;
+   }
++#endif
+ 
+   auto* optimization_guide_decider =
+       OptimizationGuideKeyedServiceFactory::GetForProfile(bwi->GetProfile());
+--- a/chrome/browser/ui/webui/side_panel/read_anything/read_anything_untrusted_page_handler.cc
++++ b/chrome/browser/ui/webui/side_panel/read_anything/read_anything_untrusted_page_handler.cc
+@@ -277,6 +277,14 @@
+ 
+ // The contents MIME type is fixed when the main frame commits, so this reliably
+ // identifies full-page PDFs before their content frame exists.
++bool OopifPdfEnabled() {
++#if BUILDFLAG(ENABLE_PDF)
++  return chrome_pdf::features::IsOopifPdfEnabled();
++#else
++  return false;
++#endif
++}
++
+ bool IsFullPagePdf(content::WebContents* contents) {
+   return contents && contents->GetContentsMimeType() == pdf::kPDFMimeType;
+ }
+@@ -285,10 +293,14 @@
+   if (!contents) {
+     return false;
+   }
++#if BUILDFLAG(ENABLE_PDF)
+   return chrome_pdf::features::IsOopifPdfEnabled()
+              ? !!extensions::mime_handler::MimeHandlerStreamManager::
+                     FromWebContents(contents)
+              : has_pdf_observer;
++#else
++  return has_pdf_observer;
++#endif
+ }
+ 
+ // Returns the frame hosting the PDF's contents, or nullptr if `contents` is
+@@ -303,12 +315,16 @@
+ // printing (printing::GetRenderFrameHostToUse) and Mahi
+ // (mahi::GetPDFRenderFrameHost).
+ content::RenderFrameHost* FindPdfContentFrame(content::WebContents* contents) {
++#if BUILDFLAG(ENABLE_PDF)
+   content::RenderFrameHost* embedder_host =
+-      chrome_pdf::features::IsOopifPdfEnabled()
++      OopifPdfEnabled()
+           ? pdf_frame_util::FindFullPagePdfExtensionHost(contents)
+           : contents->GetPrimaryMainFrame();
+   return embedder_host ? pdf_frame_util::FindPdfChildFrame(embedder_host)
+                        : nullptr;
++#else
++  return nullptr;
++#endif
+ }
+ 
+ // Returns whether `rfh` is a subframe of the primary page that the primary main
+@@ -914,8 +930,9 @@
+            IsWhatsNewEmbeddedContentFrame(rfh, main_frame);
+   }
+ 
++#if BUILDFLAG(ENABLE_PDF)
+   content::RenderFrameHost* pdf_rfh =
+-      chrome_pdf::features::IsOopifPdfEnabled()
++      OopifPdfEnabled()
+           ? pdf_frame_util::FindFullPagePdfExtensionHost(contents)
+           : pdf_frame_util::FindPdfChildFrame(contents->GetPrimaryMainFrame());
+   if (!pdf_rfh) {
+@@ -928,8 +945,11 @@
+   // For OOPIF PDFs, `pdf_rfh` is the extension host, while PDF content lives
+   // in its child frame. Accept both so requests targeting either the extension
+   // host or the content frame succeed.
+-  return chrome_pdf::features::IsOopifPdfEnabled() &&
++  return OopifPdfEnabled() &&
+          rfh == pdf_frame_util::FindPdfChildFrame(pdf_rfh);
++#else
++  return false;
++#endif
+ }
+ 
+ bool ReadAnythingUntrustedPageHandler::AreActionsAllowedInTree(

@@ -34,7 +34,7 @@ def main():
         "linux_arch": arch["linux_arch"],
         "chromium_cpu": arch["chromium_cpu"],
         "target_triple": arch["target_triple"],
-        "toolchain_version": lock["toolchain"]["version"],
+        "toolchain_version": arch.get("version", lock["toolchain"]["version"]),
         "toolchain_root": lock["toolchain"]["root"],
         "toolchain_sha256": arch["archive_sha256"],
         "environment_compatibility_id": (

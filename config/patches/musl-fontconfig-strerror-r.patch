@@ -1,0 +1,12 @@
+--- a/third_party/fontconfig/include/meson-config.h
++++ b/third_party/fontconfig/include/meson-config.h
+@@ -72,7 +72,9 @@
+ 
+ #define HAVE_GETTEXT 1
+ 
++#if defined(__GLIBC__)
+ #define HAVE_GNU_STRERROR_R 1
++#endif
+ 
+ #define HAVE_INTEL_ATOMIC_PRIMITIVES 1
+ 

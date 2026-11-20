@@ -15,6 +15,7 @@ FROM ${BASE_IMAGE} AS builder-base
 
 ARG TARGET_ARCH
 ARG PRODUCT=chromium
+ARG PROFILE=
 ARG PACKAGE_LOCK=config/packages.amd64.lock
 ARG INPUTS_LOCK=config/inputs.lock
 ARG SYSTEM_LIBRARY_POLICY=config/system-library-preflight.schema.json
@@ -36,7 +37,7 @@ RUN --network=none --mount=type=bind,from=locked-apks,target=/locked-apks set -e
     apk add --no-cache --repositories-file /dev/null "$@"
 COPY scripts/helium-crt.sh /opt/chromium-build/scripts/helium-crt.sh
 RUN set -eux; \
-    if [ "$PRODUCT" = helium ]; then \
+    if [ "$PRODUCT" = helium ] || { [ "$PROFILE" = chromium-wayland-release ] && [ "$TARGET_ARCH" = arm64 ]; }; then \
         mkdir -p /opt/chromium-llvm; \
         curl -fsSL "$LLVM_URL" -o /tmp/llvm.tar.xz; \
         test "$(stat -c %s /tmp/llvm.tar.xz)" = "$LLVM_SIZE"; \
@@ -159,6 +160,7 @@ WORKDIR /work
 FROM builder-base AS pure-runtime
 ARG TARGET_ARCH
 ARG PRODUCT
+ARG PROFILE
 ARG PURE_RUNTIME_JOBS=
 ARG PURE_NSS_URL=
 ARG PURE_NSS_SHA512=
@@ -186,12 +188,13 @@ RUN /opt/chromium-build/scripts/build-pure-runtime.sh
 FROM builder-base
 ARG TARGET_ARCH
 ARG PRODUCT
+ARG PROFILE
 ARG INPUTS_LOCK=config/inputs.lock
 ARG PACKAGE_LOCK=config/packages.amd64.lock
 ARG SYSTEM_LIBRARY_POLICY=config/system-library-preflight.schema.json
 COPY --from=pure-runtime /opt/pure-runtime /opt/pure-runtime
 RUN set -eux; \
-    if [ "$PRODUCT" = "helium" ] && [ "$TARGET_ARCH" = "arm64" ]; then \
+    if { [ "$PRODUCT" = "helium" ] || [ "$PROFILE" = "chromium-wayland-release" ]; } && [ "$TARGET_ARCH" = "arm64" ]; then \
         for library in /opt/pure-runtime/lib/*.so*; do \
             rm -f "/usr/lib/$(basename -- "$library")"; \
         done; \

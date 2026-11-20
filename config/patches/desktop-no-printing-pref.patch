@@ -1,0 +1,15 @@
+--- a/chrome/browser/renderer_context_menu/render_view_context_menu.cc
++++ b/chrome/browser/renderer_context_menu/render_view_context_menu.cc
+@@ -4660,8 +4660,12 @@
+ bool RenderViewContextMenu::IsPrintPreviewEnabled() const {
+   if (IsAnyGlicWebContents(this) &&
+       base::FeatureList::IsEnabled(features::kGlicPrintMenuItem)) {
++#if BUILDFLAG(ENABLE_PRINTING)
+     return GetPrefs(browser_context_)->GetBoolean(prefs::kPrintingEnabled) &&
+            (source_web_contents_ && !source_web_contents_->IsCrashed());
++#else
++    return false;
++#endif
+   }
+ 
+   if (params_.media_type != ContextMenuDataMediaType::kNone &&

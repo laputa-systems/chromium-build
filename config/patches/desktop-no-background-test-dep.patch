@@ -1,0 +1,16 @@
+--- a/chrome/browser/extensions/BUILD.gn
++++ b/chrome/browser/extensions/BUILD.gn
+@@ -3178,12 +3178,12 @@
+     if (!is_chromeos) {
+       # Chrome OS doesn't use background mode or download bubbles.
+       deps += [
+-        "//chrome/browser/background/extensions",
+         "//chrome/browser/download/bubble",
+       ]
+     }
+ 
+     if (enable_background_mode) {
++      deps += [ "//chrome/browser/background/extensions" ]
+       sources += [ "background_app_browsertest.cc" ]
+     }
+ 

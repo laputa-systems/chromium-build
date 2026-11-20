@@ -24,6 +24,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+import linux_product
 from browser_test_support import (
     CdpConnection,
     WebSocket,
@@ -425,13 +426,17 @@ def run(args: argparse.Namespace) -> int:
     output.mkdir(parents=True, exist_ok=True)
     report_path = output / "test-fast.json"
     lock = json.loads(args.inputs_lock.read_text(encoding="utf-8"))
-    product_version, browser_version = chromium_version(lock)
+    desktop = linux_product.desktop(args.product, "helium-wayland-release" if args.product == "helium" else "chromium-wayland-release")
+    assert desktop is not None
+    browser_version = lock["chromium"]["version"]
+    product_version = lock["product"]["version"] if args.product == "helium" else browser_version
+    devtools_product = f"{desktop.browser_prefix}/{product_version}"
     profile = Path(tempfile.mkdtemp(prefix="helium-profile-", dir=output))
     report = {
         "schema": 2,
         "status": "running",
         "network": "loopback-only",
-        "product": "helium",
+        "product": desktop.name,
         "product_version": product_version,
         "chromium_version": browser_version,
         "browser": str(args.helium),
@@ -465,7 +470,7 @@ def run(args: argparse.Namespace) -> int:
         report["version"] = version_text
         headless_environment = dict(version_environment)
         try:
-            report["headless"] = run_headless(args, output, headless_environment, f"Helium/{product_version}")
+            report["headless"] = run_headless(args, output, headless_environment, devtools_product)
         except BaseException:
             report["headless"] = args.headless_result
             raise
@@ -531,8 +536,8 @@ def run(args: argparse.Namespace) -> int:
         record_process_group(process, os.getpgid(process.pid))
         version_info = wait_cdp(debug_port, process, 30)
         browser = version_info.get("Browser", "")
-        if browser != f"Helium/{product_version}":
-            raise RuntimeError(f"DevTools browser identity is not Helium/{product_version}: {browser!r}")
+        if browser != devtools_product:
+            raise RuntimeError(f"DevTools browser identity is not {devtools_product}: {browser!r}")
         browser_connection = CdpConnection(WebSocket(version_info["webSocketDebuggerUrl"]))
         server = urllib.request.Request(
             f"http://127.0.0.1:{debug_port}/json/new?{urllib.parse.quote(args.fixture.as_uri(), safe=':/?=&')}",
@@ -604,7 +609,8 @@ def run(args: argparse.Namespace) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--helium", type=Path, required=True)
+    parser.add_argument("--helium", "--chrome", dest="helium", type=Path, required=True)
+    parser.add_argument("--product", choices=("helium", "chromium"), default="helium")
     parser.add_argument("--fixtures", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--inputs-lock", type=Path, default=Path("/opt/chromium-build/config/helium.inputs.lock"))
@@ -612,7 +618,11 @@ def main() -> int:
     parser.add_argument("--load-instances", type=int, default=0, help="with --headless-only, concurrent headless browsers for the page-evaluation load check")
     parser.add_argument("--load-seconds", type=float, default=180.0)
     args = parser.parse_args()
-    args.fixture = args.fixtures / "helium-fast.html"
+    desktop = linux_product.desktop(args.product, "helium-wayland-release" if args.product == "helium" else "chromium-wayland-release")
+    assert desktop is not None
+    if args.product == "chromium" and args.inputs_lock == Path("/opt/chromium-build/config/helium.inputs.lock"):
+        args.inputs_lock = Path("/opt/chromium-build") / desktop.inputs
+    args.fixture = args.fixtures / desktop.fixture
     if not args.fixture.is_file():
         parser.error(f"missing fixture {args.fixture}")
     if os.geteuid() == 0:

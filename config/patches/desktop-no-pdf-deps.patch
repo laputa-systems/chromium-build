@@ -1,0 +1,86 @@
+--- a/chrome/browser/contextual_tasks/BUILD.gn
++++ b/chrome/browser/contextual_tasks/BUILD.gn
+@@ -474,7 +474,6 @@
+     ]
+     deps += [
+       "//chrome/browser:file_select_helper",
+-      "//chrome/browser/pdf",
+       "//chrome/browser/resources/contextual_tasks:resources",
+       "//chrome/browser/resources/webui_toolbar_shared:resources",
+       "//chrome/browser/tab_list",
+@@ -507,6 +506,10 @@
+     deps += [ "//chrome/browser/ui/views/search_ai_mode" ]
+   }
+ 
++  if (!is_android && enable_pdf) {
++    deps += [ "//chrome/browser/pdf" ]
++  }
++
+   if (enable_webui_contextual_tasks_composebox) {
+     # FaviconSource is only used under #if
+     # ENABLE_WEBUI_CONTEXTUAL_TASKS_COMPOSEBOX.
+--- a/chrome/browser/ui/webui/side_panel/read_anything/BUILD.gn
++++ b/chrome/browser/ui/webui/side_panel/read_anything/BUILD.gn
+@@ -2,6 +2,8 @@
+ # Use of this source code is governed by a BSD-style license that can be
+ # found in the LICENSE file.
+ 
++import("//pdf/features.gni")
++
+ assert(!is_android)
+ 
+ source_set("read_anything") {
+@@ -78,7 +80,6 @@
+   sources = [ "read_anything_untrusted_page_handler_browsertest.cc" ]
+   deps = [
+     ":read_anything",
+-    "//chrome/browser/pdf:pdf_extension_test_utils",
+     "//chrome/browser/speech",
+     "//chrome/browser/translate",
+     "//chrome/browser/ui/browser_window",
+@@ -99,4 +100,8 @@
+     "//testing/gmock",
+     "//testing/gtest",
+   ]
++
++  if (enable_pdf) {
++    deps += [ "//chrome/browser/pdf:pdf_extension_test_utils" ]
++  }
+ }
+--- a/chrome/browser/ui/views/user_education/browser_user_education_service.cc
++++ b/chrome/browser/ui/views/user_education/browser_user_education_service.cc
+@@ -112,7 +112,6 @@
+ #include "components/feature_engagement/public/event_constants.h"
+ #include "components/feature_engagement/public/feature_constants.h"
+ #include "components/lens/lens_features.h"
+-#include "components/pdf/browser/pdf_document_helper.h"
+ #include "components/safe_browsing/core/common/safebrowsing_referral_methods.h"
+ #include "components/saved_tab_groups/public/features.h"
+ #include "components/send_tab_to_self/features.h"
+@@ -173,8 +172,9 @@
+ #include "chrome/browser/ui/webui/extensions_zero_state_promo/zero_state_promo_ui.h"
+ #endif  // BUILDFLAG(ENABLE_EXTENSIONS_CORE)
+ 
+-#if BUILDFLAG(ENABLE_PDF_INK2)
++#if BUILDFLAG(ENABLE_PDF)
+ #include "chrome/browser/pdf/pdf_help_bubble_handler_factory.h"
++#include "components/pdf/browser/pdf_document_helper.h"
+ #endif
+ 
+ namespace {
+@@ -1041,6 +1041,7 @@
+           .SetBubbleIcon(kLightbulbOutlineIcon)
+           .SetBubbleTitleText(IDS_PASSWORD_MANAGER_IPH_CREATE_SHORTCUT_TITLE)));
+ 
++#if BUILDFLAG(ENABLE_PDF)
+   // kIPHPdfGlicSummarizeFeature:
+   registry.RegisterFeature(std::move(
+       FeaturePromoSpecification::CreateForToastPromo(
+@@ -1058,6 +1059,7 @@
+           .SetMetadata(151, "cuianthony@ch40m1um.qjz9zk",
+                        "Triggered when the PDF Viewer loads with the "
+                        "Summarize button.")));
++#endif  // BUILDFLAG(ENABLE_PDF)
+ 
+ #if BUILDFLAG(ENABLE_PDF_INK2)
+   // kIPHPdfInkSignaturesFeature:

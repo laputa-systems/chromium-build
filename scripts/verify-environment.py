@@ -124,8 +124,9 @@ def main() -> None:
         if not str(resolved).startswith(f"{llvm_root}/"):
             raise ScriptFailure(f"{variable} resolves outside {llvm_root}: {resolved}")
     cc = os.environ["CC"]
-    if toolchain["version"] not in run([cc, "--version"], capture_output=True).stdout:
-        raise ScriptFailure(f"clang version is not {toolchain['version']}")
+    version = arch_toolchain.get("version", toolchain["version"])
+    if version not in run([cc, "--version"], capture_output=True).stdout:
+        raise ScriptFailure(f"clang version is not {version}")
     if run([cc, "-dumpmachine"], capture_output=True).stdout.strip() != arch_toolchain["target_triple"]:
         raise ScriptFailure("compiler target does not match the lock")
     for tool in ("clang", "clang++", "ld.lld", "llvm-ar", "llvm-ranlib", "llvm-nm", "llvm-strip", "llvm-objcopy"):
@@ -134,14 +135,14 @@ def main() -> None:
     require_file(ninja, "missing /usr/local/bin/ninja")
     if run([str(ninja), "--version"], capture_output=True).stdout.strip() != "1.13.2":
         raise ScriptFailure("Ninja is not the locked Alpine version")
-    lld_version = toolchain.get("lld_version", toolchain["version"])
+    lld_version = arch_toolchain.get("lld_version", toolchain.get("lld_version", version))
     if lld_version not in run([str(llvm_root / "bin/ld.lld"), "--version"], capture_output=True).stdout:
         raise ScriptFailure("LLD version is not locked")
     config_hashes = []
     for name in ("clang.cfg", "clang++.cfg"):
         path = require_file(llvm_root / "bin" / name)
         config_hashes.append(f"{digest(path)}  {path}")
-    expected_hashes = (toolchain["clang_cfg_sha256"], toolchain["clangxx_cfg_sha256"])
+    expected_hashes = tuple(arch_toolchain.get(key, toolchain[key]) for key in ("clang_cfg_sha256", "clangxx_cfg_sha256"))
     if tuple(line.split()[0] for line in config_hashes) != expected_hashes:
         raise ScriptFailure("Clang config hash differs from lock")
     atomic_write(metadata / "toolchain-config-sha256", "\n".join(config_hashes) + "\n")

@@ -1,5 +1,5 @@
 Prefix: CHB
-Next: 22
+Next: 23
 
 
 ### CHB-11 · P1 · bound back-to-back begin frames sent to the browser UI compositor in unthrottled headless
@@ -102,3 +102,11 @@ Next: 22
 - **Fix with:** none
 - **Effort:** S
 
+### CHB-22 · P4 · Hydrogen's allocator is unguarded and alternatives are unmeasured; keep PartitionAlloc unless a workload shows a large win
+
+- **Area:** Browser / Allocator
+- **Where:** config/profiles/chromium-wayland-release.gn; scripts/verify-gn-args.py (LEAN_DESKTOP, helium_expected: no allocator keys); Gate D metadata gn-args.canonical.txt for chromium-wayland-release (use_partition_alloc, use_partition_alloc_as_malloc, use_allocator_shim, enable_backup_ref_ptr_support, use_raw_ptr_backup_ref_impl all true, is_musl true); config/patches/helium/helium-partitionalloc-musl-ifunc.patch
+- **Problem:** Hydrogen builds against musl but does not use musl's malloc: the effective GN args of the first chromium-wayland-release build keep PartitionAlloc-Everywhere with the allocator shim and BackupRefPtr (MiraclePtr) use-after-free mitigation. Nothing asserts this, so a future profile or patch change could silently drop to musl's mallocng and lose BackupRefPtr. Separately, mimalloc 3.7.0 is a credible challenger for ordinary allocations, but replacing PartitionAlloc would lose or weaken BackupRefPtr's protection, and Blink's direct PartitionAlloc use, Oilpan and V8's heaps would be unaffected, so a win must be large and measured on real workloads to justify it.
+- **Recommendation:** Now: add use_partition_alloc_as_malloc, use_allocator_shim and enable_backup_ref_ptr_support = true to the chromium-wayland-release contract in scripts/verify-gn-args.py so Gate D fails if they change. Later, only after BCTL-59 qualifies Hydrogen and only if bctl attributes browser memory or CPU to the general allocator: build three variants from one pinned revision (A production PartitionAlloc; B use_partition_alloc_as_malloc=false and use_allocator_shim=false, musl mallocng for ordinary allocations; C as B with mimalloc 3.7.0 linked or preloaded, confirming actual malloc/free dispatch in browser, zygote and renderer processes, in default and MI_SECURE=CHECKED), compare natively on Linux x86_64 and then in Reactor on bctl's workflow, headed and density benchmarks (workflow time, browser and renderer CPU, p95 action latency, host VM footprint with corrected accounting, retained memory after cycles, renderer churn and stability), and validate sandbox, CDP, adblock and site isolation. Change the default only for a substantial, repeatable per-workload win that justifies giving up BackupRefPtr.
+- **Fix with:** none
+- **Effort:** M
