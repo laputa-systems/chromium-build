@@ -58,6 +58,15 @@
  
  if (enable_print_media_l10n) {
    source_set("print_media_l10n") {
+@@ -45,7 +45,7 @@
+     "//printing/mojom",
+   ]
+ 
+-  if (is_linux) {
++  if (is_linux && enable_printing) {
+     deps += [
+       "//build/config/linux/dbus:buildflags",
+       "//ui/linux:linux_ui",
 --- a/chrome/browser/renderer_context_menu/BUILD.gn
 +++ b/chrome/browser/renderer_context_menu/BUILD.gn
 @@ -135,7 +135,6 @@
