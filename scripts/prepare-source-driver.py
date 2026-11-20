@@ -120,6 +120,7 @@ DESKTOP_PATCHES = (
     "musl-libcxx-156.patch",
     "musl-v8-sandbox-trap-ubsan.patch",
     "musl-rust-target-156.patch",
+    "desktop-rust-host-toolchain.patch",
     "headless-no-printing-linux-context.patch",
     "desktop-no-printing-pref.patch",
     "headless-no-printing-pdf-helpers.patch",
