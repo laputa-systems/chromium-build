@@ -336,3 +336,9 @@ This runs the full three-instance, 180-second headless check and verifies the
 acceptance report and restored ownership. It never rebuilds or publishes.
 
 For the Chromium Wayland desktop, packaging must trim locale packs to en-US.
+
+The `chromium-wayland-release` profile stages the Chromium desktop runtime with
+`chrome`, `chrome_crashpad_handler`, `chrome_sandbox`, and only the en-US locale.
+Its package launcher is `chromium`. Both `test-fast` and `test-staged` run the
+headless checks followed by the owned Sway session, checking `Chrome/<version>`
+against `config/inputs.lock`. FFmpeg is statically linked in the browser.

@@ -8,6 +8,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import linux_product
 from script_support import (
     ScriptFailure,
     fail_main,
@@ -36,7 +37,8 @@ def main() -> None:
     test_tmp.chmod(0o777)
     os.environ["TMPDIR"] = str(test_tmp)
     os.environ["CHROMIUM_TEST_TMPDIR"] = str(test_tmp)
-    if product == "helium":
+    desktop = linux_product.desktop(product, profile)
+    if desktop:
         run(["python3", "-m", "unittest", "discover", "-s", str(root / "tests"), "-p", "test_helium_*.py"])
         staged_chrome = os.environ.get("CHROMIUM_TEST_CHROME")
         if staged_chrome:
@@ -60,6 +62,8 @@ def main() -> None:
             "--output",
             str(output),
         ]
+        if product == "chromium":
+            command.extend(["--product", product, "--inputs-lock", str(root / desktop.inputs)])
         if os.geteuid() == 0 and shutil.which("su"):
             command = ["su", "chromium", "-s", "/bin/sh", "-c", "exec " + " ".join(subprocess.list2cmdline([item]) for item in command)]
         run(command, timeout=timeout)
