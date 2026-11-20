@@ -189,6 +189,7 @@ def unbundle_checks(args):
     libraries = report.get("libraries", [])
     require(libraries, "system-unbundle report contains no libraries")
     for library in libraries:
+        require(library.get("state") in {"bundled", "system"}, f"system-unbundle report has no state for {library.get('name')}")
         replacement = args.source_root / library["gn_replacement"]
         require(replacement.exists(), f"missing GN replacement for {library['name']}: {replacement}")
         for removed in library.get("removed_source_trees", []):

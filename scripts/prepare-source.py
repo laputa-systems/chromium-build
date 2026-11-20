@@ -269,6 +269,7 @@ def apply_system_unbundle(source):
         "libraries": [
             {
                 "name": "ffmpeg",
+                "state": "system",
                 "gn_replacement": "third_party/ffmpeg/BUILD.gn",
                 "removed_source_trees": [],
             }
