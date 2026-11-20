@@ -147,7 +147,7 @@ def make_archive(
     root_name = f"{desktop_name}-{version}{revision}-linux-{arch_name}-musl"
     payload = root / root_name
     payload.mkdir(parents=True)
-    (payload / executable).write_bytes(Path("/bin/true").read_bytes() if Path("/bin/true").is_file() else b"#!/bin/sh\nexit 0\n")
+    (payload / executable).write_bytes(b"#!/bin/sh\nexit 0\n")
     (payload / executable).chmod(0o755)
     (payload / launcher).write_text("#!/bin/sh\nprintf 'Helium 0.20.3.1\\n'\n", encoding="utf-8")
     (payload / launcher).chmod(0o755)
