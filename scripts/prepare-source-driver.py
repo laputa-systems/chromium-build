@@ -233,7 +233,7 @@ def prepare_chromium(root: Path, work: Path, inputs: Path, metadata: Path, sourc
     if source.exists():
         raise ScriptFailure("prepared source already exists; preserve or move it before preparing")
     desktop = os.environ.get("CHROMIUM_PROFILE") == "chromium-wayland-release"
-    rust_target = ({"arm64": "aarch64-unknown-linux-musl", "amd64": "x86_64-alpine-linux-musl"} if desktop else {"arm64": "aarch64-alpine-linux-musl", "amd64": "x86_64-alpine-linux-musl"}).get(arch)
+    rust_target = ({"arm64": "aarch64-unknown-linux-musl", "amd64": "x86_64-unknown-linux-musl"} if desktop else {"arm64": "aarch64-alpine-linux-musl", "amd64": "x86_64-alpine-linux-musl"}).get(arch)
     if rust_target is None:
         raise ScriptFailure(f"unsupported architecture {arch}")
     temp = Path(tempfile.mkdtemp(prefix="src.prepare.", dir=work))
