@@ -453,7 +453,7 @@ def main():
         native["native_host_tools"] = remove_foreign_host_binaries(args.source, args.arch)
         native["native_executables"] = {name: install_native_executable(args.source, args.native_inputs, lock["architecture_inputs"][args.arch][name], args.arch) for name in NATIVE_EXECUTABLES}
     builder_links = add_builder_links(args.source, bool(native))
-    unbundle = ({"schema": 1, "status": "complete", "network": "none", "libraries": [{"name": "ffmpeg", "state": "bundled", "gn_replacement": "third_party/ffmpeg/BUILD.gn", "removed_source_trees": []}]} if native else apply_system_unbundle(args.source))
+    unbundle = ({"schema": 1, "status": "complete", "network": "none", "libraries": [{"name": "ffmpeg", "state": "bundled", "gn_replacement": "third_party/ffmpeg/BUILD.gn", "removed_source_trees": []}]} if args.native_inputs else apply_system_unbundle(args.source))
 
     source_report = {
         "schema": 1,
