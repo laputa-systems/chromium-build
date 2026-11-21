@@ -18,4 +18,3 @@ def bare_completed_process(result: subprocess.CompletedProcess) -> None:  # ty: 
 
 def parametrized(value: dict[str, Any], process: subprocess.Popen[bytes], result: subprocess.CompletedProcess[str]) -> None:
     del value, process, result
-
