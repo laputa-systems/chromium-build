@@ -20,15 +20,6 @@ Next: 35
 - **Effort:** L
 - **Design:** docs/rfc/CHB-21-chromium-replaces-helium.md
 
-### CHB-2 · P2 · restore the DevTools frontend after the first lean package
-
-- **Area:** Build
-- **Where:** `config/patches/helium/helium-no-devtools-frontend.patch`, `config/profiles/helium-wayland-release.gn`, `docs/linux.md`
-- **Problem:** The current Helium profile disables the DevTools frontend and drops its resources to reduce graph size and build time. Raw CDP remains, but users cannot open the built-in DevTools UI. The removal is deliberate for the first package and is not proven against future Helium frontend changes.
-- **Recommendation:** When DevTools is required, remove `helium-no-devtools-frontend.patch` from `config/helium.patch-disposition.json`, restore the upstream `enable_devtools_frontend` default, rebuild, and qualify the packaged frontend under dwl. Measure the package and build-time delta before keeping it enabled by default.
-- **Fix with:** none
-- **Effort:** M
-
 ### CHB-8 · P2 · complete the Helium behavior acceptance matrix
 
 - **Area:** Tests
@@ -47,12 +38,12 @@ Next: 35
 - **Fix with:** none
 - **Effort:** L
 
-### CHB-16 · P3 · replace the default HarfBuzz OpenType shaping path with HarfRust
+### CHB-16 · P2 · make HarfRust Hydrogen's shaper, then remove HarfBuzz
 
 - **Area:** Build
-- **Where:** config/helium.inputs.lock; config/helium.packages.arm64.lock; config/helium.packages.amd64.lock; config/helium.system-library-preflight.schema.json; Chromium third_party/blink/renderer/platform/fonts/shaping/ and third_party/harfbuzz-ng/
-- **Problem:** HarfRust 0.13.3 is already compiled and linked in the recorded Helium arm64 build, but default Blink shaping selects HarfBuzz's OpenType shaper and bctl does not enable the experimental HarfRustShaping feature. HarfBuzz therefore remains compiled and required. Enabling the existing HarfRust path needs rendering qualification; eliminating HarfBuzz additionally requires auditing remaining callers and shaping fallbacks.
-- **Recommendation:** Make HarfRust the supported default for the bctl Helium build, audit all HarfBuzz callers and fallback shaping paths, and remove HarfBuzz compilation and dependencies once replacement coverage is proven. Qualify complex scripts, ligatures, fallback fonts, variable fonts and real headed/headless pages; do not equate enabling the experimental feature with eliminating HarfBuzz. Preserve sandbox and browser acceptance gates.
+- **Where:** config/patches/ (chromium product), config/inputs.lock, config/packages.arm64.lock, config/packages.amd64.lock, config/system-library-preflight.schema.json; Chromium third_party/blink/renderer/platform/fonts/shaping/ and third_party/harfbuzz-ng/; consumer qualification in laputa-systems/bctl
+- **Problem:** The owner decided on 2026-11-20 to adopt HarfRust. Hydrogen (Chromium 156) already compiles HarfRust and carries the `HarfRustShaping` feature. bctl qualified it against HarfBuzz on the packaged Hydrogen 156 arm64 binary (bctl 05419b49): 20 complex-script, emoji, OpenType-feature, variable-font and real-page fixtures rendered with 0 differing pixels and 0 line-width change, and a broken-layout control font proved the switch took effect. `desktop-harfrust-shaping-default.patch` (#37) now makes `HarfRustShaping` stable for the desktop product, so the next Hydrogen rebuild ships it by default. HarfBuzz stays compiled and required by its other callers.
+- **Recommendation:** After the rebuild, confirm in bctl that the packaged default shapes with HarfRust (the broken-layout control font differs from a `--disable-features=HarfRustShaping` run). Then audit the remaining HarfBuzz callers and fallback shaping paths and remove HarfBuzz compilation and dependencies only when replacement coverage is proven. Enabling the feature is not eliminating HarfBuzz. Preserve the sandbox and browser acceptance gates.
 - **Fix with:** `reference-parity`
 - **Effort:** L
 

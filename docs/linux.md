@@ -205,8 +205,9 @@ bundled Linux PGO profile is selected from `chrome/build/pgo_profiles` through
 `chrome/build/linux.pgo.txt`, so PGO needs no network fetch. The profile
 enables VA-API video decode, disables D-Bus and GTK, and omits the DevTools
 frontend resources while retaining raw CDP. `helium-no-devtools-frontend.patch`
-and `helium-no-dbus.patch` carry those exclusions; `TODO.md` tracks restoring
-the frontend and completing the non-D-Bus fallbacks. With `use_dbus=false` and
+and `helium-no-dbus.patch` carry those exclusions. The frontend is omitted
+permanently, in Hydrogen too (`desktop-no-devtools-frontend.patch`); `TODO.md`
+tracks completing the non-D-Bus fallbacks. With `use_dbus=false` and
 `use_gtk=false`, the packaged browser does not require a session bus or GTK:
 native file choosers, GTK theming, and native dialogs are gone, and uploads
 go through the web content or CDP. Native notifications are
