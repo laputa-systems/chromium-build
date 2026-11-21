@@ -123,10 +123,7 @@ def read_manifest(archive: Path) -> JsonObject:
                 if str(relative) in names:
                     raise runtime_install.InstallError(f"archive contains a duplicate entry: {member.name}")
                 names.add(str(relative))
-            try:
-                bundle.extractall(root.parent, filter="data")
-            except TypeError:
-                bundle.extractall(root.parent)
+            bundle.extractall(root.parent, filter="data")
         manifest_path = root / "package-manifest.json"
         if not manifest_path.is_file():
             raise runtime_install.InstallError("archive has no package manifest")

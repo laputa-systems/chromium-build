@@ -187,10 +187,7 @@ def verified_archive(archive: Path):
                 if str(relative) in names:
                     raise InstallError(f"archive contains a duplicate entry: {member.name}")
                 names.add(str(relative))
-            try:
-                bundle.extractall(root.parent, filter="data")
-            except TypeError:
-                bundle.extractall(root.parent)
+            bundle.extractall(root.parent, filter="data")
         manifest = manifest_for(root, report, archive)
         yield VerifiedArchive(archive, archive_digest, root_name, report["product_version"], report["architecture"], manifest), root
 
