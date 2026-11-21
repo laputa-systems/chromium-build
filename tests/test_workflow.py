@@ -146,9 +146,10 @@ class WorkflowTests(unittest.TestCase):
         self.assertLess(release.index("sha256sum -c SHA256SUMS"), release.index("gh release create"))
         self.assertLess(release.index("git/refs"), release.index("gh release create"))
 
-    def test_lint_workflow_runs_make_lint(self):
-        text = read_workflow("lint.yml")
+    def test_ci_workflow_runs_make_lint_and_test(self):
+        text = read_workflow("ci.yml")
         self.assertIn("run: make lint", text)
+        self.assertIn("run: make test", text)
         self.assertNotIn("ubuntu-latest", text)
 
 
