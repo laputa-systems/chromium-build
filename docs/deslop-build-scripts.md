@@ -16,7 +16,8 @@ Commands, run from the worktree with `TMPDIR=$PWD/.work/tmp`:
 | `make test` (warm) | 149 tests, 1 skipped, exit 0 | 17.0s |
 | `make lint` | ruff, ty and `sources_lock.py check` clean, exit 0 | 1.3s |
 
-The skipped test is the sandbox probe that needs a loopback bind. `make test`
+The skipped test is `test_workflow`'s real-archive qualification, which needs
+`CHROMIUM_RELEASE_TEST_WORK_VOLUME` and a Docker runner. `make test`
 selects the `macos` group here; the `linux` and `linux-builder` groups need a
 Linux host and the builder image (`Needs environment`).
 
