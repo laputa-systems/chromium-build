@@ -8,7 +8,11 @@ import shutil
 import subprocess
 import sys
 import time
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
+
+type JsonObject = dict[str, Any]
 
 
 class ScriptFailure(RuntimeError):
@@ -55,19 +59,18 @@ def run(
     *,
     check: bool = True,
     capture_output: bool = False,
-    text: bool = True,
     timeout: float | None = None,
-    **kwargs,
-) -> subprocess.CompletedProcess:
+    env: Mapping[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     try:
         result = subprocess.run(
             command,
             check=False,
             capture_output=capture_output,
-            text=text,
-            errors="replace" if text else None,
+            text=True,
+            errors="replace",
             timeout=timeout,
-            **kwargs,
+            env=env,
         )
     except (OSError, subprocess.TimeoutExpired) as error:
         raise ScriptFailure(f"command failed: {' '.join(command)}: {error}") from error

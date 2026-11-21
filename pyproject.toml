@@ -27,6 +27,10 @@ python-platform = "all"
 [tool.ty.analysis]
 allowed-unresolved-imports = ["PIL", "PIL.*", "gclient_eval"]
 
+[tool.ty.rules]
+missing-type-argument = "error"
+unused-ignore-comment = "error"
+
 [[tool.uv.index]]
 url = "https://pypi.17166969.xyz/current/simple/"
 default = true

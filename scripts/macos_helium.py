@@ -6,9 +6,9 @@ import shutil
 import sys
 import time
 from pathlib import Path
-from typing import Any
 
 import macos_backend as backend
+from script_support import JsonObject
 
 
 def local_patches(layout: backend.WorkLayout) -> list[str]:
@@ -23,7 +23,7 @@ def local_patches(layout: backend.WorkLayout) -> list[str]:
     return names
 
 
-def load_lock(layout: backend.WorkLayout) -> dict[str, Any]:
+def load_lock(layout: backend.WorkLayout) -> JsonObject:
     path = layout.repo_root / backend.LOCK_RELATIVE
     lock = backend.read_json(path, "macOS Helium input lock")
     if (lock.get("status"), lock.get("platform"), lock.get("architecture")) != ("resolved", "macos", "arm64"):
@@ -36,7 +36,7 @@ def load_lock(layout: backend.WorkLayout) -> dict[str, Any]:
     return lock
 
 
-def local_overlay_identity(layout: backend.WorkLayout) -> dict[str, Any]:
+def local_overlay_identity(layout: backend.WorkLayout) -> JsonObject:
     root = layout.repo_root / "config" / "patches" / "helium"
     patches = [{"name": name, "sha256": backend.sha256(root / name)} for name in local_patches(layout)]
     disposition = layout.repo_root / "config" / "macos-helium.patch-disposition.json"
@@ -53,7 +53,7 @@ def extract_single(archive: Path, destination: Path) -> Path:
     return roots[0]
 
 
-def fetch_inputs(layout: backend.WorkLayout) -> dict[str, Any]:
+def fetch_inputs(layout: backend.WorkLayout) -> JsonObject:
     layout.ensure()
     lock = load_lock(layout)
     environment = backend.isolated_environment(layout, network="fetch")
@@ -97,7 +97,7 @@ def fetch_inputs(layout: backend.WorkLayout) -> dict[str, Any]:
     return report
 
 
-def install_pgo_profile(layout: backend.WorkLayout, entry: dict[str, Any]) -> None:
+def install_pgo_profile(layout: backend.WorkLayout, entry: JsonObject) -> None:
     pinned = (layout.source / "chrome" / "build" / "mac-arm.pgo.txt").read_text(encoding="utf-8").strip()
     if pinned != entry["filename"]:
         backend.fail(f"chrome/build/mac-arm.pgo.txt pins {pinned}, the lock provides {entry['filename']}")
@@ -134,7 +134,7 @@ def scale_resources(listing: Path, resources: Path) -> None:
         backend.command_output([str(sips), "-s", "format", "png", *resize, str(resources / source), "--out", str(target)], env=os.environ)
 
 
-def prepare_source(layout: backend.WorkLayout) -> dict[str, Any]:
+def prepare_source(layout: backend.WorkLayout) -> JsonObject:
     layout.ensure()
     lock = load_lock(layout)
     environment = backend.isolated_environment(layout, network="none")

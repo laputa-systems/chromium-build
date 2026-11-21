@@ -19,9 +19,10 @@ from linux_native_tools import (
     install_rust_toolchain,
     remove_foreign_host_binaries,
 )
+from script_support import JsonObject
 
 
-def read_json(path: Path) -> dict:
+def read_json(path: Path) -> JsonObject:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -40,7 +41,7 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def run(command: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess:
+def run(command: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[bytes]:
     print("prepare-helium:", " ".join(map(str, command)))
     return subprocess.run(command, cwd=cwd, check=True)
 
@@ -60,7 +61,7 @@ def series(root: Path, name: str) -> list[Path]:
     return patches
 
 
-def apply_patch(source: Path, patch: Path, record_dir: Path | None = None) -> dict:
+def apply_patch(source: Path, patch: Path, record_dir: Path | None = None) -> JsonObject:
     recorded = patch
     if record_dir is not None:
         record_dir.mkdir(parents=True, exist_ok=True)
@@ -101,7 +102,7 @@ def apply_patch(source: Path, patch: Path, record_dir: Path | None = None) -> di
     }
 
 
-def apply_series(source: Path, root: Path, label: str, record_dir: Path, excluded: set[str]) -> tuple[list[dict], list[str]]:
+def apply_series(source: Path, root: Path, label: str, record_dir: Path, excluded: set[str]) -> tuple[list[JsonObject], list[str]]:
     records, skipped = [], []
     for patch in series(root, label):
         name = f"{label}/{patch.relative_to(root / 'patches').as_posix()}"
@@ -126,7 +127,7 @@ def materialize_local_patches(destination: Path, names: list[str], source_roots:
 
 
 
-def toolchain_selection(lock: dict, arch: str) -> dict:
+def toolchain_selection(lock: JsonObject, arch: str) -> JsonObject:
     return {
         "status": "complete",
         "network": "none",

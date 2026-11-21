@@ -12,7 +12,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from script_support import ScriptFailure
+from script_support import JsonObject, ScriptFailure
 
 PRODUCTS = ("chromium", "helium")
 PROFILES = {
@@ -209,7 +209,7 @@ def identity(product: Product) -> dict[str, object]:
     }
 
 
-def require_report(path: Path, product: Product, phase: str) -> dict:
+def require_report(path: Path, product: Product, phase: str) -> JsonObject:
     if not path.is_file():
         raise ScriptFailure(f"{phase} has not passed for {product.name}; run {phase} first")
     report = json.loads(path.read_text(encoding="utf-8"))
@@ -236,10 +236,12 @@ def package_world(path: Path) -> list[str]:
     world = lock.get("world")
     if not isinstance(world, list) or not world:
         raise ScriptFailure(f"{path}: world list is empty")
+    tokens: list[str] = []
     for token in world:
         if not isinstance(token, str) or not re.fullmatch(r"[A-Za-z0-9+._-]+=[A-Za-z0-9._-]+", token):
             raise ScriptFailure(f"{path}: invalid package token {token!r}")
-    return world
+        tokens.append(token)
+    return tokens
 
 
 def resolve_main(argv: list[str]) -> int:

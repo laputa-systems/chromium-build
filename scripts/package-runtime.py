@@ -16,6 +16,7 @@ from pathlib import Path, PurePosixPath
 
 import linux_product
 import linux_runtime
+from script_support import JsonObject
 
 HOST_LIBRARIES = linux_runtime.MUSL_LIBRARIES
 GLIBC = linux_runtime.GLIBC_LIBRARIES
@@ -121,7 +122,7 @@ def bundle_fonts(root: Path) -> None:
     (root / "fontconfig" / "fonts.conf").write_text(FONTS_CONF, encoding="utf-8")
 
 
-def stage_manifest(stage: Path, product: str) -> dict:
+def stage_manifest(stage: Path, product: str) -> JsonObject:
     manifest = json.loads((stage / "runtime-manifest.json").read_text(encoding="utf-8"))
     if manifest.get("status") != "complete":
         raise RuntimeError("staged runtime is incomplete; run stage-runtime first")
@@ -132,7 +133,7 @@ def stage_manifest(stage: Path, product: str) -> dict:
     return manifest
 
 
-def copy_staged(stage: Path, destination: Path, manifest: dict) -> None:
+def copy_staged(stage: Path, destination: Path, manifest: JsonObject) -> None:
     for entry in manifest["files"]:
         relative = PurePosixPath(entry["path"])
         source = stage / relative
@@ -228,7 +229,7 @@ def archive_package(
     return archive, checksum
 
 
-def verify_archive(archive: Path, archive_root: str, expected: dict) -> None:
+def verify_archive(archive: Path, archive_root: str, expected: JsonObject) -> None:
     with tempfile.TemporaryDirectory(prefix="helium package verification ") as directory:
         root = Path(directory)
         with tarfile.open(archive, "r:xz") as bundle:

@@ -6,6 +6,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from script_support import JsonObject
+
 ROOT = Path(__file__).resolve().parents[1]
 SETUP = runpy.run_path(str(ROOT / "scripts/setup-helium-adblock.py"))
 
@@ -48,7 +50,7 @@ class VendorTest(unittest.TestCase):
             f'checksum = "{digest}"\n'
         )
 
-    def vendor(self) -> dict:
+    def vendor(self) -> JsonObject:
         return SETUP["vendor"](
             self.source, self.inputs, "helium-filters-1.tar.gz", hashlib.sha256(self.filters).hexdigest(), self.patches
         )

@@ -19,6 +19,7 @@ from pathlib import Path, PurePosixPath
 
 import linux_product
 import linux_runtime
+from script_support import JsonObject
 
 
 class InstallError(RuntimeError):
@@ -32,7 +33,7 @@ class VerifiedArchive:
     root_name: str
     version: str
     architecture: str
-    manifest: dict
+    manifest: JsonObject
 
 
 def digest(path: Path) -> str:
@@ -75,7 +76,7 @@ def archive_product(archive: Path, desktop: linux_product.Desktop) -> None:
         raise InstallError(f"archive is not {desktop.name}; acceptance is for {desktop.name!r}, not {archive_name}")
 
 
-def acceptance(archive: Path, archive_digest: str) -> dict:
+def acceptance(archive: Path, archive_digest: str) -> JsonObject:
     path = archive.with_name(archive.name + ".acceptance.json")
     require_regular_file(path, "archive acceptance sidecar")
     report = json.loads(path.read_text(encoding="utf-8"))
@@ -117,7 +118,7 @@ def safe_member(member: tarfile.TarInfo, root_name: str) -> PurePosixPath:
     return relative
 
 
-def manifest_for(root: Path, report: dict, archive: Path) -> dict:
+def manifest_for(root: Path, report: JsonObject, archive: Path) -> JsonObject:
     manifest_path = root / "package-manifest.json"
     require_regular_file(manifest_path, "package manifest")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))

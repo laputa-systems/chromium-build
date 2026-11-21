@@ -22,6 +22,8 @@ import tarfile
 import tomllib
 from pathlib import Path
 
+from script_support import JsonObject
+
 WORKSPACE_SOURCE = "components/helium_adblock/rs/crates"
 WORKSPACE = "third_party/rust/helium/chromium_crates_io"
 CHROMIUM_WORKSPACE = "third_party/rust/chromium_crates_io"
@@ -122,7 +124,7 @@ def unpack_filters(source: Path, filters: Path, expected_sha256: str) -> str:
     return digest
 
 
-def vendor(source: Path, inputs: Path, filters: str, filters_sha256: str, crate_patches: Path) -> dict:
+def vendor(source: Path, inputs: Path, filters: str, filters_sha256: str, crate_patches: Path) -> JsonObject:
     return {
         "filters": {"path": FILTERS, "archive": filters, "sha256": unpack_filters(source, inputs / filters, filters_sha256)},
         "crates": vendor_crates(source, inputs, crate_patches),
@@ -144,7 +146,7 @@ def copy_workspace_inputs(source: Path) -> None:
         shutil.copyfile(chromium / relative, workspace / relative)
 
 
-def cargo_metadata(source: Path, environment: dict[str, str]) -> dict:
+def cargo_metadata(source: Path, environment: dict[str, str]) -> JsonObject:
     workspace = source / WORKSPACE
     result = subprocess.run(
         [sys.executable, str(source / "tools/crates/run_cargo.py"), "metadata", "--locked", "--offline",
@@ -156,7 +158,7 @@ def cargo_metadata(source: Path, environment: dict[str, str]) -> dict:
     return json.loads(result.stdout)
 
 
-def write_forwarders(source: Path, metadata: dict) -> None:
+def write_forwarders(source: Path, metadata: JsonObject) -> None:
     members = set(metadata["workspace_members"])
     for package in metadata["packages"]:
         if package["source"] is not None or package["id"] in members:
@@ -181,7 +183,7 @@ def write_forwarders(source: Path, metadata: dict) -> None:
             shutil.copyfile(upstream / "README.chromium", destination / "README.chromium")
 
 
-def write_engine_version(source: Path, metadata: dict) -> str:
+def write_engine_version(source: Path, metadata: JsonObject) -> str:
     versions = {package["version"] for package in metadata["packages"] if package["name"] == "adblock"}
     if len(versions) != 1:
         raise SystemExit(f"cargo metadata resolved adblock versions {sorted(versions)}, want exactly one")
