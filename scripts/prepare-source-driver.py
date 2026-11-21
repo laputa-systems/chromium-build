@@ -110,6 +110,7 @@ DESKTOP_PATCHES = (
     "headless-no-web-app-dbus-portal.patch",
     "headless-global-accelerator-no-dbus-return.patch",
     "bounded-back-to-back-begin-frames.patch",
+    "desktop-harfrust-shaping-default.patch",
     "musl-no-execinfo-156.patch",
     "musl-no-mallinfo-156.patch",
     "musl-mallinfo-function-156.patch",
