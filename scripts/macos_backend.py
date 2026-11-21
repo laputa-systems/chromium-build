@@ -25,6 +25,7 @@ import stat
 import subprocess
 import sys
 import tarfile
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -52,7 +53,6 @@ MH_MAGIC_64 = 0xFEEDFACF
 MH_PIE_FLAG = 0x200000
 MH_EXECUTE = 0x2
 MH_DYLIB = 0x6
-MH_BUNDLE = 0x8
 CPU_TYPE_ARM64 = 0x0100000C
 LC_REQ_DYLD = 0x80000000
 LC_SEGMENT_64 = 0x19
@@ -122,7 +122,7 @@ def atomic_write(path: Path, content: str) -> None:
     os.replace(temporary, path)
 
 
-def atomic_json(path: Path, value: Any) -> None:
+def atomic_json(path: Path, value: object) -> None:
     atomic_write(path, json.dumps(value, indent=2, sort_keys=True) + "\n")
 
 
@@ -380,7 +380,7 @@ def stream_command(
 ) -> None:
     effective = sandbox_prefix_for_env(env) + list(command)
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    started = time.monotonic()
+    timed_out = threading.Event()
     try:
         with log_path.open("w", encoding="utf-8") as log:
             process = subprocess.Popen(
@@ -392,22 +392,34 @@ def stream_command(
                 text=True,
                 bufsize=1,
             )
-            assert process.stdout is not None
-            for line in process.stdout:
-                print(line, end="")
-                log.write(line)
-                log.flush()
-                if timeout is not None and time.monotonic() - started > timeout:
-                    process.terminate()
-                    try:
-                        process.wait(timeout=10)
-                    except subprocess.TimeoutExpired:
-                        process.kill()
-                        process.wait()
-                    fail(f"command timed out; see {log_path}")
-            status = process.wait()
+
+            def stop_on_timeout() -> None:
+                if process.poll() is not None:
+                    return
+                timed_out.set()
+                process.terminate()
+                try:
+                    process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+
+            watchdog = threading.Timer(timeout, stop_on_timeout) if timeout is not None else None
+            if watchdog is not None:
+                watchdog.start()
+            try:
+                assert process.stdout is not None
+                for line in process.stdout:
+                    print(line, end="")
+                    log.write(line)
+                    log.flush()
+                status = process.wait()
+            finally:
+                if watchdog is not None:
+                    watchdog.cancel()
     except OSError as error:
         fail(f"command failed: {' '.join(command)}: {error}")
+    if timed_out.is_set():
+        fail(f"command timed out; see {log_path}")
     if status:
         fail(f"command failed ({status}); see {log_path}")
 
@@ -2060,7 +2072,7 @@ def materialize_archive_dependency_metadata(
     original_sys_path = list(sys.path)
     try:
         sys.path.insert(0, str(depot_tools))
-        import gclient_eval  # type: ignore[import-not-found]
+        import gclient_eval
 
         common_variables = {
             "checkout_mac": True,
@@ -2786,7 +2798,7 @@ def apply_macos_profile_compatibility(source: Path) -> dict[str, Any]:
     }
 
 
-def stable_digest(value: Any) -> str:
+def stable_digest(value: object) -> str:
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
@@ -3518,13 +3530,6 @@ def parse_macho_header(path: Path) -> dict[str, Any] | None:
                 minos = candidate
         offset += cmdsize
     return {"flags": flags, "filetype": filetype, "ncmds": ncmds, "commands": commands, "minos": minos}
-
-
-def macho_has_pie(path: Path) -> bool:
-    header = parse_macho_header(path)
-    if header is None:
-        fail(f"cannot parse Mach-O header: {path}")
-    return bool(header["flags"] & MH_PIE_FLAG)
 
 
 def macho_min_os(path: Path) -> tuple[int, int, int] | None:

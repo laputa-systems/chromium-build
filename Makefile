@@ -47,7 +47,7 @@ DOCKER ?= docker
 .NOTPARALLEL:
 .PHONY: image fetch prepare gate-a gate-b gate-c gate-d gate-e gate-f gates
 .PHONY: release-linux package install
-.PHONY: bootstrap full-build resume-build build-target stage-runtime test-fast test-functional test-staged cache-stats resume-check graph-breakdown check-py lint test test-ci build verify clean
+.PHONY: bootstrap full-build resume-build build-target stage-runtime test-fast test-functional test-staged cache-stats resume-check graph-breakdown check-py lint test test-ci coverage build verify clean
 .PHONY: macos-doctor macos-smoke-preflight macos-update-lock macos-fetch macos-prepare macos-configure macos-cache-stats macos-build macos-stage-runtime macos-test-staged
 
 check-py: lint
@@ -60,6 +60,12 @@ lint:
 test:
 	mkdir -p .work/tmp
 	TMPDIR="$(CURDIR)/.work/tmp" PYTHONPATH=scripts:tests uv run python tests/run_controller_tests.py $(if $(filter Darwin,$(shell uname -s)),macos,linux)
+
+coverage:
+	mkdir -p .work/tmp
+	rm -f .work/tmp/.coverage*
+	TMPDIR="$(CURDIR)/.work/tmp" PYTHONPATH=scripts:tests uv run --with coverage coverage run tests/run_controller_tests.py $(if $(filter Darwin,$(shell uname -s)),macos,linux)
+	uv run --with coverage coverage report --skip-empty
 
 test-ci:
 	mkdir -p .work/tmp

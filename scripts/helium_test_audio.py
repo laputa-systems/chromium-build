@@ -18,15 +18,16 @@ from pathlib import Path
 
 from browser_test_support import CdpConnection, WebSocket, terminate_process
 from helium_wayland import HeadlessSway
+from script_support import JsonObject
 
 
-def write_json(path: Path, value: dict) -> None:
+def write_json(path: Path, value: JsonObject) -> None:
     temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}")
     temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     temporary.replace(path)
 
 
-def wait_cdp(port: int, process: subprocess.Popen, timeout: float) -> dict:
+def wait_cdp(port: int, process: subprocess.Popen[bytes], timeout: float) -> JsonObject:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if process.poll() is not None:
@@ -76,7 +77,7 @@ def run(args: argparse.Namespace) -> int:
     output.mkdir(parents=True, exist_ok=True)
     report_path = output / "test-audio.json"
     profile = Path(tempfile.mkdtemp(prefix="helium-audio-profile-", dir=output))
-    report: dict = {
+    report: JsonObject = {
         "schema": 1,
         "status": "running",
         "persona": args.persona,
@@ -190,8 +191,8 @@ def run(args: argparse.Namespace) -> int:
     return 0
 
 
-def parse_persona(value: str) -> dict:
-    parsed: dict = {}
+def parse_persona(value: str) -> JsonObject:
+    parsed: JsonObject = {}
     for part in value.split(","):
         key, _, field = part.partition("=")
         parsed[key.strip()] = int(field.strip())

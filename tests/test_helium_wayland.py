@@ -9,6 +9,8 @@ import time
 import unittest
 from pathlib import Path
 
+from script_support import JsonObject
+
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts/helium_wayland.py"
 
@@ -114,7 +116,7 @@ class FixtureTest(unittest.TestCase):
         path.chmod(0o755)
         return path
 
-    def run_fixture(self, *, timeout: float = 10, extra: list[str] | None = None) -> subprocess.CompletedProcess:
+    def run_fixture(self, *, timeout: float = 10, extra: list[str] | None = None) -> subprocess.CompletedProcess[str]:
         command = [
             sys.executable,
             str(SCRIPT),
@@ -141,7 +143,7 @@ class FixtureTest(unittest.TestCase):
         command.extend(extra or [])
         return subprocess.run(command, capture_output=True, text=True, timeout=timeout, check=False)
 
-    def report(self) -> dict:
+    def report(self) -> JsonObject:
         return json.loads((self.output / "fixture-report.json").read_text(encoding="utf-8"))
 
     def install_success(self):

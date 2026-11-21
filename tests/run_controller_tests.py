@@ -3,7 +3,7 @@ import sys
 import unittest
 from pathlib import Path
 
-MACOS = {"test_macos_backend", "test_release_assets"}
+MACOS = {"test_macos_backend", "test_release_assets", "test_verify_macos_ci"}
 LINUX_BUILDER = {"test_helium_crt", "test_helium_runtime", "test_helium_wayland"}
 
 

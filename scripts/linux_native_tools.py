@@ -8,8 +8,10 @@ import tarfile
 import tempfile
 from pathlib import Path
 
+from script_support import JsonObject
 
-def install_rust_toolchain(source: Path, inputs: Path, lock: dict, arch: str) -> dict | None:
+
+def install_rust_toolchain(source: Path, inputs: Path, lock: JsonObject, arch: str) -> JsonObject | None:
     item = lock["architecture_inputs"][arch].get("rust_toolchain")
     if item is None:
         return None
@@ -57,7 +59,7 @@ def elf_machine(path: Path) -> int | None:
     return int.from_bytes(header[18:20], "little")
 
 
-def remove_foreign_host_binaries(source: Path, arch: str) -> dict:
+def remove_foreign_host_binaries(source: Path, arch: str) -> JsonObject:
     removed: dict[str, int] = {}
 
     def record(relative: Path) -> None:
@@ -85,7 +87,7 @@ def remove_foreign_host_binaries(source: Path, arch: str) -> dict:
 NATIVE_EXECUTABLES = ("typescript_native", "esbuild_native")
 
 
-def install_native_executable(source: Path, inputs: Path, item: dict, arch: str) -> dict:
+def install_native_executable(source: Path, inputs: Path, item: JsonObject, arch: str) -> JsonObject:
     destination = source / item["destination"]
     pin = item["chromium_pin"]
     if pin["contains"] not in (source / pin["path"]).read_text(encoding="utf-8"):

@@ -34,11 +34,12 @@ from browser_test_support import (
     terminate_process,
 )
 from helium_wayland import FIXTURE_SIZE, HeadlessSway, verify_png
+from script_support import JsonObject
 
 CONTENT_COLOR = (51, 204, 102)
 
 
-def write_json(path: Path, value: dict) -> None:
+def write_json(path: Path, value: JsonObject) -> None:
     temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}")
     temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     temporary.replace(path)
@@ -67,7 +68,7 @@ def png_dimensions(path: Path) -> tuple[int, int]:
     return struct.unpack(">II", data[16:24])
 
 
-def wait_cdp(port: int, process: subprocess.Popen, timeout: float) -> dict:
+def wait_cdp(port: int, process: subprocess.Popen[bytes], timeout: float) -> JsonObject:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if process.poll() is not None:
@@ -111,7 +112,7 @@ def evaluate(connection: CdpConnection, expression: str):
     return result.get("result", {}).get("value")
 
 
-def find_window(tree: dict, pids: set[int]) -> dict:
+def find_window(tree: JsonObject, pids: set[int]) -> JsonObject:
     def walk(node):
         yield node
         for child in node.get("nodes", []) + node.get("floating_nodes", []):
@@ -128,7 +129,7 @@ def find_window(tree: dict, pids: set[int]) -> dict:
     return candidates[0]
 
 
-def sample_pixels(path: Path, window: dict) -> dict:
+def sample_pixels(path: Path, window: JsonObject) -> JsonObject:
     from PIL import Image
 
     image = Image.open(path).convert("RGB")
@@ -149,7 +150,7 @@ def sample_pixels(path: Path, window: dict) -> dict:
     return {"background": background, "content": center, "chrome": chrome, "window": rect}
 
 
-def sandbox_observations(connection: CdpConnection, require_pid_namespace: bool = False) -> dict:
+def sandbox_observations(connection: CdpConnection, require_pid_namespace: bool = False) -> JsonObject:
     try:
         processes = connection.call("SystemInfo.getProcessInfo").get("processInfo", [])
     except Exception as error:
@@ -189,7 +190,7 @@ def sandbox_observations(connection: CdpConnection, require_pid_namespace: bool 
     return {"renderers": observations}
 
 
-def unprivileged_user_namespaces() -> dict:
+def unprivileged_user_namespaces() -> JsonObject:
     values = {}
     for name in ("user/max_user_namespaces", "kernel/unprivileged_userns_clone"):
         path = Path("/proc/sys") / name
@@ -207,7 +208,7 @@ def serve_fixtures(directory: Path) -> http.server.ThreadingHTTPServer:
     return server
 
 
-def wait_devtools_line(log_path: Path, process: subprocess.Popen, timeout: float) -> str:
+def wait_devtools_line(log_path: Path, process: subprocess.Popen[bytes], timeout: float) -> str:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         match = re.search(r"DevTools listening on (ws://\S+)", log_path.read_text(encoding="utf-8", errors="replace"))
@@ -219,7 +220,7 @@ def wait_devtools_line(log_path: Path, process: subprocess.Popen, timeout: float
     raise RuntimeError("headless Helium never printed its DevTools endpoint")
 
 
-def close_browser(browser_connection: CdpConnection, process: subprocess.Popen, process_group: int) -> dict:
+def close_browser(browser_connection: CdpConnection, process: subprocess.Popen[bytes], process_group: int) -> JsonObject:
     browser_connection.call("Browser.close")
     browser_connection.close()
     returncode = process.wait(timeout=30)
@@ -235,7 +236,7 @@ def close_browser(browser_connection: CdpConnection, process: subprocess.Popen, 
     return {"returncode": returncode, "survivors": survivors, "exited_unreaped": exited_unreaped}
 
 
-def headless_environment_for(environment: dict, profile: Path) -> dict:
+def headless_environment_for(environment: dict[str, str], profile: Path) -> JsonObject:
     environment = {name: value for name, value in environment.items() if name not in ("WAYLAND_DISPLAY", "DISPLAY", "XDG_SESSION_TYPE")}
     home = profile / "home"
     home.mkdir(mode=0o700)
@@ -251,7 +252,7 @@ def headless_environment_for(environment: dict, profile: Path) -> dict:
 SIGSYS = 31
 
 
-def crashed_targets(connection: CdpConnection) -> list[dict]:
+def crashed_targets(connection: CdpConnection) -> list[JsonObject]:
     crashes = [event.get("params", {}) for event in connection.events if event.get("method") == "Target.targetCrashed"]
     connection.events = [event for event in connection.events if event.get("method") != "Target.targetCrashed"]
     return [
@@ -265,7 +266,7 @@ def crashed_targets(connection: CdpConnection) -> list[dict]:
     ]
 
 
-def load_instance(args: argparse.Namespace, output: Path, environment: dict, index: int, deadline: float, server_port: int, result: dict) -> None:
+def load_instance(args: argparse.Namespace, output: Path, environment: dict[str, str], index: int, deadline: float, server_port: int, result: JsonObject) -> None:
     profile = Path(tempfile.mkdtemp(prefix=f"helium-load-{index}-", dir=output))
     log_path = output / f"test-fast-load-{index}.log"
     process = None
@@ -320,10 +321,10 @@ def load_instance(args: argparse.Namespace, output: Path, environment: dict, ind
             result["cleanup"] = terminate_process(process)
 
 
-def run_headless_load(args: argparse.Namespace, output: Path, environment: dict) -> dict:
+def run_headless_load(args: argparse.Namespace, output: Path, environment: dict[str, str]) -> JsonObject:
     server = serve_fixtures(args.fixtures)
     deadline = time.monotonic() + args.load_seconds
-    instances: list[dict] = [{} for _ in range(args.load_instances)]
+    instances: list[JsonObject] = [{} for _ in range(args.load_instances)]
     threads = [
         threading.Thread(target=load_instance, args=(args, output, environment, index, deadline, server.server_address[1], instances[index]))
         for index in range(args.load_instances)
@@ -351,11 +352,11 @@ def run_headless_load(args: argparse.Namespace, output: Path, environment: dict)
     return result
 
 
-def run_headless(args: argparse.Namespace, output: Path, environment: dict, devtools_product: str) -> dict:
+def run_headless(args: argparse.Namespace, output: Path, environment: dict[str, str], devtools_product: str) -> JsonObject:
     profile = Path(tempfile.mkdtemp(prefix="helium-headless-profile-", dir=output))
     environment = headless_environment_for(environment, profile)
     user_data = profile / "user-data"
-    result: dict = {"user_namespaces": unprivileged_user_namespaces(), "profile": str(profile)}
+    result: JsonObject = {"user_namespaces": unprivileged_user_namespaces(), "profile": str(profile)}
     server = serve_fixtures(args.fixtures)
     log_path = output / "test-fast-headless.log"
     process = None
@@ -417,7 +418,7 @@ def run_headless(args: argparse.Namespace, output: Path, environment: dict, devt
         args.headless_result = result
 
 
-def chromium_version(lock: dict) -> tuple[str, str]:
+def chromium_version(lock: JsonObject) -> tuple[str, str]:
     return lock["product"]["version"], lock["chromium"]["version"]
 
 

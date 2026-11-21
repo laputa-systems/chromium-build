@@ -72,7 +72,6 @@ class Product:
     profile: str
     chromium_version: str
     product_version: str | None
-    devtools_revision: str
     image: str
     work_volume: str
     cache_volume: str
@@ -169,7 +168,6 @@ def resolve(product: str, arch: str, profile: str | None = None, root: Path | No
         profile=profile,
         chromium_version=chromium_version,
         product_version=product_version,
-        devtools_revision=lock["chromium"]["devtools_revision"],
         image=image,
         work_volume=work_volume,
         cache_volume=cache_volume,
@@ -209,24 +207,6 @@ def identity(product: Product) -> dict[str, object]:
     }
 
 
-def require_report(path: Path, product: Product, phase: str) -> dict:
-    if not path.is_file():
-        raise ScriptFailure(f"{phase} has not passed for {product.name}; run {phase} first")
-    report = json.loads(path.read_text(encoding="utf-8"))
-    if report.get("status") != "complete":
-        raise ScriptFailure(f"{phase} report is incomplete; rerun {phase}")
-    expected = identity(product)
-    for key in ("product", "chromium_version", "product_version", "architecture", "profile", "inputs_lock_sha256"):
-        if key not in report:
-            raise ScriptFailure(f"{phase} report has no {key}; rerun {phase}")
-        if report[key] != expected[key]:
-            raise ScriptFailure(
-                f"{phase} report {key}={report[key]!r} does not match "
-                f"{expected[key]!r}; rerun {phase}"
-            )
-    return report
-
-
 def package_world(path: Path) -> list[str]:
     if not path.is_file():
         raise ScriptFailure(f"missing package lock {path}")
@@ -236,10 +216,12 @@ def package_world(path: Path) -> list[str]:
     world = lock.get("world")
     if not isinstance(world, list) or not world:
         raise ScriptFailure(f"{path}: world list is empty")
+    tokens: list[str] = []
     for token in world:
         if not isinstance(token, str) or not re.fullmatch(r"[A-Za-z0-9+._-]+=[A-Za-z0-9._-]+", token):
             raise ScriptFailure(f"{path}: invalid package token {token!r}")
-    return world
+        tokens.append(token)
+    return tokens
 
 
 def resolve_main(argv: list[str]) -> int:

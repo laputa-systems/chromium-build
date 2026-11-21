@@ -14,6 +14,7 @@ from pathlib import Path
 
 import linux_product
 import runtime_install
+from script_support import JsonObject
 
 
 def digest(path: Path) -> str:
@@ -24,7 +25,7 @@ def digest(path: Path) -> str:
     return hasher.hexdigest()
 
 
-def section(report: dict, key: str) -> dict:
+def section(report: JsonObject, key: str) -> JsonObject:
     value = report.get(key)
     return value if isinstance(value, dict) else {}
 
@@ -43,7 +44,7 @@ def headless_renderers_sandboxed(renderers: object) -> bool:
     )
 
 
-def headless_checks(headless: dict, desktop: linux_product.Desktop | None = None) -> dict[str, bool]:
+def headless_checks(headless: JsonObject, desktop: linux_product.Desktop | None = None) -> dict[str, bool]:
     desktop = desktop or runtime_install.desktop_for("helium")
     version_info = section(headless, "version_info")
     headless_exit = section(headless, "exit")
@@ -58,7 +59,7 @@ def headless_checks(headless: dict, desktop: linux_product.Desktop | None = None
     }
 
 
-def report_checks(report: dict, desktop: linux_product.Desktop | None = None) -> dict[str, bool]:
+def report_checks(report: JsonObject, desktop: linux_product.Desktop | None = None) -> dict[str, bool]:
     desktop = desktop or runtime_install.desktop_for("helium")
     renderers = section(report, "sandbox").get("renderers")
     headless = section(report, "headless")
@@ -82,7 +83,7 @@ def report_checks(report: dict, desktop: linux_product.Desktop | None = None) ->
     return checks
 
 
-def host_headless_checks(report: dict, product_version: str, desktop: linux_product.Desktop | None = None) -> dict[str, bool]:
+def host_headless_checks(report: JsonObject, product_version: str, desktop: linux_product.Desktop | None = None) -> dict[str, bool]:
     desktop = desktop or runtime_install.desktop_for("helium")
     if report.get("status") != "complete" or report.get("product") != desktop.name or report.get("scope") != "headless":
         raise runtime_install.InstallError(f"host headless report is not a complete {desktop.name.capitalize()} headless result")
@@ -109,7 +110,7 @@ def host_headless_checks(report: dict, product_version: str, desktop: linux_prod
     return checks
 
 
-def read_manifest(archive: Path) -> dict:
+def read_manifest(archive: Path) -> JsonObject:
     archive_digest = runtime_install.sidecar_digest(archive)
     root_name = archive.name.removesuffix(".tar.xz")
     with tempfile.TemporaryDirectory(prefix="helium-qualify-", dir=os.environ.get("TMPDIR") or None) as directory:
@@ -122,10 +123,7 @@ def read_manifest(archive: Path) -> dict:
                 if str(relative) in names:
                     raise runtime_install.InstallError(f"archive contains a duplicate entry: {member.name}")
                 names.add(str(relative))
-            try:
-                bundle.extractall(root.parent, filter="data")
-            except TypeError:
-                bundle.extractall(root.parent)
+            bundle.extractall(root.parent, filter="data")
         manifest_path = root / "package-manifest.json"
         if not manifest_path.is_file():
             raise runtime_install.InstallError("archive has no package manifest")

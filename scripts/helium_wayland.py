@@ -15,6 +15,8 @@ import tempfile
 import time
 from pathlib import Path
 
+from script_support import JsonObject
+
 READY_TIMEOUT = 15.0
 OPERATION_TIMEOUT = 10.0
 TERMINATE_TIMEOUT = 5.0
@@ -59,8 +61,8 @@ class HeadlessSway:
         self.log_path = self.attempt / "sway.log"
         self.wayland_socket: Path | None = None
         self.ipc_socket: Path | None = None
-        self.sway_process: subprocess.Popen | None = None
-        self.clipboard_process: subprocess.Popen | None = None
+        self.sway_process: subprocess.Popen[bytes] | None = None
+        self.clipboard_process: subprocess.Popen[bytes] | None = None
         self._log = None
         self._cancelled = False
 
@@ -112,7 +114,6 @@ class HeadlessSway:
             os.setgroups([])
             os.setgid(owner[1])
             os.setuid(owner[0])
-        self._owner = owner
         self.generate_config()
 
     def generate_config(self) -> None:
@@ -143,7 +144,7 @@ class HeadlessSway:
             time.sleep(0.1)
         raise FixtureError("sway did not become ready with an active output")
 
-    def query_outputs(self) -> list[dict]:
+    def query_outputs(self) -> list[JsonObject]:
         result = self.run_ipc(["-t", "get_outputs", "-r"])
         try:
             outputs = json.loads(result.stdout)
@@ -153,7 +154,7 @@ class HeadlessSway:
             raise FixtureError("swaymsg output list is not an array")
         return [item for item in outputs if isinstance(item, dict) and item.get("active")]
 
-    def run_ipc(self, arguments: list[str]) -> subprocess.CompletedProcess:
+    def run_ipc(self, arguments: list[str]) -> subprocess.CompletedProcess[str]:
         if self.ipc_socket is None:
             raise FixtureError("sway IPC socket is unavailable")
         return self.run(
@@ -161,7 +162,7 @@ class HeadlessSway:
             self.operation_timeout,
         )
 
-    def run(self, command: list[str], timeout: float, environment: dict[str, str] | None = None) -> subprocess.CompletedProcess:
+    def run(self, command: list[str], timeout: float, environment: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
         try:
             result = subprocess.run(
                 command,
@@ -178,7 +179,7 @@ class HeadlessSway:
             raise FixtureError(f"{command[0]} failed with {result.returncode}: {result.stderr.strip()}")
         return result
 
-    def select_output(self) -> dict:
+    def select_output(self) -> JsonObject:
         outputs = self.query_outputs()
         if not outputs:
             raise FixtureError("no active Sway output")
@@ -224,7 +225,7 @@ class HeadlessSway:
             time.sleep(0.1)
         raise FixtureError("clipboard round-trip did not observe the copied value")
 
-    def capture(self, output: dict) -> Path:
+    def capture(self, output: JsonObject) -> Path:
         if self.wayland_socket is None:
             raise FixtureError("Wayland socket is unavailable")
         name = output["name"]
@@ -255,7 +256,7 @@ class HeadlessSway:
         self._cancelled = True
 
 
-def output_size(output: dict) -> tuple[int, int]:
+def output_size(output: JsonObject) -> tuple[int, int]:
     mode = output.get("current_mode")
     if isinstance(mode, dict):
         width, height = mode.get("width"), mode.get("height")
@@ -276,7 +277,7 @@ def verify_png(path: Path) -> None:
         raise FixtureError(f"grim produced {width}x{height}, expected {FIXTURE_SIZE[0]}x{FIXTURE_SIZE[1]}")
 
 
-def terminate_group(process: subprocess.Popen, timeout: float) -> None:
+def terminate_group(process: subprocess.Popen[bytes], timeout: float) -> None:
     try:
         os.killpg(os.getpgid(process.pid), signal.SIGTERM)
     except ProcessLookupError:
@@ -299,7 +300,7 @@ def executable(name: str, override: str | None = None) -> str:
     return value
 
 
-def write_report(path: Path, report: dict) -> None:
+def write_report(path: Path, report: JsonObject) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}")
     temporary.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
