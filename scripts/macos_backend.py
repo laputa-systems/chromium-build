@@ -122,7 +122,7 @@ def atomic_write(path: Path, content: str) -> None:
     os.replace(temporary, path)
 
 
-def atomic_json(path: Path, value: Any) -> None:
+def atomic_json(path: Path, value: object) -> None:
     atomic_write(path, json.dumps(value, indent=2, sort_keys=True) + "\n")
 
 
@@ -2060,7 +2060,7 @@ def materialize_archive_dependency_metadata(
     original_sys_path = list(sys.path)
     try:
         sys.path.insert(0, str(depot_tools))
-        import gclient_eval  # type: ignore[import-not-found]
+        import gclient_eval
 
         common_variables = {
             "checkout_mac": True,
@@ -2786,7 +2786,7 @@ def apply_macos_profile_compatibility(source: Path) -> dict[str, Any]:
     }
 
 
-def stable_digest(value: Any) -> str:
+def stable_digest(value: object) -> str:
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
