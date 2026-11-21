@@ -61,18 +61,20 @@ class PolicyTestCase(unittest.TestCase):
             self.assertEqual(verify_macos_ci.main([str(argument) for argument in arguments]), 0)
         return output.getvalue().strip()
 
-    def assertRejected(self, *arguments: object, message: str) -> None:
+    def assertRejected(self, *arguments: object, message: str, report: object = None) -> None:
         with self.assertRaises(SystemExit) as raised:
             self.run_check(*arguments)
-        self.assertPolicyFailure(raised.exception, message)
+        self.assertPolicyFailure(raised.exception, message, report)
 
-    def assertPolicyFailure(self, error: SystemExit, message: str) -> None:
+    def assertPolicyFailure(self, error: SystemExit, message: str, report: object = None) -> None:
         text = str(error)
         if message.startswith("^"):
             self.assertRegex(text, message)
             return
         expected = f"macOS CI policy check failed: {message}"
-        self.assertTrue(text == expected or text.startswith(expected + "\nreport="), text)
+        if report is not None:
+            expected += "\nreport=" + json.dumps(report, indent=2, sort_keys=True)
+        self.assertEqual(text, expected)
 
 
 class InputLockTests(PolicyTestCase):
@@ -91,8 +93,10 @@ class InputLockTests(PolicyTestCase):
             "macos-26-arm64-locked-inputs-no-test-inputs-chromium-chromium.tar.xz-" + "ab" * 64
             + "-ungoogled-ungoogled.tar.gz-" + "cd" * 64,
         )
-        self.assertTrue(
-            self.run_check("cache-key", "--lock", lock, "--include-test-inputs").endswith("-ublock-origin-ublock.zip-" + "ef" * 64)
+        self.assertEqual(
+            self.run_check("cache-key", "--lock", lock, "--include-test-inputs"),
+            "macos-26-arm64-locked-inputs-with-test-inputs-chromium-chromium.tar.xz-" + "ab" * 64
+            + "-ungoogled-ungoogled.tar.gz-" + "cd" * 64 + "-ublock-origin-ublock.zip-" + "ef" * 64,
         )
 
     def test_cache_key_rejects_a_missing_or_malformed_digest(self):
@@ -101,6 +105,9 @@ class InputLockTests(PolicyTestCase):
             document["ungoogled"]["source"]["sha512"] = digest
             lock = write_json(self.root / "lock.json", document)
             self.assertRejected("cache-key", "--lock", lock, message="ungoogled has no valid SHA-512 lock digest")
+        del document["ungoogled"]["source"]["sha512"]
+        lock = write_json(self.root / "lock.json", document)
+        self.assertRejected("cache-key", "--lock", lock, message="ungoogled has no valid SHA-512 lock digest")
 
     def test_unreadable_or_non_object_locks_are_rejected(self):
         self.assertRejected("cache-key", "--lock", self.root / "missing.json", message=f"^{re.escape('macOS input lock is not readable JSON at ' + str(self.root / 'missing.json'))}")
@@ -110,9 +117,35 @@ class InputLockTests(PolicyTestCase):
     def test_chromium_version_prints_the_locked_version_and_requires_one(self):
         lock = write_json(self.root / "lock.json", self.lock())
         self.assertEqual(self.run_check("chromium-version", "--lock", lock), "156.0.1.2")
-        for chromium in ({}, {"version": ""}, {"version": 156}):
-            lock = write_json(self.root / "bad.json", {"chromium": chromium})
+        for document in ({}, {"chromium": {}}, {"chromium": {"version": ""}}, {"chromium": {"version": 156}}):
+            lock = write_json(self.root / "bad.json", document)
             self.assertRejected("chromium-version", "--lock", lock, message="macOS lock has no Chromium version")
+
+    def test_every_phase_report_names_itself_when_it_cannot_be_read(self):
+        metadata = self.root / "metadata"
+        for command, report, label in (
+            ("verify-preflight", "doctor.json", "doctor report"),
+            ("verify-configure", "configure-macos.json", "configure report"),
+            ("verify-cache-disabled", "compiler-cache-stats.json", "compiler cache report"),
+            ("verify-package", "package-macos.json", "package report"),
+        ):
+            with self.subTest(command):
+                self.assertRejected(
+                    command, "--work-root", self.root,
+                    message=f"^{re.escape(f'{label} is not readable JSON at {metadata / report}: ')}",
+                )
+                write_json(metadata / report, [])
+                self.assertRejected(
+                    command, "--work-root", self.root,
+                    message=f"^{re.escape(f'{label} must be a JSON object: {metadata / report}')}$",
+                )
+                (metadata / report).unlink()
+
+    def test_chromium_version_names_the_lock_it_cannot_read(self):
+        missing = self.root / "missing.json"
+        self.assertRejected(
+            "chromium-version", "--lock", missing, message=f"^{re.escape(f'macOS input lock is not readable JSON at {missing}: ')}"
+        )
 
     def test_the_committed_macos_lock_yields_a_cache_key(self):
         key = self.run_check("cache-key", "--lock", ROOT / "config" / "macos.inputs.lock")
@@ -120,20 +153,35 @@ class InputLockTests(PolicyTestCase):
 
 
 class LlvmTests(PolicyTestCase):
-    def clang(self, version: str, status: int = 0) -> Path:
+    def clang(self, version: str, status: int = 0, diagnostic: str = "") -> Path:
         path = self.root / "clang"
-        path.write_text(f"#!/bin/sh\necho 'clang version {version}'\nexit {status}\n", encoding="utf-8")
+        path.write_text(
+            f"#!/bin/sh\n[ \"$1\" = --version ] || exit 64\nprintf '{diagnostic}' >&2\n"
+            f"echo 'clang version {version}'\nexit {status}\n",
+            encoding="utf-8",
+        )
         path.chmod(0o755)
         return path
 
     def test_version_at_or_above_the_minimum_is_printed(self):
         self.assertEqual(self.run_check("verify-llvm", "--clang", self.clang("24.0.1"), "--minimum", "24.0.1"), "24.0.1")
         self.assertEqual(self.run_check("verify-llvm", "--clang", self.clang("25.1"), "--minimum", "24.9.9"), "25.1.0")
+        self.assertEqual(self.run_check("verify-llvm", "--clang", self.clang("24.0.0"), "--minimum", "24.0"), "24.0.0")
 
     def test_older_unparseable_failing_or_missing_clang_is_rejected(self):
         self.assertRejected("verify-llvm", "--clang", self.clang("23.9.9"), "--minimum", "24.0.0", message="LLVM (23, 9, 9) is older than (24, 0, 0)")
         self.assertRejected("verify-llvm", "--clang", self.clang("unknown"), "--minimum", "24", message="LLVM clang version is not parseable: clang version unknown")
-        self.assertRejected("verify-llvm", "--clang", self.clang("24.0.0", status=1), "--minimum", "24", message="LLVM clang failed: ")
+        self.assertRejected(
+            "verify-llvm", "--clang", self.clang("24.0.0", status=1, diagnostic="boom\\n"), "--minimum", "24",
+            message="LLVM clang failed: boom",
+        )
+        self.assertRejected(
+            "verify-llvm", "--clang", self.clang("24.0.0", status=1, diagnostic="\\377"), "--minimum", "24",
+            message="LLVM clang failed: \ufffd",
+        )
+        self.assertRejected(
+            "verify-llvm", "--clang", self.clang("24.0.0"), "--minimum", "junk", message="^could not parse a version from 'junk'$"
+        )
         self.assertRejected("verify-llvm", "--clang", self.root / "absent", "--minimum", "24", message="^could not execute LLVM clang: ")
 
 
@@ -167,7 +215,56 @@ class PreflightTests(PolicyTestCase):
             with self.subTest(message):
                 with self.assertRaises(SystemExit) as raised:
                     self.verify(report)
-                self.assertPolicyFailure(raised.exception, message)
+                self.assertPolicyFailure(raised.exception, message, report)
+
+    def test_version_floors_are_inclusive(self):
+        for section, key in (("macos", "version"), ("xcode", "sdk_version")):
+            for version, accepted in (("26", False), ("26.0", True), ("26.0.0", True), ("25.99.9", False)):
+                report = doctor_report()
+                report["checks"][section][key] = version
+                with self.subTest(section=section, version=version):
+                    if accepted:
+                        self.verify(report)
+                    else:
+                        with self.assertRaises(SystemExit):
+                            self.verify(report)
+
+    def test_the_required_llvm_tools_are_enough_and_the_report_may_omit_references(self):
+        report = doctor_report()
+        report["checks"]["llvm"]["tools"] = {name: "/bin/" + name for name in ("llvm-ar", "llvm-nm", "llvm-objcopy", "llvm-strip")}
+        del report["references"]
+        self.assertEqual(self.verify(report), "macOS full-build preflight policy: passed")
+
+    def test_missing_sections_fail_the_policy_instead_of_crashing(self):
+        report = doctor_report()
+        for section, message in (
+            ("filesystem", "free disk space is below the full-build floor"),
+            ("compiler_cache", "compiler caching is enabled"),
+            ("rust", "Rust toolchain is incomplete"),
+            ("llvm", "LLVM is not the bundled Chromium clang"),
+        ):
+            broken = json.loads(json.dumps(report))
+            del broken["checks"][section]
+            with self.subTest(section):
+                with self.assertRaises(SystemExit) as raised:
+                    self.verify(broken)
+                self.assertPolicyFailure(raised.exception, message, broken)
+        broken = json.loads(json.dumps(report))
+        del broken["checks"]["llvm"]["tools"]
+        with self.assertRaises(SystemExit) as raised:
+            self.verify(broken)
+        self.assertPolicyFailure(raised.exception, "required LLVM tools are missing", broken)
+        for section in ("macos", "xcode"):
+            broken = json.loads(json.dumps(report))
+            del broken["checks"][section]
+            with self.subTest(section):
+                with self.assertRaises(SystemExit) as raised:
+                    self.verify(broken)
+                self.assertEqual(str(raised.exception), "could not parse a version from '0'")
+        broken = {"status": "complete", "preflight_scope": "host-only-full-build"}
+        with self.assertRaises(SystemExit) as raised:
+            self.verify(broken)
+        self.assertEqual(str(raised.exception), "could not parse a version from '0'")
 
     def test_the_free_space_floor_is_the_argument(self):
         report = doctor_report()
@@ -187,22 +284,31 @@ class PhaseReportTests(PolicyTestCase):
         (metadata / "macos-release.args.gn").write_text('macos_single_locale = "en-US"\nis_component_build = false\n', encoding="utf-8")
         self.assertEqual(self.run_check("verify-configure", "--work-root", self.root), "macOS configure policy: passed")
         (metadata / "macos-release.args.gn").write_text('is_component_build = false\n', encoding="utf-8")
-        self.assertRejected("verify-configure", "--work-root", self.root, message="configure did not select en-US only")
+        self.assertRejected(
+            "verify-configure", "--work-root", self.root, message="configure did not select en-US only", report={"status": "complete"}
+        )
         (metadata / "macos-release.args.gn").write_text('macos_single_locale = "en-US"\nis_component_build = true\n', encoding="utf-8")
-        self.assertRejected("verify-configure", "--work-root", self.root, message="configure enabled a component build")
+        self.assertRejected(
+            "verify-configure", "--work-root", self.root, message="configure enabled a component build", report={"status": "complete"}
+        )
         (metadata / "macos-release.args.gn").unlink()
         self.assertRejected("verify-configure", "--work-root", self.root, message="^could not read generated GN args: ")
         write_json(metadata / "configure-macos.json", {"status": "failed"})
-        self.assertRejected("verify-configure", "--work-root", self.root, message="configure did not complete")
+        self.assertRejected(
+            "verify-configure", "--work-root", self.root, message="configure did not complete", report={"status": "failed"}
+        )
 
     def test_cache_disabled_requires_the_stats_report_to_say_so(self):
         path = self.root / "metadata" / "compiler-cache-stats.json"
         write_json(path, {"cache": {"status": "disabled"}})
         self.assertEqual(self.run_check("verify-cache-disabled", "--work-root", self.root), "compiler-cache policy: disabled")
-        write_json(path, {"cache": {"status": "enabled"}})
-        self.assertRejected("verify-cache-disabled", "--work-root", self.root, message="compiler caching is enabled")
-        write_json(path, {})
-        self.assertRejected("verify-cache-disabled", "--work-root", self.root, message="compiler caching is enabled")
+        report = {"cache": {"status": "enabled"}}
+        write_json(path, report)
+        self.assertRejected("verify-cache-disabled", "--work-root", self.root, message="compiler caching is enabled", report=report)
+        write_json(path, {"other": 1})
+        self.assertRejected(
+            "verify-cache-disabled", "--work-root", self.root, message="compiler caching is enabled", report={"other": 1}
+        )
 
 
 class PackageTests(PolicyTestCase):
@@ -212,10 +318,8 @@ class PackageTests(PolicyTestCase):
         archive.write_bytes(content)
         digest = hashlib.sha256(content).hexdigest()
         archive.with_name(archive.name + ".sha256").write_text(f"{digest}  {archive.name}\n", encoding="utf-8")
-        write_json(
-            self.root / "metadata" / "package-macos.json",
-            {"status": "complete", "archive": str(archive), "acceptance": acceptance, "sha256": digest},
-        )
+        self.report = {"status": "complete", "archive": str(archive), "acceptance": acceptance, "sha256": digest}
+        write_json(self.root / "metadata" / "package-macos.json", self.report)
         return archive
 
     def verify(self) -> str:
@@ -231,30 +335,74 @@ class PackageTests(PolicyTestCase):
 
     def test_acceptance_and_archive_name_must_agree(self):
         self.package(acceptance="skipped", name="Chromium-1.zip")
-        self.assertRejected("verify-package", "--work-root", self.root, message="skipped acceptance must use experimental archive")
+        self.assertRejected("verify-package", "--work-root", self.root, message="skipped acceptance must use experimental archive", report=self.report)
         self.package(acceptance="complete", name="Chromium-1-experimental.zip")
-        self.assertRejected("verify-package", "--work-root", self.root, message="production package must not use experimental name")
+        self.assertRejected("verify-package", "--work-root", self.root, message="production package must not use experimental name", report=self.report)
         self.package(acceptance="unknown", name="Chromium-1.zip")
-        self.assertRejected("verify-package", "--work-root", self.root, message="package acceptance is not recorded")
+        self.assertRejected("verify-package", "--work-root", self.root, message="package acceptance is not recorded", report=self.report)
 
     def test_digest_checksum_and_location_are_verified(self):
         archive = self.package(acceptance="complete", name="Chromium-1.zip")
         archive.write_bytes(b"tampered")
-        self.assertRejected("verify-package", "--work-root", self.root, message="package digest does not match its report")
+        self.assertRejected("verify-package", "--work-root", self.root, message="package digest does not match its report", report=self.report)
         archive = self.package(acceptance="complete", name="Chromium-1.zip")
         archive.with_name(archive.name + ".sha256").write_text("0" * 64 + "\n", encoding="utf-8")
-        self.assertRejected("verify-package", "--work-root", self.root, message="package checksum is incorrect")
+        self.assertRejected("verify-package", "--work-root", self.root, message="package checksum is incorrect", report=self.report)
         archive.with_name(archive.name + ".sha256").unlink()
-        self.assertRejected("verify-package", "--work-root", self.root, message="package checksum is missing")
+        self.assertRejected("verify-package", "--work-root", self.root, message="package checksum is missing", report=self.report)
         archive.write_bytes(b"")
-        self.assertRejected("verify-package", "--work-root", self.root, message="package archive is missing")
+        self.assertRejected("verify-package", "--work-root", self.root, message="package archive is missing", report=self.report)
         outside = self.root / "elsewhere.zip"
         outside.write_bytes(b"archive")
-        report = json.loads((self.root / "metadata" / "package-macos.json").read_text())
-        write_json(self.root / "metadata" / "package-macos.json", {**report, "archive": str(outside)})
-        self.assertRejected("verify-package", "--work-root", self.root, message="package escaped the release directory")
-        write_json(self.root / "metadata" / "package-macos.json", {**report, "status": "failed"})
-        self.assertRejected("verify-package", "--work-root", self.root, message="package did not complete")
+        for changes, message in (
+            ({"archive": str(outside)}, "package escaped the release directory"),
+            ({"archive": None}, "package escaped the release directory"),
+            ({"status": "failed"}, "package did not complete"),
+        ):
+            report = {key: value for key, value in {**self.report, **changes}.items() if value is not None}
+            write_json(self.root / "metadata" / "package-macos.json", report)
+            self.assertRejected("verify-package", "--work-root", self.root, message=message, report=report)
+        archive.write_bytes(b"a")
+        report = {**self.report, "sha256": hashlib.sha256(b"a").hexdigest()}
+        archive.with_name(archive.name + ".sha256").write_text(report["sha256"], encoding="utf-8")
+        write_json(self.root / "metadata" / "package-macos.json", report)
+        self.assertIn("package policy: passed", self.verify())
+        del report["acceptance"]
+        write_json(self.root / "metadata" / "package-macos.json", report)
+        self.assertRejected("verify-package", "--work-root", self.root, message="package acceptance is not recorded", report=report)
+
+
+class CommandLineTests(PolicyTestCase):
+    def usage_error(self, *arguments: str) -> str:
+        errors = io.StringIO()
+        with contextlib.redirect_stderr(errors), self.assertRaises(SystemExit) as raised:
+            verify_macos_ci.main(list(arguments))
+        self.assertEqual(raised.exception.code, 2)
+        return errors.getvalue().strip().splitlines()[-1].split(": error: ", 1)[1]
+
+    def test_help_describes_the_module(self):
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output), self.assertRaises(SystemExit) as raised:
+            verify_macos_ci.main(["--help"])
+        self.assertEqual(raised.exception.code, 0)
+        self.assertIn(str(verify_macos_ci.__doc__), output.getvalue())
+
+    def test_a_command_is_required(self):
+        self.assertEqual(self.usage_error(), "the following arguments are required: command")
+
+    def test_each_command_names_its_required_options(self):
+        for command, required in (
+            ("claim-work-root", "--repo-root, --work-root"),
+            ("cache-key", "--lock"),
+            ("chromium-version", "--lock"),
+            ("verify-llvm", "--clang, --minimum"),
+            ("verify-preflight", "--work-root"),
+            ("verify-configure", "--work-root"),
+            ("verify-cache-disabled", "--work-root"),
+            ("verify-package", "--work-root"),
+        ):
+            with self.subTest(command):
+                self.assertEqual(self.usage_error(command), f"the following arguments are required: {required}")
 
 
 class WorkRootTests(PolicyTestCase):
