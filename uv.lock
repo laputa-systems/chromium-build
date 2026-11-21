@@ -26,7 +26,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "laputa-buildlib", specifier = "==0.1.0" }]
+requires-dist = [{ name = "laputa-buildlib", specifier = "==0.2.0" }]
 
 [package.metadata.requires-dev]
 dev = [
@@ -37,10 +37,10 @@ dev = [
 
 [[package]]
 name = "laputa-buildlib"
-version = "0.1.0"
+version = "0.2.0"
 source = { registry = "https://pypi.17166969.xyz/current/simple/" }
 wheels = [
-    { url = "https://pypi.17166969.xyz/current/wheels/laputa_buildlib-0.1.0-py3-none-any.whl", hash = "sha256:edd102a1713c903f93e19b10036983d123dd76fa1b04a0e5f3c5070f00a95383" },
+    { url = "https://pypi.17166969.xyz/current/wheels/laputa_buildlib-0.2.0-py3-none-any.whl", hash = "sha256:aaee620f0478544b1d32075b44de48e69bbcbd8b974d5f599d037494d59f4b4a" },
 ]
 
 [[package]]
