@@ -31,6 +31,12 @@ allowed-unresolved-imports = ["PIL", "PIL.*", "gclient_eval"]
 missing-type-argument = "error"
 unused-ignore-comment = "error"
 
+[tool.coverage.run]
+data_file = ".work/tmp/.coverage"
+branch = true
+source = ["scripts"]
+patch = ["subprocess"]
+
 [[tool.uv.index]]
 url = "https://pypi.17166969.xyz/current/simple/"
 default = true
