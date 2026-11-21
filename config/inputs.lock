@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "chromium": {
-    "package_revision": 1,
+    "package_revision": 2,
     "version": "156.0.8078.79",
     "devtools_revision": "8c62f844ad8e0664ff41a633bfc17c472f1c5fd6",
     "archive_filename": "chromium-156.0.8078.79-base.tar.zst",
