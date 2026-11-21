@@ -7,6 +7,7 @@ import json
 import os
 import re
 import tempfile
+import urllib.error
 import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -16,6 +17,8 @@ from typing import IO
 from urllib.request import Request
 
 from script_support import ScriptFailure, fail_main, require_file, require_network
+
+ALPINE_FALLBACK_HOSTS = ("dl-4", "dl-5")
 
 
 class HTTPSRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -89,6 +92,30 @@ def write_atomic(path, text):
     temporary.replace(path)
 
 
+def download(item, path):
+    """Download the first of the item's URLs that answers, returning its final URL.
+
+    Builder APKs list Alpine mirrors after the locked URL: dl-cdn sometimes
+    answers 404 for a file it still serves elsewhere. Only HTTP and network
+    errors move to the next URL; the caller verifies the pinned digest.
+    """
+    urls = item.get("urls") or [item["url"]]
+    opener = urllib.request.build_opener(HTTPSRedirectHandler())
+    for index, url in enumerate(urls):
+        try:
+            with opener.open(Request(url, headers={"User-Agent": "curl/8.0"})) as response, path.open("wb") as output:
+                final_url = response.geturl()
+                if urllib.parse.urlparse(final_url).scheme != "https":
+                    raise RuntimeError(f'{item["name"]}: final URL is not HTTPS')
+                while chunk := response.read(1024 * 1024):
+                    output.write(chunk)
+            return final_url
+        except urllib.error.URLError:
+            if index == len(urls) - 1:
+                raise
+    raise RuntimeError(f'{item["name"]}: no download URL')
+
+
 def fetch_one(item, inputs_root):
     filename = item["filename"]
     if not filename or Path(filename).name != filename:
@@ -104,14 +131,7 @@ def fetch_one(item, inputs_root):
         ) as temporary:
             temporary_path = Path(temporary.name)
         try:
-            opener = urllib.request.build_opener(HTTPSRedirectHandler())
-            request = Request(item["url"], headers={"User-Agent": "curl/8.0"})
-            with opener.open(request) as response, temporary_path.open("wb") as output:
-                final_url = response.geturl()
-                if urllib.parse.urlparse(final_url).scheme != "https":
-                    raise RuntimeError(f'{item["name"]}: final URL is not HTTPS')
-                while chunk := response.read(1024 * 1024):
-                    output.write(chunk)
+            final_url = download(item, temporary_path)
             verify(temporary_path, item)
             temporary_path.replace(destination)
             action = "downloaded"
@@ -157,7 +177,9 @@ def stage_builder_apks(lock, lock_path, architecture, cache_root):
         size = archive.get("size")
         if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{128}", digest) or type(size) is not int or size <= 0:
             raise ScriptFailure(f"{lock_path}: invalid digest or size for {name}")
-        items.append(dict(archive, name=name, filename=filename))
+        locked = archive["url"]
+        items.append(dict(archive, name=name, filename=filename,
+                          urls=[locked, *(locked.replace("://dl-cdn.", f"://{host}.", 1) for host in ALPINE_FALLBACK_HOSTS)]))
 
     identity = json.dumps(archives, sort_keys=True, separators=(",", ":"))
     destination = cache_root / hashlib.sha256(identity.encode()).hexdigest()
