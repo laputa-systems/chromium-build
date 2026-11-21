@@ -90,6 +90,26 @@ class FetchInputsTest(unittest.TestCase):
             STAGE_BUILDER_APKS(lock, "fixture lock", "arm64", Path(directory))
         self.assertEqual(requested, [locked, locked.replace("dl-cdn.", "dl-4.")])
 
+    def test_a_builder_apk_no_mirror_serves_names_the_package_and_each_url(self):
+        package = "openssl-3.5.9-r1"
+        locked = f"https://dl-cdn.alpinelinux.org/alpine/v3.24/main/aarch64/{package}.apk"
+        archive = {"url": locked, "sha512": "0" * 128, "size": 1}
+        lock = {"status": "resolved", "architecture": "arm64", "base_release": "3.24.2",
+                "archives": {package: archive}, "resolved": [package]}
+
+        class Opener:
+            def open(self, request):
+                raise urllib.error.HTTPError(request.full_url, 404, "Not Found", HTTPMessage(), None)
+
+        with tempfile.TemporaryDirectory() as directory, \
+                mock.patch("urllib.request.build_opener", lambda *handlers: Opener()), \
+                self.assertRaises(ScriptFailure) as caught:
+            STAGE_BUILDER_APKS(lock, "fixture lock", "arm64", Path(directory))
+        message = str(caught.exception)
+        self.assertIn(package, message)
+        for host in ("dl-cdn", "dl-4", "dl-5"):
+            self.assertIn(locked.replace("dl-cdn.", f"{host}."), message)
+
     def test_reused_verified_extension_is_readable_by_browser_user(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

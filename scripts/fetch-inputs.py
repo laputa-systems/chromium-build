@@ -101,7 +101,8 @@ def download(item, path):
     """
     urls = item.get("urls") or [item["url"]]
     opener = urllib.request.build_opener(HTTPSRedirectHandler())
-    for index, url in enumerate(urls):
+    failures = []
+    for url in urls:
         try:
             with opener.open(Request(url, headers={"User-Agent": "curl/8.0"})) as response, path.open("wb") as output:
                 final_url = response.geturl()
@@ -110,10 +111,9 @@ def download(item, path):
                 while chunk := response.read(1024 * 1024):
                     output.write(chunk)
             return final_url
-        except urllib.error.URLError:
-            if index == len(urls) - 1:
-                raise
-    raise RuntimeError(f'{item["name"]}: no download URL')
+        except urllib.error.URLError as error:
+            failures.append(f"{url}: {error}")
+    raise RuntimeError(f'{item["name"]}: ' + "; ".join(failures or ["no download URL"]))
 
 
 def fetch_one(item, inputs_root):
