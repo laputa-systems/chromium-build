@@ -4,6 +4,7 @@ import contextlib
 import hashlib
 import io
 import json
+import re
 import shutil
 import tempfile
 import unittest
@@ -63,7 +64,15 @@ class PolicyTestCase(unittest.TestCase):
     def assertRejected(self, *arguments: object, message: str) -> None:
         with self.assertRaises(SystemExit) as raised:
             self.run_check(*arguments)
-        self.assertIn(message, str(raised.exception))
+        self.assertPolicyFailure(raised.exception, message)
+
+    def assertPolicyFailure(self, error: SystemExit, message: str) -> None:
+        text = str(error)
+        if message.startswith("^"):
+            self.assertRegex(text, message)
+            return
+        expected = f"macOS CI policy check failed: {message}"
+        self.assertTrue(text == expected or text.startswith(expected + "\nreport="), text)
 
 
 class InputLockTests(PolicyTestCase):
@@ -94,16 +103,16 @@ class InputLockTests(PolicyTestCase):
             self.assertRejected("cache-key", "--lock", lock, message="ungoogled has no valid SHA-512 lock digest")
 
     def test_unreadable_or_non_object_locks_are_rejected(self):
-        self.assertRejected("cache-key", "--lock", self.root / "missing.json", message="is not readable JSON")
+        self.assertRejected("cache-key", "--lock", self.root / "missing.json", message=f"^{re.escape('macOS input lock is not readable JSON at ' + str(self.root / 'missing.json'))}")
         lock = write_json(self.root / "list.json", [])
-        self.assertRejected("cache-key", "--lock", lock, message="must be a JSON object")
+        self.assertRejected("cache-key", "--lock", lock, message=f"^macOS input lock must be a JSON object: {re.escape(str(lock))}$")
 
     def test_chromium_version_prints_the_locked_version_and_requires_one(self):
         lock = write_json(self.root / "lock.json", self.lock())
         self.assertEqual(self.run_check("chromium-version", "--lock", lock), "156.0.1.2")
         for chromium in ({}, {"version": ""}, {"version": 156}):
             lock = write_json(self.root / "bad.json", {"chromium": chromium})
-            self.assertRejected("chromium-version", "--lock", lock, message="no Chromium version")
+            self.assertRejected("chromium-version", "--lock", lock, message="macOS lock has no Chromium version")
 
     def test_the_committed_macos_lock_yields_a_cache_key(self):
         key = self.run_check("cache-key", "--lock", ROOT / "config" / "macos.inputs.lock")
@@ -122,10 +131,10 @@ class LlvmTests(PolicyTestCase):
         self.assertEqual(self.run_check("verify-llvm", "--clang", self.clang("25.1"), "--minimum", "24.9.9"), "25.1.0")
 
     def test_older_unparseable_failing_or_missing_clang_is_rejected(self):
-        self.assertRejected("verify-llvm", "--clang", self.clang("23.9.9"), "--minimum", "24.0.0", message="older than")
-        self.assertRejected("verify-llvm", "--clang", self.clang("unknown"), "--minimum", "24", message="not parseable")
-        self.assertRejected("verify-llvm", "--clang", self.clang("24.0.0", status=1), "--minimum", "24", message="LLVM clang failed")
-        self.assertRejected("verify-llvm", "--clang", self.root / "absent", "--minimum", "24", message="could not execute")
+        self.assertRejected("verify-llvm", "--clang", self.clang("23.9.9"), "--minimum", "24.0.0", message="LLVM (23, 9, 9) is older than (24, 0, 0)")
+        self.assertRejected("verify-llvm", "--clang", self.clang("unknown"), "--minimum", "24", message="LLVM clang version is not parseable: clang version unknown")
+        self.assertRejected("verify-llvm", "--clang", self.clang("24.0.0", status=1), "--minimum", "24", message="LLVM clang failed: ")
+        self.assertRejected("verify-llvm", "--clang", self.root / "absent", "--minimum", "24", message="^could not execute LLVM clang: ")
 
 
 class PreflightTests(PolicyTestCase):
@@ -158,7 +167,7 @@ class PreflightTests(PolicyTestCase):
             with self.subTest(message):
                 with self.assertRaises(SystemExit) as raised:
                     self.verify(report)
-                self.assertIn(message, str(raised.exception))
+                self.assertPolicyFailure(raised.exception, message)
 
     def test_the_free_space_floor_is_the_argument(self):
         report = doctor_report()
@@ -168,7 +177,7 @@ class PreflightTests(PolicyTestCase):
             self.verify(report)
 
     def test_the_doctor_report_must_be_readable(self):
-        self.assertRejected("verify-preflight", "--work-root", self.root, message="doctor report is not readable JSON")
+        self.assertRejected("verify-preflight", "--work-root", self.root, message=f"^doctor report is not readable JSON at {re.escape(str(self.root / 'metadata' / 'doctor.json'))}: ")
 
 
 class PhaseReportTests(PolicyTestCase):
@@ -178,11 +187,11 @@ class PhaseReportTests(PolicyTestCase):
         (metadata / "macos-release.args.gn").write_text('macos_single_locale = "en-US"\nis_component_build = false\n', encoding="utf-8")
         self.assertEqual(self.run_check("verify-configure", "--work-root", self.root), "macOS configure policy: passed")
         (metadata / "macos-release.args.gn").write_text('is_component_build = false\n', encoding="utf-8")
-        self.assertRejected("verify-configure", "--work-root", self.root, message="en-US only")
+        self.assertRejected("verify-configure", "--work-root", self.root, message="configure did not select en-US only")
         (metadata / "macos-release.args.gn").write_text('macos_single_locale = "en-US"\nis_component_build = true\n', encoding="utf-8")
-        self.assertRejected("verify-configure", "--work-root", self.root, message="component build")
+        self.assertRejected("verify-configure", "--work-root", self.root, message="configure enabled a component build")
         (metadata / "macos-release.args.gn").unlink()
-        self.assertRejected("verify-configure", "--work-root", self.root, message="could not read generated GN args")
+        self.assertRejected("verify-configure", "--work-root", self.root, message="^could not read generated GN args: ")
         write_json(metadata / "configure-macos.json", {"status": "failed"})
         self.assertRejected("verify-configure", "--work-root", self.root, message="configure did not complete")
 
