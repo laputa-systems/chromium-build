@@ -19,6 +19,7 @@ from urllib.request import Request
 from script_support import ScriptFailure, fail_main, require_file, require_network
 
 ALPINE_FALLBACK_HOSTS = ("dl-4", "dl-5")
+BUILDER_APK_MIRROR = "https://github.com/laputa-systems/chromium-build/releases/download"
 
 
 class HTTPSRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -95,9 +96,10 @@ def write_atomic(path, text):
 def download(item, path):
     """Download the first of the item's URLs that answers, returning its final URL.
 
-    Builder APKs list Alpine mirrors after the locked URL: dl-cdn sometimes
-    answers 404 for a file it still serves elsewhere. Only HTTP and network
-    errors move to the next URL; the caller verifies the pinned digest.
+    Builder APKs list this repository's alpine-apks release and then other
+    Alpine mirrors after the locked URL, because Alpine drops a superseded
+    revision from every mirror. Only HTTP and network errors move to the next
+    URL; the caller verifies the pinned digest.
     """
     urls = item.get("urls") or [item["url"]]
     opener = urllib.request.build_opener(HTTPSRedirectHandler())
@@ -178,8 +180,9 @@ def stage_builder_apks(lock, lock_path, architecture, cache_root):
         if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{128}", digest) or type(size) is not int or size <= 0:
             raise ScriptFailure(f"{lock_path}: invalid digest or size for {name}")
         locked = archive["url"]
-        items.append(dict(archive, name=name, filename=filename,
-                          urls=[locked, *(locked.replace("://dl-cdn.", f"://{host}.", 1) for host in ALPINE_FALLBACK_HOSTS)]))
+        mirror = f"{BUILDER_APK_MIRROR}/alpine-apks-v{series}/{apk_arch}-{filename}"
+        fallbacks = [locked.replace("://dl-cdn.", f"://{host}.", 1) for host in ALPINE_FALLBACK_HOSTS]
+        items.append(dict(archive, name=name, filename=filename, urls=[locked, mirror, *fallbacks]))
 
     identity = json.dumps(archives, sort_keys=True, separators=(",", ":"))
     destination = cache_root / hashlib.sha256(identity.encode()).hexdigest()
