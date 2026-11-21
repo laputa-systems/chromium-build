@@ -7,6 +7,7 @@ import os
 import shutil
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -51,6 +52,19 @@ class MacOSBackendTests(unittest.TestCase):
         with self.assertRaisesRegex(backend.MacOSFailure, "failed dry-run"):
             backend.patch_file(source, patch, self.root / "patch-records", os.environ, exact=True)
         self.assertEqual(target.read_text(), "prefix\nfirst\nsecond\nthird\n")
+
+    def test_stream_command_timeout_stops_a_command_that_prints_nothing(self):
+        log = self.root / "silent.log"
+        started = time.monotonic()
+        with self.assertRaisesRegex(backend.MacOSFailure, "timed out"):
+            backend.stream_command(["sleep", "30"], env={}, cwd=None, log_path=log, timeout=0.5)
+        self.assertLess(time.monotonic() - started, 15)
+
+    def test_stream_command_logs_output_and_reports_a_failing_status(self):
+        log = self.root / "failing.log"
+        with self.assertRaisesRegex(backend.MacOSFailure, r"command failed \(3\)"):
+            backend.stream_command(["sh", "-c", "echo before; exit 3"], env={}, cwd=None, log_path=log, timeout=30)
+        self.assertEqual(log.read_text(), "before\n")
 
     def test_acceptance_rejects_successful_zero_test_selection(self):
         log = self.root / "acceptance.log"

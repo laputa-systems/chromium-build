@@ -25,6 +25,7 @@ import stat
 import subprocess
 import sys
 import tarfile
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -380,7 +381,7 @@ def stream_command(
 ) -> None:
     effective = sandbox_prefix_for_env(env) + list(command)
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    started = time.monotonic()
+    timed_out = threading.Event()
     try:
         with log_path.open("w", encoding="utf-8") as log:
             process = subprocess.Popen(
@@ -392,22 +393,32 @@ def stream_command(
                 text=True,
                 bufsize=1,
             )
-            assert process.stdout is not None
-            for line in process.stdout:
-                print(line, end="")
-                log.write(line)
-                log.flush()
-                if timeout is not None and time.monotonic() - started > timeout:
-                    process.terminate()
-                    try:
-                        process.wait(timeout=10)
-                    except subprocess.TimeoutExpired:
-                        process.kill()
-                        process.wait()
-                    fail(f"command timed out; see {log_path}")
-            status = process.wait()
+
+            def stop_on_timeout() -> None:
+                timed_out.set()
+                process.terminate()
+                try:
+                    process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+
+            watchdog = threading.Timer(timeout, stop_on_timeout) if timeout is not None else None
+            if watchdog is not None:
+                watchdog.start()
+            try:
+                assert process.stdout is not None
+                for line in process.stdout:
+                    print(line, end="")
+                    log.write(line)
+                    log.flush()
+                status = process.wait()
+            finally:
+                if watchdog is not None:
+                    watchdog.cancel()
     except OSError as error:
         fail(f"command failed: {' '.join(command)}: {error}")
+    if timed_out.is_set():
+        fail(f"command timed out; see {log_path}")
     if status:
         fail(f"command failed ({status}); see {log_path}")
 
