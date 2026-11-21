@@ -394,6 +394,8 @@ def stream_command(
             )
 
             def stop_on_timeout() -> None:
+                if process.poll() is not None:
+                    return
                 timed_out.set()
                 process.terminate()
                 try:
