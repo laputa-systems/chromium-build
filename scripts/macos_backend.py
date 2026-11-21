@@ -53,7 +53,6 @@ MH_MAGIC_64 = 0xFEEDFACF
 MH_PIE_FLAG = 0x200000
 MH_EXECUTE = 0x2
 MH_DYLIB = 0x6
-MH_BUNDLE = 0x8
 CPU_TYPE_ARM64 = 0x0100000C
 LC_REQ_DYLD = 0x80000000
 LC_SEGMENT_64 = 0x19
@@ -3529,13 +3528,6 @@ def parse_macho_header(path: Path) -> dict[str, Any] | None:
                 minos = candidate
         offset += cmdsize
     return {"flags": flags, "filetype": filetype, "ncmds": ncmds, "commands": commands, "minos": minos}
-
-
-def macho_has_pie(path: Path) -> bool:
-    header = parse_macho_header(path)
-    if header is None:
-        fail(f"cannot parse Mach-O header: {path}")
-    return bool(header["flags"] & MH_PIE_FLAG)
 
 
 def macho_min_os(path: Path) -> tuple[int, int, int] | None:

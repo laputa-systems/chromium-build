@@ -7,7 +7,6 @@ import os
 import shutil
 import subprocess
 import sys
-import time
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -21,12 +20,6 @@ class ScriptFailure(RuntimeError):
 
 def value(name: str, default: str | None = None) -> str | None:
     return os.environ.get(name, default)
-
-
-def required_path(path: Path, message: str) -> Path:
-    if not path.exists():
-        raise ScriptFailure(message)
-    return path
 
 
 def require_file(path: Path, message: str | None = None) -> Path:
@@ -92,7 +85,7 @@ def atomic_json(path: Path, value: object) -> None:
     atomic_write(path, json.dumps(value, indent=2, sort_keys=True) + "\n")
 
 
-def stream_command(command: list[str], log_path: Path, timeout: float | None = None) -> int:
+def stream_command(command: list[str], log_path: Path) -> int:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     try:
         with log_path.open("w", encoding="utf-8") as log:
@@ -103,16 +96,11 @@ def stream_command(command: list[str], log_path: Path, timeout: float | None = N
                 text=True,
                 bufsize=1,
             )
-            deadline = None if timeout is None else time.monotonic() + timeout
             assert process.stdout is not None
             for line in process.stdout:
                 print(line, end="")
                 log.write(line)
                 log.flush()
-                if deadline is not None and time.monotonic() > deadline:
-                    process.kill()
-                    process.wait()
-                    raise ScriptFailure(f"command timed out: {' '.join(command)}")
             returncode = process.wait()
     except OSError as error:
         raise ScriptFailure(f"command failed: {' '.join(command)}: {error}") from error

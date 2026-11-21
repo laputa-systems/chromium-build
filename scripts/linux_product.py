@@ -12,7 +12,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from script_support import JsonObject, ScriptFailure
+from script_support import ScriptFailure
 
 PRODUCTS = ("chromium", "helium")
 PROFILES = {
@@ -207,24 +207,6 @@ def identity(product: Product) -> dict[str, object]:
         "profile": product.profile,
         "inputs_lock_sha256": product.lock_sha256,
     }
-
-
-def require_report(path: Path, product: Product, phase: str) -> JsonObject:
-    if not path.is_file():
-        raise ScriptFailure(f"{phase} has not passed for {product.name}; run {phase} first")
-    report = json.loads(path.read_text(encoding="utf-8"))
-    if report.get("status") != "complete":
-        raise ScriptFailure(f"{phase} report is incomplete; rerun {phase}")
-    expected = identity(product)
-    for key in ("product", "chromium_version", "product_version", "architecture", "profile", "inputs_lock_sha256"):
-        if key not in report:
-            raise ScriptFailure(f"{phase} report has no {key}; rerun {phase}")
-        if report[key] != expected[key]:
-            raise ScriptFailure(
-                f"{phase} report {key}={report[key]!r} does not match "
-                f"{expected[key]!r}; rerun {phase}"
-            )
-    return report
 
 
 def package_world(path: Path) -> list[str]:

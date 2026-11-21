@@ -114,7 +114,6 @@ class HeadlessSway:
             os.setgroups([])
             os.setgid(owner[1])
             os.setuid(owner[0])
-        self._owner = owner
         self.generate_config()
 
     def generate_config(self) -> None:
