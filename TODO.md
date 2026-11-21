@@ -137,15 +137,6 @@ Next: 35
 - **Fix with:** test-audit
 - **Effort:** M
 
-### CHB-30 · P3 · Drop the duplicate lint workflow and align the uv pin (was DSLP-13)
-
-- **Area:** deslop · ci
-- **Where:** .github/workflows/lint.yml, .github/workflows/ci.yml, pyproject.toml, uv.lock
-- **Problem:** lint.yml and the lint job of ci.yml both run make lint on ubuntu-26.04-arm (fleet workflow-redundancy), with uv 0.13.7 and 0.13.8. The fleet python-standard rule wants uv 0.13.8, ruff 0.17.5 and ty 0.0.104; the repository pins 0.13.7, 0.17.4 and 0.0.101 and has no .python-version. test_workflow.test_lint_workflow_runs_make_lint pins lint.yml. The fleet owned-tool-support finding was not examined.
-- **Recommendation:** Run repomod fix for the python-standard pins, delete lint.yml (update the test to read ci.yml), keep one uv version. CI changes are outside this pass. Accept: repomod lint shows no workflow-redundancy or python-standard finding for this repository.
-- **Fix with:** none
-- **Effort:** S
-
 ### CHB-22 · P4 · Hydrogen's allocator is unguarded and alternatives are unmeasured; keep PartitionAlloc unless a workload shows a large win
 
 - **Area:** Browser / Allocator
