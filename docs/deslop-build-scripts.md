@@ -167,7 +167,7 @@ survivors are dispositioned:
 
 Advisory: `sources_lock.py` under the same tests and its existing 5 tests:
 223 killed, 95 survived, 126 without covering tests (the `--fetch` network path
-and `resolve_sha256`); not dispositioned. No mutation lane or `make mutants-diff`
+and `resolve_sha256`); not dispositioned. No mutation lane or diff-scoped mutation target
 was added: the repository uses `unittest`, mutmut needs pytest, and a lane
 needs a CI workflow, which is out of scope here.
 
