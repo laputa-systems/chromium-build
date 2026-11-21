@@ -121,7 +121,7 @@ def verify_preflight(arguments: argparse.Namespace) -> None:
     require(llvm.get("source") == "bundled", "LLVM is not the bundled Chromium clang", report)
     require(llvm.get("selection_reason") == "bundled-chromium-llvm-only", "wrong LLVM selection", report)
     require(rust.get("status") == "complete", "Rust toolchain is incomplete", report)
-    require(rust.get("toolchain") == "nightly-2026-09-15", "wrong Rust nightly", report)
+    require(rust.get("toolchain") == macos_backend.RUST_TOOLCHAIN, "wrong Rust nightly", report)
     require(rust.get("components") == ["rust-src", "llvm-tools-preview"], "wrong Rust components", report)
     require(cache.get("status") == "disabled", "compiler caching is enabled", report)
     require(
