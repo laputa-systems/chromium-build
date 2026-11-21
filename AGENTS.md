@@ -55,3 +55,17 @@ fails when the two disagree.
   Docker on the maintainer's machine and are not released from CI.
 - The `rust-toolchain-<revision>-aarch64-linux-musl` GitHub releases are the input mirror
   that `config/helium.inputs.lock` pins; they sit outside the release contract.
+
+## Verification
+
+- Costs on an M-series Mac, warm: `make test` 17s (149 tests, 1 skipped; first run adds about 7s for the venv), `make lint` 1.3s. CI runs both in `ci.yml` on Linux arm64 and macOS; `make test-ci` runs the Linux builder group in the image. No test builds Chromium.
+- `make test` runs `tests/run_controller_tests.py`: group `macos` on Darwin, `linux` on Linux, `linux-builder` only inside the builder image. Modules outside the host's group do not run.
+- `./chromium-build` flags, validation and exit codes: `tests/test_image_jobs.py` covers `image` and `--jobs` only; the remaining flags, `install` and the docker phases are `none`.
+- macOS backend commands, work-root ownership, sandbox profiles, build identity, release manifest: `tests/test_macos_backend.py`; its `main` entry and exit codes are `none`.
+- Release assets and `sources.lock.json`: `tests/test_release_assets.py`, `tests/test_sources_lock.py` (`make lint` runs the same check). Release workflow shape: `tests/test_workflow.py`.
+- macOS CI policy checks `scripts/verify_macos_ci.py`, used by `release.yml`: `none`.
+- Linux package, install, qualification: `tests/test_helium_runtime.py`, `tests/test_qualify_package.py`; profiles and GN contracts: `tests/test_helium_gn.py`; fixtures and CDP transport: `tests/test_browser_test_support.py`, `tests/test_helium_wayland.py`.
+- Gates A to F, `prepare`, `build`, `test-functional` scripts: image-only, `none` on the host; they run in `release-linux`.
+- Performance workload: none. The only hot path is Chromium's own build, which a full build measures and CI cannot repeat.
+- Vendored upstream sources: none. `config/patches/` holds first-party patches against the pinned Chromium, ungoogled-chromium and Helium trees (revisions in `config/*.inputs.lock`); `config/glibc/` is first-party assembly.
+- Deslop findings, coverage and mutation records: [docs/deslop-build-scripts.md](docs/deslop-build-scripts.md).
