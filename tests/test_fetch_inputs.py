@@ -1,11 +1,15 @@
 """Permissions for verified inputs consumed by the unprivileged browser tests."""
 
 import hashlib
+import io
 import json
 import runpy
 import tempfile
 import unittest
+import urllib.error
+from http.client import HTTPMessage
 from pathlib import Path
+from unittest import mock
 
 from script_support import ScriptFailure
 
@@ -46,6 +50,45 @@ class FetchInputsTest(unittest.TestCase):
         archive["url"] = archive["url"].replace("/v3.24/", "/edge/")
         with self.assertRaisesRegex(ScriptFailure, "invalid builder APK archive"):
             STAGE_BUILDER_APKS(lock, "fixture lock", "arm64", cache)
+
+    def test_builder_apks_fall_back_to_another_alpine_mirror_on_http_errors(self):
+        package = "openssl-3.5.9-r1"
+        content = b"test package bytes"
+        locked = f"https://dl-cdn.alpinelinux.org/alpine/v3.24/main/aarch64/{package}.apk"
+        archive = {"url": locked, "sha512": hashlib.sha512(content).hexdigest(), "size": len(content)}
+        lock = {"status": "resolved", "architecture": "arm64", "base_release": "3.24.2",
+                "archives": {package: archive}, "resolved": [package]}
+        requested = []
+
+        class Response(io.BytesIO):
+            def __init__(self, url, body):
+                super().__init__(body)
+                self.url = url
+
+            def geturl(self):
+                return self.url
+
+        def opener(body):
+            class Opener:
+                def open(self, request):
+                    requested.append(request.full_url)
+                    if "dl-cdn." in request.full_url:
+                        raise urllib.error.HTTPError(request.full_url, 404, "Not Found", HTTPMessage(), None)
+                    return Response(request.full_url, body)
+            return lambda *handlers: Opener()
+
+        with tempfile.TemporaryDirectory() as directory, \
+                mock.patch("urllib.request.build_opener", opener(content)):
+            staged = STAGE_BUILDER_APKS(lock, "fixture lock", "arm64", Path(directory))
+            self.assertEqual((staged / f"{package}.apk").read_bytes(), content)
+        self.assertEqual(requested, [locked, locked.replace("dl-cdn.", "dl-4.")])
+
+        requested.clear()
+        with tempfile.TemporaryDirectory() as directory, \
+                mock.patch("urllib.request.build_opener", opener(b"?" * len(content))), \
+                self.assertRaisesRegex(ScriptFailure, "SHA-512 mismatch"):
+            STAGE_BUILDER_APKS(lock, "fixture lock", "arm64", Path(directory))
+        self.assertEqual(requested, [locked, locked.replace("dl-cdn.", "dl-4.")])
 
     def test_reused_verified_extension_is_readable_by_browser_user(self):
         with tempfile.TemporaryDirectory() as directory:
