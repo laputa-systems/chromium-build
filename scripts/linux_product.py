@@ -72,7 +72,6 @@ class Product:
     profile: str
     chromium_version: str
     product_version: str | None
-    devtools_revision: str
     image: str
     work_volume: str
     cache_volume: str
@@ -169,7 +168,6 @@ def resolve(product: str, arch: str, profile: str | None = None, root: Path | No
         profile=profile,
         chromium_version=chromium_version,
         product_version=product_version,
-        devtools_revision=lock["chromium"]["devtools_revision"],
         image=image,
         work_volume=work_volume,
         cache_volume=cache_volume,
