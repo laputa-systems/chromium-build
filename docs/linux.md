@@ -32,9 +32,13 @@ needed beyond its base image.
 `chromium-build image` verifies those archives in its worktree
 cache and passes them to the Docker build. The installation
 runs with networking disabled and an empty APK repository list.
-The installed package manifest must match the owning lock. A cold cache
-requires the exact archive URLs to remain available. When upstream removes
-an archive, refresh the closure from the same stable branch.
+The installed package manifest must match the owning lock. Alpine keeps
+only the newest revision of a package, so every locked APK is also an asset
+of this repository's `alpine-apks-v<series>` release, named
+`<arch>-<package>.apk`. A fetch tries the locked URL, then that release,
+then the dl-4 and dl-5 mirrors, and accepts only the locked size and
+SHA-512. After refreshing a lock, upload its new archives while upstream
+still serves them: `scripts/mirror-builder-apks.py .work/tmp/apks`.
 
 To refresh the closure, resolve the supported stable branch in
 a disposable container from the same base digest. Capture the
