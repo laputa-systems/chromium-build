@@ -17,6 +17,8 @@ patch inventories, and phase reports define current behavior.
 
 ## Guides
 
+- Fil-C Hydrogen feasibility, isolated compiler/runtime experiments and
+  executable milestones: [Fil-C campaign](docs/CAMPAIGN-FIL-C.md).
 - Linux musl builds (amd64-only; Linux/arm64 is out of scope), profiles,
   gates, packaging, and installation: [Linux](docs/linux.md).
 - Native macOS builds, cache selection, staged acceptance, and packaging:
@@ -69,3 +71,4 @@ fails when the two disagree.
 - Performance workload: none. The only hot path is Chromium's own build, which a full build measures and CI cannot repeat.
 - Vendored upstream sources: none. `config/patches/` holds first-party patches against the pinned Chromium, ungoogled-chromium and Helium trees (revisions in `config/*.inputs.lock`); `config/glibc/` is first-party assembly.
 - Deslop findings, coverage and mutation records: [docs/deslop-build-scripts.md](docs/deslop-build-scripts.md).
+
