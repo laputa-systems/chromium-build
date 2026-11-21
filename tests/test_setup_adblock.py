@@ -9,7 +9,6 @@ from pathlib import Path
 from script_support import JsonObject
 
 ROOT = Path(__file__).resolve().parents[1]
-SETUP = runpy.run_path(str(ROOT / "scripts/setup-helium-adblock.py"))
 
 
 def tarball(members: dict[str, bytes]) -> bytes:
@@ -22,8 +21,12 @@ def tarball(members: dict[str, bytes]) -> bytes:
     return buffer.getvalue()
 
 
-class VendorTest(unittest.TestCase):
+class VendorCases(unittest.TestCase):
+    script: str
+    filters_directory: str
+
     def setUp(self) -> None:
+        self.setup = runpy.run_path(str(ROOT / "scripts" / self.script))
         self.directory = tempfile.TemporaryDirectory()
         root = Path(self.directory.name)
         self.source = root / "src"
@@ -51,7 +54,7 @@ class VendorTest(unittest.TestCase):
         )
 
     def vendor(self) -> JsonObject:
-        return SETUP["vendor"](
+        return self.setup["vendor"](
             self.source, self.inputs, "helium-filters-1.tar.gz", hashlib.sha256(self.filters).hexdigest(), self.patches
         )
 
@@ -70,7 +73,7 @@ class VendorTest(unittest.TestCase):
         self.assertFalse((vendored / "logo.png").exists())
         self.assertEqual((vendored / ".cargo-checksum.json").read_text(), '{"files":{}}')
         self.assertEqual([c["name"] for c in record["crates"]], ["seahash"])
-        self.assertTrue((self.source / "third_party/helium_filters/assets/assets.json").is_file())
+        self.assertTrue((self.source / f"{self.filters_directory}/assets/assets.json").is_file())
 
     def test_a_crate_that_does_not_match_the_lock_is_refused(self) -> None:
         crate = tarball({"seahash-4.1.0/src/lib.rs": b""})
@@ -88,7 +91,7 @@ class VendorTest(unittest.TestCase):
 
     def test_filters_that_do_not_match_the_lock_are_refused(self) -> None:
         with self.assertRaisesRegex(SystemExit, "is not the locked"):
-            SETUP["vendor"](self.source, self.inputs, "helium-filters-1.tar.gz", "0" * 64, self.patches)
+            self.setup["vendor"](self.source, self.inputs, "helium-filters-1.tar.gz", "0" * 64, self.patches)
 
     def test_a_crate_patch_changes_the_vendored_crate(self) -> None:
         self.locked_crate()
@@ -119,6 +122,19 @@ class VendorTest(unittest.TestCase):
         self.patches.rmdir()
         with self.assertRaisesRegex(SystemExit, "crate patch directory .* does not exist"):
             self.vendor()
+
+
+class HeliumVendorTest(VendorCases):
+    script = "setup-helium-adblock.py"
+    filters_directory = "third_party/helium_filters"
+
+
+class ChromiumVendorTest(VendorCases):
+    script = "setup-chromium-adblock.py"
+    filters_directory = "third_party/adblock_filters"
+
+
+del VendorCases
 
 
 if __name__ == "__main__":
