@@ -48,8 +48,8 @@ fails when the two disagree.
   the macOS app, `x86_64-unknown-linux-musl` runs `release-linux`, and
   `aarch64-unknown-linux-musl` selects Helium's arm64 builder for the explicit steps.
   `make build-target` takes the Ninja output as `NINJA_TARGET`. `make clean` removes
-  Python caches and the macOS stage, output, and release directories, and keeps
-  fetched inputs, source, and Docker volumes.
+  the root Ruff cache and macOS build, stage, release, and verification outputs. It keeps installed
+  dependencies, fetched inputs, source, and Docker volumes.
 - Run the Python static checks with `make check-py` (alias of `make lint`).
 - Releases: `.github/workflows/release.yml` publishes
   `chromium-<version>-aarch64-apple-darwin.tar.xz` and its manifest from a manual dispatch.

@@ -98,9 +98,15 @@ else
 endif
 
 clean:
-	rm -rf .venv .ruff_cache
-	find . -path './.git' -prune -o -path './.work' -prune -o -name __pycache__ -type d -prune -exec rm -rf {} +
-	rm -rf .work/macos-arm64/out .work/macos-arm64/stage .work/macos-arm64/release .work/macos-arm64/verify
+	@for parent in ./.work ./.work/macos-arm64; do \
+	  if test -L "$$parent"; then printf '%s\n' "make clean: $$parent must be a local directory" >&2; exit 1; fi; \
+	done
+	@for artifact in ./.ruff_cache ./.work/macos-arm64/out ./.work/macos-arm64/stage ./.work/macos-arm64/release ./.work/macos-arm64/verify; do \
+	  if test -L "$$artifact" || { test -e "$$artifact" && ! test -d "$$artifact"; }; then \
+	    printf '%s\n' "make clean: $$artifact must be a local build directory" >&2; exit 1; \
+	  fi; \
+	done
+	rm -rf -- ./.ruff_cache ./.work/macos-arm64/out ./.work/macos-arm64/stage ./.work/macos-arm64/release ./.work/macos-arm64/verify
 
 image:
 	$(CHROMIUM_BUILD) image
