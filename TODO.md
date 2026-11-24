@@ -128,16 +128,6 @@ Next: 37
 - **Fix with:** test-audit
 - **Effort:** M
 
-### CHB-35 · P3 · Establish Fil-C feasibility for Hydrogen across V8 and Rust
-
-- **Area:** Build / Memory safety research
-- **Where:** docs/roadmap.md; config/profiles/chromium-wayland-release.gn; scripts/linux_product.py; scripts/generate-gn.py; scripts/verify-gn-args.py; scripts/build-target.py; config/patches/adblock-engine-bridge.patch; pinned Chromium/V8 and Fil-C/Fil-Rust sources
-- **Problem:** The owner requested a Fil-C Hydrogen feasibility campaign on 2026-11-21. No local Fil-C browser build or protected V8/Rust pilot is verified. V8's generated builtins and heap representations, Rust/C++ ownership transfers, the musl runtime closure, and sandbox integration prevent assuming a compiler substitution will preserve protection or Hydrogen behavior.
-- **Recommendation:** Establish protected Fil-C feasibility for Hydrogen while preserving production behavior; see the roadmap for execution and acceptance.
-- **Fix with:** none
-- **Effort:** L
-- **Design:** docs/roadmap.md#campaign-fil-c-hydrogen-feasibility
-
 ### CHB-36 · P3 · Test source lock digest resolution and download validation
 
 - **Area:** Source locks · tests
