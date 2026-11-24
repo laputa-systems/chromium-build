@@ -7,7 +7,7 @@ This is the single plan for this repository: all current and future work, and th
 - **State:** active; Fil-C Hydrogen feasibility is open, source review complete; runtime feasibility is unproven.
 - **Slice:** FC0 runtime pilot is next; no Fil-C implementation, build, benchmark, or browser run is accepted.
 - **Last accepted revision:** `76a3b07dc956351c8c48ee784a158e979c271210`; integration green is not established by the campaign record. The Fil-C source review used code baseline `10b7bec505eea27394aa50cb987436d538f64043`.
-- **Parked:** no experiments have run; native Linux execution is needed. Create or resume `campaign/filc-hydrogen` from current master and refresh the baseline.
+- **Parked:** no experiments have run; native Linux execution is needed, first on Linux arm64 under OrbStack on the macOS host. Create or resume `campaign/filc-hydrogen` from current master and refresh the baseline.
 
 ## Sequence
 
@@ -106,9 +106,13 @@ not claim a working port or start a browser build.
 
 **Prescribed:**
 
-- Begin on native Linux amd64. Linux arm64 follows a credible native pilot;
-  Reactor integration follows native Linux qualification. macOS and Windows
-  are outside this campaign.
+- Begin on Linux arm64 in an OrbStack Linux container on the owner's macOS
+  host (owner, 2026-11-21: threadripper is busy and low on disk). It runs
+  natively there, with no emulation: Fil-C 0.687 ships `linux-aarch64`
+  builds. Linux amd64 follows when a quiet amd64 host is available. Reactor
+  integration follows native Linux qualification. macOS and Windows are not
+  targets; the macOS host only runs the Linux builder. Do not claim amd64
+  from an arm64 run, or the reverse.
 - The destination is the existing `chromium` product with its Wayland
   appliance behavior, not a replacement browser engine. Hydrogen's executable
   remains `chrome`; Reactor is bctl's kernel.
@@ -180,6 +184,14 @@ boundaries. FC0-FC3 establish them. Source planning does not pass runtime
 preflight.
 
 #### Existing control commands
+
+The first control runs on the OrbStack Linux arm64 Docker host with the same
+commands, `--arch arm64` and its own identities
+(`hydrogen-filc-control:arm64`, `hydrogen-filc-control-work-arm64`,
+`hydrogen-filc-control-ccache-arm64`). Never reuse the production
+`ungoogled-chromium-156-*-arm64` volumes on that host. The arm64 native
+control uses the ordinary arm64 toolchain (Laputa LLVM 23.1.5), not the amd64
+Chromium Clang.
 
 On an already provisioned native Linux amd64 Docker host, these existing
 commands prepare an **ordinary-Clang stock control**, not a Fil-C build.
