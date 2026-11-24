@@ -65,10 +65,9 @@ fails when the two disagree.
 - `./chromium-build` argument validation, usage and exit codes (0, 1, 2): `tests/test_chromium_build_cli.py`; `image` and `--jobs`: `tests/test_image_jobs.py`; the docker phases and `install` are `none`.
 - macOS backend commands, work-root ownership, sandbox profiles, build identity, release manifest: `tests/test_macos_backend.py`; its `main` entry and exit codes are `none`.
 - Release assets and `sources.lock.json`: `tests/test_release_assets.py`, `tests/test_sources_lock.py` (`make lint` runs the same check). Release workflow shape: `tests/test_workflow.py`.
-- macOS CI policy checks `scripts/verify_macos_ci.py`, used by `release.yml`: `tests/test_verify_macos_ci.py` (bounded mutation run in the deslop doc).
+- macOS CI policy checks `scripts/verify_macos_ci.py`, used by `release.yml`: `tests/test_verify_macos_ci.py`.
 - Linux package, install, qualification: `tests/test_helium_runtime.py`, `tests/test_qualify_package.py`; profiles and GN contracts: `tests/test_helium_gn.py`; fixtures and CDP transport: `tests/test_browser_test_support.py`, `tests/test_helium_wayland.py`.
 - Gates A to F, `prepare`, `build`, `test-functional` scripts: image-only, `none` on the host; they run in `release-linux`.
 - Performance workload: none. The only hot path is Chromium's own build, which a full build measures and CI cannot repeat.
 - Vendored upstream sources: none. `config/patches/` holds first-party patches against the pinned Chromium, ungoogled-chromium and Helium trees (revisions in `config/*.inputs.lock`); `config/glibc/` is first-party assembly.
-- Deslop findings, coverage and mutation records: [docs/deslop-build-scripts.md](docs/deslop-build-scripts.md).
 

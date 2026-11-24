@@ -1,5 +1,5 @@
 Prefix: CHB
-Next: 36
+Next: 37
 
 ### CHB-11 · P1 · bound back-to-back begin frames sent to the browser UI compositor in unthrottled headless
 
@@ -67,7 +67,7 @@ Next: 36
 
 ### CHB-23 · P3 · Share the helpers the build scripts copy (was DSLP-6)
 
-- **Area:** deslop · dedupe
+- **Area:** Build scripts · deduplication
 - **Where:** scripts/*.py (digest in 8 files, read_json in 6, sha256 in 3, stream_command/run/atomic_json in script_support.py and macos_backend.py)
 - **Problem:** The same file digest, JSON read and process-streaming helpers are written out in each entrypoint. The two stream_command copies already diverged and both had the silent-hang timeout defect (one fixed in this pass, one removed as dead). script_support.py ships in the builder image beside every entrypoint, so image scripts can share it; only the macOS and host-only scripts may import buildlib.
 - **Recommendation:** Move digest, read_json and atomic JSON writes into script_support.py and make macos_backend use its own typed variants only where the error type differs. Keep the image scripts stdlib-only. Accept: one definition of each helper; make test and make test-ci pass.
@@ -76,7 +76,7 @@ Next: 36
 
 ### CHB-24 · P3 · Stop macos_backend.main rebinding module globals (was DSLP-7)
 
-- **Area:** deslop · types
+- **Area:** macOS backend · types
 - **Where:** scripts/macos_backend.py (main, DEFAULT_PROFILE, LOCK_RELATIVE, WorkLayout.__init__)
 - **Problem:** main declares global DEFAULT_PROFILE, LOCK_RELATIVE and rebinds them from --profile before any WorkLayout is built; WorkLayout.output and the lock loader read the globals. Importing the module and calling a phase function behaves differently from running main, and the tests only pass because the default profile is the one they use.
 - **Recommendation:** Carry the profile and lock path on WorkLayout (or a small frozen profile value) and drop the globals. Accept: no global statement in macos_backend.py; test_macos_backend covers both macos-release and macos-helium-release layouts.
@@ -85,7 +85,7 @@ Next: 36
 
 ### CHB-25 · P3 · Kill the whole process group when stream_command times out (was DSLP-8)
 
-- **Area:** deslop · lifecycle
+- **Area:** macOS backend · lifecycle
 - **Where:** scripts/macos_backend.py (stream_command)
 - **Problem:** The timeout now fires on a silent command, but it terminates only the direct child. A phase such as pnpm run test:browser spawns descendants that keep the stdout pipe open, so the reader loop can still block until they exit. Not reproduced with a real tree; the design leaves it open. Moving the child to a new session would stop Ctrl-C reaching it, so the fix needs an explicit interrupt path.
 - **Recommendation:** Start the child in its own process group, kill the group on timeout and on KeyboardInterrupt, and test with a shell that backgrounds a sleeper. Accept: the test fails before and passes after, in under 15s.
@@ -94,7 +94,7 @@ Next: 36
 
 ### CHB-26 · P3 · Replace dict[str, Any] build documents with typed models (was DSLP-9)
 
-- **Area:** deslop · types
+- **Area:** Build scripts · types
 - **Where:** scripts/macos_backend.py (about 90 dict[str, Any] sites), scripts/verify_macos_ci.py, scripts/macos_helium.py, JsonObject in scripts/script_support.py
 - **Problem:** Phase reports, locks and manifests are untyped JSON dicts, so ty at unsound-return-statement reports 17 sites where Any from json.loads is returned as str, list[str] or tuple[int, int, int]. The rule stays off for that reason (6 more hits are typeshed re.Match.group noise).
 - **Recommendation:** Model the lock, doctor report, package report and release manifest as TypedDict or dataclasses validated at the read boundary, then adopt unsound-return-statement. Accept: the 17 sites fixed with a witness each; rule at error.
@@ -103,7 +103,7 @@ Next: 36
 
 ### CHB-27 · P3 · Test the macOS backend entry point and its exit codes (was DSLP-10)
 
-- **Area:** deslop · tests
+- **Area:** macOS backend · tests
 - **Where:** scripts/macos_backend.py (parse_arguments, main), tests/test_macos_backend.py
 - **Problem:** main maps MacOSFailure to exit 1, KeyboardInterrupt to 130 and unknown commands to a failure, rejects --headed-reference outside test-staged and any profile but the two macOS ones. Only ./chromium-build forwarding of one flag is tested now; no test calls main.
 - **Recommendation:** Add main-level tests with a temporary work root: each rejected argument, exit codes 0, 1 and 130, and the work-lock release. Prove one injected fault. Accept: the Verification section lists the test for the macOS backend entry.
@@ -112,7 +112,7 @@ Next: 36
 
 ### CHB-28 · P3 · Measure and test the Linux image scripts on a Linux host (was DSLP-11)
 
-- **Area:** deslop · tests
+- **Area:** Linux builder · tests
 - **Where:** scripts/ gates A to F, prepare-source*.py, prepare-helium.py, stage-runtime.py, package-runtime.py, test-functional*.py, verify-*.py; tests/run_controller_tests.py linux and linux-builder groups
 - **Problem:** About 20 scripts run only inside the builder image and sit at 0% to 25% in the macOS group coverage; the linux and linux-builder groups cannot run on Darwin, so this pass measured nothing for them and could not mutate them. Needs environment: Linux host, Docker and the builder image.
 - **Recommendation:** On a Linux builder run make coverage for the linux group and make test-ci with coverage inside the image; add tests for the 0% gate scripts (verify-environment, run-probes, generate-gn) that need no browser. Accept: per-script coverage recorded; each public gate has a guarding test or a stated reason.
@@ -121,7 +121,7 @@ Next: 36
 
 ### CHB-29 · P3 · Add a mutation lane for the release-gating scripts (was DSLP-12)
 
-- **Area:** deslop · ci
+- **Area:** Release gates · tests
 - **Where:** .github/workflows/, Makefile, tests/
 - **Problem:** A bounded mutmut run on verify_macos_ci.py is reproducible only by hand (scratch copy with scripts renamed src and a pytest runner) because mutmut 3 needs pytest and a tracked source package; the repository uses unittest. CI workflow changes are out of scope for this pass. No lane or diff-scoped target exists.
 - **Recommendation:** Add pytest as a dev dependency from the stuff mirror or a mutmut runner for unittest, qualify the recipe with negative controls in CI, then wire it for verify_macos_ci.py, sources_lock.py and release_assets.py. Accept: lane green with a negative control failing for the intended reason.
@@ -138,6 +138,15 @@ Next: 36
 - **Effort:** L
 - **Design:** docs/roadmap.md#campaign-fil-c-hydrogen-feasibility
 
+### CHB-36 · P3 · Test source lock digest resolution and download validation
+
+- **Area:** Source locks · tests
+- **Where:** scripts/sources_lock.py (download_digests, resolve_sha256, write); tests/test_sources_lock.py
+- **Problem:** The source lock writer downloads and hashes missing inputs, validates HTTPS redirects, sizes and SHA-512, and reuses matching prior digests, but the existing tests only exercise the missing digest error without fetching. Regressions could produce an incorrect release source lock.
+- **Recommendation:** Add focused tests with controlled responses for digest reuse, successful fetches, rejected redirects and size or SHA-512 mismatches; verify the written lock contains the expected SHA-256.
+- **Fix with:** none
+- **Effort:** M
+
 ### CHB-22 · P4 · Hydrogen's allocator is unguarded and alternatives are unmeasured; keep PartitionAlloc unless a workload shows a large win
 
 - **Area:** Browser / Allocator
@@ -149,7 +158,7 @@ Next: 36
 
 ### CHB-31 · P4 · Share the Helium and Chromium adblock setup scripts or retire one (was DSLP-14)
 
-- **Area:** deslop · dedupe
+- **Area:** Adblock · deduplication
 - **Where:** scripts/setup-chromium-adblock.py, scripts/setup-helium-adblock.py, tests/test_setup_adblock.py
 - **Problem:** Two 237-line scripts differ by the FILTERS directory constant. The shared tests now cover both, so a fix to one is caught only if made in both. CHB-21 retires the Helium product.
 - **Recommendation:** Delete setup-helium-adblock.py with the Helium product, or turn the pair into one module parametrised by the filters directory. Accept: one script, both callers (prepare-source.py, prepare-helium.py, macos_helium.py) pass tests.
@@ -158,7 +167,7 @@ Next: 36
 
 ### CHB-32 · P4 · Lint the shell entrypoints (was DSLP-15)
 
-- **Area:** deslop · tooling
+- **Area:** Build scripts · tooling
 - **Where:** Makefile (lint), chromium-build, scripts/*.sh, scripts/rust-host-linker
 - **Problem:** make lint runs ruff and ty on Python only. shellcheck over chromium-build and the shell scripts reports 5 warnings (SC1007, two SC2054 on docker --tmpfs words, SC2034 on an unused loop counter, SC2046 in build-rust-toolchain.sh); all benign today, but nothing stops a real one.
 - **Recommendation:** Add shellcheck to make lint with the five warnings fixed or annotated, if shellcheck is available in CI. Accept: make lint fails on an injected SC2086.
@@ -167,7 +176,7 @@ Next: 36
 
 ### CHB-33 · P4 · Read the Rust components list from the backend in the policy check (was DSLP-16)
 
-- **Area:** deslop · single-source
+- **Area:** macOS release · configuration
 - **Where:** scripts/verify_macos_ci.py (verify_preflight), scripts/macos_backend.py
 - **Problem:** The nightly now comes from macos_backend.RUST_TOOLCHAIN, but the component list [rust-src, llvm-tools-preview] is still spelled in both files and in the input locks.
 - **Recommendation:** Export one constant from macos_backend and use it in the policy check and test fixture. Accept: one definition outside the locks.
