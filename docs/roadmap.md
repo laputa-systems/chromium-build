@@ -1,26 +1,48 @@
-# Fil-C Hydrogen feasibility campaign
+# Roadmap
+
+This is the single plan for this repository: all current and future work, and the handoff for resuming it. Campaigns are sections below, and their items interleave in **Sequence**. "Resume the roadmap" means continue from **Status**.
 
 ## Status
 
-- **Goal:** determine whether Hydrogen can run with meaningful Fil-C memory
-  protection, and produce a reproducible Linux musl candidate if it can.
-- **State:** open; source review complete; runtime feasibility unproven.
-- **Backlog:** [CHB-35](../TODO.md), P3 research priority (assumed; no
-  production defect or urgency was asserted).
-- **Accepted code baseline:** `10b7bec505eea27394aa50cb987436d538f64043`.
-  No Fil-C implementation slice, build, benchmark, or browser run is accepted.
-- **Next:** FC0, an isolated native-Linux runtime pilot and control inventory.
-- **Red / parked:** no experiments run; native Linux build execution is needed.
-- **Execution branch:** create or resume `campaign/filc-hydrogen` from current
-  master. Preserve concurrent work and refresh the baseline before editing.
-- **Resume:** read this document and AGENTS.md, inspect the branch and retained
-  evidence, then execute the next unaccepted slice. First command:
-  `git status --short --branch`.
+- **State:** active; Fil-C Hydrogen feasibility is open, source review complete; runtime feasibility is unproven.
+- **Slice:** FC0 runtime pilot is next; no Fil-C implementation, build, benchmark, or browser run is accepted.
+- **Last accepted revision:** `76a3b07dc956351c8c48ee784a158e979c271210`; integration green is not established by the campaign record. The Fil-C source review used code baseline `10b7bec505eea27394aa50cb987436d538f64043`.
+- **Parked:** no experiments have run; native Linux execution is needed. Create or resume `campaign/filc-hydrogen` from current master and refresh the baseline.
 
-Rewrite this block in place after accepted work. Git history records earlier
-checkpoints; do not append a second chronological campaign log.
+## Sequence
 
-## Charter
+
+The proof commands below are **planned interfaces to implement**, except
+the existing control commands in Baseline. FC0 introduces only the smallest
+`tests/filc/verify.py runtime RUN` proof; extend this thin runner when a
+later real artifact needs verification. Do not build a generic campaign
+framework or fabricate green reports for absent binaries.
+
+`RUN` is an example retained directory, `.work/filc/run-001`. The runner
+reads its captured identities and artifact locations, executes real probes,
+writes raw results, and exits nonzero for missing artifacts, wrong identity,
+failed checks, or unexpected controls. Distinguish not-run from pass. A new
+run gets a new directory.
+
+| Slice | Size / prerequisite | Owned change set | Local acceptance after any required build |
+| --- | --- | --- | --- |
+| FC0: runtime pilot | S/M; provisioned Linux host | isolated Fil-C pins/bootstrap/fetch plumbing; tests/filc/runtime fixtures; initial runtime proof; evidence/status | `python3 tests/filc/verify.py runtime .work/filc/run-001`; valid C/C++ runs, spatial and temporal controls produce the expected Fil-C diagnostic, and compiler/loader/runtime identities are captured. |
+| FC1: isolated GN toolchain | M; FC0 | experimental profile/pins; CLI/profile routing; GN generation/verification; narrow-build identity checks; focused controller tests | Focused profile/CLI tests, candidate `poc`, and runtime proof on its own volume; changing compiler/profile identity invalidates reuse. |
+| FC2: real Rust boundary | M-sized slices; FC1 | dedicated Fil-Rust/musl patches; adblock-derived fixture; bridge proof through integrator | `python3 tests/filc/verify.py bridge .work/filc/run-001`; both call directions, ownership/lifetime, strings/vectors, callbacks and pointer/bounds controls match explicit expected outcomes. |
+| FC3: protected V8 paths | M-sized slices; FC1; parallel with FC2 until browser integration | V8/code-generation/heap patches; d8 fixtures; V8 proof through integrator | `python3 tests/filc/verify.py v8 .work/filc/run-001`; pinned d8 executes the differential corpus, GC/callback cases and generated-code protection controls. |
+| FC4: browser integration | M-sized slices; FC2 and FC3 | Chromium patches; allocator/IPC/sandbox adaptations; browser proof | `python3 tests/filc/verify.py browser .work/filc/run-001`; content_shell first, then Hydrogen, with actual process/feature/protection evidence and declared gaps. |
+| FC5: native qualification | M-sized slices; FC4 | staging/package isolation; applicable existing acceptance; package proof | `python3 tests/filc/verify.py package .work/filc/run-001`, invoking existing applicable staged/browser/package checks; artifact digest, required-feature parity, sandbox and dependency closure match. |
+| FC6: measure and decide | S/M; best executable result, including a blocked earlier slice | result section here; durable evidence summary; independent deferred backlog work | Reproduce accepted proof cases from a clean candidate build and retained inputs; classify the result under Acceptance. Identify arm64/Reactor proof separately. |
+
+Break FC2-FC5 into independently checkable patches. The first generated-code
+milestone may be one protected builtin or interpreter handler before the
+full d8 corpus. An upstream-compatible fix and reduced regression case are
+accepted progress even before a browser exists.
+
+## Campaign: Fil-C Hydrogen feasibility
+
+### Goal and state
+
 
 The owner requested this campaign on 2026-11-21 to find out whether Fil-C
 Hydrogen is feasible, despite the expected difficulty. Pursue an actual port.
@@ -48,7 +70,7 @@ trusted runtime assumptions, and exercised coverage alongside results.
 A source audit, successful link, page load, or emitted JSON report does not
 substitute for the next outcome's evidence.
 
-### Continuation and ownership
+#### Continuation and ownership
 
 One integrator owns this document, TODO.md, profile routing, locks, common
 build scripts, and the proof entrypoint. After FC1, Rust bridge work and V8
@@ -75,7 +97,8 @@ Use Conventional Commits, with the slice in the commit body. Keep code
 comments about behavior, not campaign IDs. Commit accepted changes in small
 slices; do not mark red experiments as accepted product changes.
 
-## Decisions and boundaries
+### Decisions and execution boundary
+
 
 **Owner-decided:** open a serious Fil-C feasibility campaign for Hydrogen.
 Rustification of bctl/Reactor remains separate. Opening the campaign does
@@ -134,7 +157,8 @@ Follow AGENTS.md: no formatters, linters, hooks, or CI; focused local checks.
 Do not run host setup or install global tools. Missing builder infrastructure
 is an environment requirement, not a reason to alter the host blindly.
 
-## Baseline and known constraints
+### Baseline
+
 
 The source review used the baseline above. Refresh these facts at execution
 start; avoid silently advancing Chromium and changing its compiler in the
@@ -155,7 +179,7 @@ under the musl contract, and preservation of protections across V8 and Rust
 boundaries. FC0-FC3 establish them. Source planning does not pass runtime
 preflight.
 
-### Existing control commands
+#### Existing control commands
 
 On an already provisioned native Linux amd64 Docker host, these existing
 commands prepare an **ordinary-Clang stock control**, not a Fil-C build.
@@ -189,7 +213,7 @@ A known Ninja target after the graph exists:
 Do not use generic `make build` or `release-linux` as the first experiment:
 the current release sequence reaches installation. Use explicit phases.
 
-### Resumption hazards to repair or respect
+#### Resumption hazards to repair or respect
 
 - GN output is profile-specific, but `/work/metadata` is shared within a
   work volume. Separate output directories alone do not separate evidence.
@@ -204,36 +228,9 @@ the current release sequence reaches installation. Use explicit phases.
 - `metadata/build-target.log` is overwritten by the next target. Archive it
   under the attempt identity before another invocation.
 
-## Sequence and proof
+### Execution details
 
-The proof commands below are **planned interfaces to implement**, except
-the existing control commands above. FC0 introduces only the smallest
-`tests/filc/verify.py runtime RUN` proof; extend this thin runner when a
-later real artifact needs verification. Do not build a generic campaign
-framework or fabricate green reports for absent binaries.
-
-`RUN` is an example retained directory, `.work/filc/run-001`. The runner
-reads its captured identities and artifact locations, executes real probes,
-writes raw results, and exits nonzero for missing artifacts, wrong identity,
-failed checks, or unexpected controls. Distinguish not-run from pass. A new
-run gets a new directory.
-
-| Slice | Size / prerequisite | Owned change set | Local acceptance after any required build |
-| --- | --- | --- | --- |
-| FC0: runtime pilot | S/M; provisioned Linux host | isolated Fil-C pins/bootstrap/fetch plumbing; tests/filc/runtime fixtures; initial runtime proof; evidence/status | `python3 tests/filc/verify.py runtime .work/filc/run-001`; valid C/C++ runs, spatial and temporal controls produce the expected Fil-C diagnostic, and compiler/loader/runtime identities are captured. |
-| FC1: isolated GN toolchain | M; FC0 | experimental profile/pins; CLI/profile routing; GN generation/verification; narrow-build identity checks; focused controller tests | Focused profile/CLI tests, candidate `poc`, and runtime proof on its own volume; changing compiler/profile identity invalidates reuse. |
-| FC2: real Rust boundary | M-sized slices; FC1 | dedicated Fil-Rust/musl patches; adblock-derived fixture; bridge proof through integrator | `python3 tests/filc/verify.py bridge .work/filc/run-001`; both call directions, ownership/lifetime, strings/vectors, callbacks and pointer/bounds controls match explicit expected outcomes. |
-| FC3: protected V8 paths | M-sized slices; FC1; parallel with FC2 until browser integration | V8/code-generation/heap patches; d8 fixtures; V8 proof through integrator | `python3 tests/filc/verify.py v8 .work/filc/run-001`; pinned d8 executes the differential corpus, GC/callback cases and generated-code protection controls. |
-| FC4: browser integration | M-sized slices; FC2 and FC3 | Chromium patches; allocator/IPC/sandbox adaptations; browser proof | `python3 tests/filc/verify.py browser .work/filc/run-001`; content_shell first, then Hydrogen, with actual process/feature/protection evidence and declared gaps. |
-| FC5: native qualification | M-sized slices; FC4 | staging/package isolation; applicable existing acceptance; package proof | `python3 tests/filc/verify.py package .work/filc/run-001`, invoking existing applicable staged/browser/package checks; artifact digest, required-feature parity, sandbox and dependency closure match. |
-| FC6: measure and decide | S/M; best executable result, including a blocked earlier slice | result section here; durable evidence summary; independent deferred backlog work | Reproduce accepted proof cases from a clean candidate build and retained inputs; classify the result under Acceptance. Identify arm64/Reactor proof separately. |
-
-Break FC2-FC5 into independently checkable patches. The first generated-code
-milestone may be one protected builtin or interpreter handler before the
-full d8 corpus. An upstream-compatible fix and reduced regression case are
-accepted progress even before a browser exists.
-
-### FC0 and FC1: executable evidence
+#### FC0 and FC1: executable evidence
 
 FC0 owns the minimum isolated toolchain pins, verified downloads and
 bootstrap plumbing needed for its standalone pilot. Prefer a suitable
@@ -285,7 +282,7 @@ smoke, and existing gate evidence. Focus controller checks on
 `tests/test_helium_gn.py` where changed. Add a stale-report/wrong-toolchain
 negative case; do not weaken the native profile to accept the candidate.
 
-### FC2: Rust and musl
+#### FC2: Rust and musl
 
 Extract the ownership-bearing part of
 `config/patches/adblock-engine-bridge.patch`; an integer-only FFI example
@@ -305,7 +302,7 @@ demonstrated. Silently linking ordinary Rust objects into a Fil-C process,
 or compiling the bridge uninstrumented to bypass errors, cannot satisfy
 protected-pilot acceptance.
 
-### FC3: V8 code and heaps
+#### FC3: V8 code and heaps
 
 Inventory compiled C++, assembly, CodeStubAssembler/Torque output, builtins,
 interpreter handlers, snapshots, runtime JIT/Wasm paths and transitions.
@@ -345,7 +342,7 @@ reachable only through generated-code state across forced and concurrent
 collection, plus callback and pointer-write/barrier cases. Apply the same
 invariants to FC2's bridge. Disabling collection cannot satisfy either gate.
 
-### FC4 and FC5: product and containment
+#### FC4 and FC5: product and containment
 
 Before browser qualification, freeze the claimed protection scope and
 required invariants in the run's evidence. Qualification requires no
@@ -380,7 +377,8 @@ Keep candidate archives, manifests and install paths distinct. Run existing
 acceptance against the packaged binary and bind evidence to its digest.
 A recipe change or a source-tree run is not package qualification.
 
-## Acceptance and performance
+### Acceptance
+
 
 Functional acceptance is zero unexplained failures in the declared corpus
 and all required existing product checks. Maintain the exact baseline
@@ -421,7 +419,8 @@ and a concrete retry condition. Missing hardware, a download failure, a
 generic compiler error, or the first V8 failure does not establish technical
 infeasibility.
 
-## Evidence and environment
+### Needs environment
+
 
 Keep raw artifacts under `.work/filc/<run-id>/` and dependency checkouts
 under `.work/`. Preserve builds, caches and failing binaries for resumption.
@@ -457,7 +456,10 @@ native feasibility evidence. Do not claim them from an amd64 Linux run.
 Packaging Fil-C into llvm-prebuilt-musl follows a demonstrated consumer and
 qualified runtime closure.
 
-## Reference map
+### Reference
+
+Backlog: [CHB-35](../TODO.md). Accepted product design: [CHB-21 RFC](rfc/CHB-21-chromium-replaces-helium.md).
+
 
 Existing local code:
 
@@ -498,15 +500,25 @@ Research snapshot, 2026-11-21; refresh relevant facts before implementation:
   are adjacent research with different ABIs and reduced configurations,
   not Fil-C recipes.
 
-## Executor prompt
+## Later
 
-Execute docs/CAMPAIGN-FIL-C.md on campaign/filc-hydrogen. Start at its current
-Status, establish the native Linux runtime pilot, and keep going through
-the smallest verifiable fixes to Fil-C, the musl Rust bridge and V8 before
-full browser builds. Preserve production behavior and separate experimental
-identities. Commit accepted slices, retain exact failure evidence, and
-continue independent work when one path is blocked. Finish with a
-reproducible candidate or an evidence-backed feasibility verdict; never
-substitute a successful link, unprotected generated code, disabled sandbox,
-or missing product capability for the claimed result.
+- CHB-11 · P1 · bound back-to-back begin frames sent to the browser UI compositor in unthrottled headless
+- CHB-21 · P1 · Replace the Helium build with ungoogled Chromium for Wayland on arm64 and amd64
+- CHB-8 · P2 · complete the Helium behavior acceptance matrix
+- CHB-9 · P2 · forward-port Helium's native adblock-rust experiment
+- CHB-16 · P2 · make HarfRust Hydrogen's shaper, then remove HarfBuzz
+- CHB-18 · P3 · qualify browser payload reductions against required appliance capabilities
+- CHB-20 · P3 · native adblock refreshes its filter catalog from Helium's services at startup
+- CHB-23 · P3 · Share the helpers the build scripts copy (was DSLP-6)
+- CHB-24 · P3 · Stop macos_backend.main rebinding module globals (was DSLP-7)
+- CHB-25 · P3 · Kill the whole process group when stream_command times out (was DSLP-8)
+- CHB-26 · P3 · Replace dict[str, Any] build documents with typed models (was DSLP-9)
+- CHB-27 · P3 · Test the macOS backend entry point and its exit codes (was DSLP-10)
+- CHB-28 · P3 · Measure and test the Linux image scripts on a Linux host (was DSLP-11)
+- CHB-29 · P3 · Add a mutation lane for the release-gating scripts (was DSLP-12)
+- CHB-22 · P4 · Hydrogen's allocator is unguarded and alternatives are unmeasured; keep PartitionAlloc unless a workload shows a large win
+- CHB-31 · P4 · Share the Helium and Chromium adblock setup scripts or retire one (was DSLP-14)
+- CHB-32 · P4 · Lint the shell entrypoints (was DSLP-15)
+- CHB-33 · P4 · Read the Rust components list from the backend in the policy check (was DSLP-16)
+- CHB-34 · P4 · Needs owner · reconcile the no-linters rule with make lint (was DSLP-17)
 

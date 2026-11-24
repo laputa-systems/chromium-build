@@ -17,8 +17,8 @@ patch inventories, and phase reports define current behavior.
 
 ## Guides
 
-- Fil-C Hydrogen feasibility, isolated compiler/runtime experiments and
-  executable milestones: [Fil-C campaign](docs/CAMPAIGN-FIL-C.md).
+- Roadmap: [docs/roadmap.md](docs/roadmap.md) holds all current and future work;
+  its Status is the resume point.
 - Linux musl builds (amd64-only; Linux/arm64 is out of scope), profiles,
   gates, packaging, and installation: [Linux](docs/linux.md).
 - Native macOS builds, cache selection, staged acceptance, and packaging:

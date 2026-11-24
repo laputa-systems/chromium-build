@@ -131,12 +131,12 @@ Next: 36
 ### CHB-35 · P3 · Establish Fil-C feasibility for Hydrogen across V8 and Rust
 
 - **Area:** Build / Memory safety research
-- **Where:** docs/CAMPAIGN-FIL-C.md; config/profiles/chromium-wayland-release.gn; scripts/linux_product.py; scripts/generate-gn.py; scripts/verify-gn-args.py; scripts/build-target.py; config/patches/adblock-engine-bridge.patch; pinned Chromium/V8 and Fil-C/Fil-Rust sources
+- **Where:** docs/roadmap.md; config/profiles/chromium-wayland-release.gn; scripts/linux_product.py; scripts/generate-gn.py; scripts/verify-gn-args.py; scripts/build-target.py; config/patches/adblock-engine-bridge.patch; pinned Chromium/V8 and Fil-C/Fil-Rust sources
 - **Problem:** The owner requested a Fil-C Hydrogen feasibility campaign on 2026-11-21. No local Fil-C browser build or protected V8/Rust pilot is verified. V8's generated builtins and heap representations, Rust/C++ ownership transfers, the musl runtime closure, and sandbox integration prevent assuming a compiler substitution will preserve protection or Hydrogen behavior.
-- **Recommendation:** Execute docs/CAMPAIGN-FIL-C.md in an isolated campaign branch: deliver a real runtime pilot, register a distinct compiler/profile/work volume, repair and prove the Rust bridge and V8 paths, then integrate and qualify a native Linux musl browser. Preserve production defaults, record protection scope and measured costs, and finish with a reproducible candidate or an evidence-backed scoped feasibility verdict. Ordinary build failures trigger reduced reproducers and fixes rather than immediate cancellation.
+- **Recommendation:** Establish protected Fil-C feasibility for Hydrogen while preserving production behavior; see the roadmap for execution and acceptance.
 - **Fix with:** none
 - **Effort:** L
-- **Design:** docs/CAMPAIGN-FIL-C.md
+- **Design:** docs/roadmap.md#campaign-fil-c-hydrogen-feasibility
 
 ### CHB-22 · P4 · Hydrogen's allocator is unguarded and alternatives are unmeasured; keep PartitionAlloc unless a workload shows a large win
 
