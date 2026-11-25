@@ -1,5 +1,5 @@
 Prefix: CHB
-Next: 37
+Next: 38
 
 ### CHB-11 · P1 · bound back-to-back begin frames sent to the browser UI compositor in unthrottled headless
 
@@ -51,8 +51,8 @@ Next: 37
 
 - **Area:** Build
 - **Where:** scripts/stage-runtime.py; scripts/package-runtime.py; Helium GN profiles; bctl BCTL-32 release census
-- **Problem:** The appliance browser includes printing, Crashpad, SwiftShader/graphics libraries, broad locales and fonts. Runtime-disable flags do not prove their code or files are unused. Current size/load contributions and feature requirements are not fully qualified; Crashpad remains useful for the current real-site crash investigation.
-- **Recommendation:** Use a fresh digest-bound image size/runtime-load census to select one cut at a time. Separate print UI from automation PDF output, retain diagnostics until a replacement is proven, establish graphics-library loading/web-feature coverage, and preserve multilingual shaping/fallback/screenshot behavior when considering font/locales. Keep required licenses and provenance. Do not remove components solely because a launcher flag disables behavior.
+- **Problem:** The appliance browser includes printing, SwiftShader/graphics libraries, broad locales and fonts. Runtime-disable flags do not prove their code or files are unused. Current size/load contributions and feature requirements are not fully qualified. Crashpad is out of scope by owner decision and has its own ticket (CHB-37).
+- **Recommendation:** Use a fresh digest-bound image size/runtime-load census to select one cut at a time. Separate print UI from automation PDF output, establish graphics-library loading/web-feature coverage, and preserve multilingual shaping/fallback/screenshot behavior when considering font/locales. Keep required licenses and provenance. Do not remove components solely because a launcher flag disables behavior.
 - **Fix with:** `blast-radius`
 - **Effort:** L
 
@@ -134,6 +134,15 @@ Next: 37
 - **Where:** scripts/sources_lock.py (download_digests, resolve_sha256, write); tests/test_sources_lock.py
 - **Problem:** The source lock writer downloads and hashes missing inputs, validates HTTPS redirects, sizes and SHA-512, and reuses matching prior digests, but the existing tests only exercise the missing digest error without fetching. Regressions could produce an incorrect release source lock.
 - **Recommendation:** Add focused tests with controlled responses for digest reuse, successful fetches, rejected redirects and size or SHA-512 mismatches; verify the written lock contains the expected SHA-256.
+- **Fix with:** none
+- **Effort:** M
+
+### CHB-37 · P3 · Hydrogen still builds and ships Crashpad, which the owner ruled out of scope
+
+- **Area:** Build
+- **Where:** scripts/prepare-source-driver.py (DESKTOP_PATCHES lacks the headless-no-crashpad-{handler,runtime,guards,zygote} patches that LOCAL_PATCHES carries); config/patches/headless-no-crashpad-*.patch; scripts/linux_product.py:64 (Desktop.crashpad = chrome_crashpad_handler); scripts/stage-runtime.py:341 (required staged files); config/profiles/chromium-wayland-release.gn (crashpad_http_transport_impl); docs/linux.md (chromium-wayland-release staging list); consumers: bctl tests/qualification/results/2026-11-16-headed-macos/instagram-headed-failure.log (ptrace and tgkill failures under Reactor), bctl TODO.md BCTL-111 (recommends a crashpad minidump), laputa-systems/manganese campaign.md R10
+- **Problem:** The owner decided on 2026-11-24 that crash reporting is out of scope for Hydrogen and Manganese. The chromium-wayland-release product still compiles Crashpad, starts chrome_crashpad_handler, and requires it in every staged package. Under Reactor the handler already logs ptrace and tgkill failures, so it adds a process, startup work and kernel surface for no retained use. The headless product already removes Crashpad with four patches, but the desktop series never picked them up.
+- **Recommendation:** Rebase the four headless-no-crashpad patches onto Chromium 156 and add them to DESKTOP_PATCHES, drop chrome_crashpad_handler from the desktop's required staged files and Desktop.crashpad, and remove crashpad_http_transport_impl from the profile. Add a Gate D or stage check that fails if chrome_crashpad_handler or a Crashpad initialization path reappears. Bump package_revision, rebuild, and requalify in bctl; update BCTL-111's recommendation to use a debug-symbol build instead of a minidump. Drop Crashpad from CHB-18's candidate list.
 - **Fix with:** none
 - **Effort:** M
 
