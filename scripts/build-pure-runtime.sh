@@ -23,7 +23,7 @@ jobs=${PURE_RUNTIME_JOBS:-$(nproc)}
 rm -rf "$prefix" "$build"
 mkdir -p "$prefix" "$build"
 
-apk add --no-cache make=4.4.1-r4 meson=1.11.1-r0
+apk add --no-cache make=4.4.1-r4
 
 export CC=/opt/chromium-llvm/bin/clang
 export CXX=/opt/chromium-llvm/bin/clang++

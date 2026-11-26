@@ -27,6 +27,8 @@ ARG RUST_HOST_LINKER=
 ARG CCACHE_MAXSIZE=10G
 
 COPY --from=host-runtime /rootfs/ /
+COPY --from=oci.17166969.xyz/owned-tools@sha256:aaec19e7a44cbc53b40db2d22093600ee888689b89be94da90e5398ed02f1883 /opt/laputa /opt/laputa
+ENV PATH=$PATH:/opt/laputa/bin
 
 RUN --network=none --mount=type=bind,from=locked-apks,target=/locked-apks set -eux; \
     set -- /locked-apks/*.apk; \
